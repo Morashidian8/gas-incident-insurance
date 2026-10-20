@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3a8cc3">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="حوادث گاز">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>بیمه حوادث مشترکین گاز</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2577,7 +2584,7 @@ async function boot() {
   st.user = uid ? db.users.find(u => u.id === uid && u.active) || null : null;
   if (st.user) { try { const v = JSON.parse(sget('gii.view') || 'null'); if (v) { st.view = v.view; st.p = v.p || {}; if (st.p.id) st.claimId = st.p.id; } } catch { /* نادیده */ } }
   render();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) Promise.reject().catch(() => {});
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 boot();
 
