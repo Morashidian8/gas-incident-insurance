@@ -1,6 +1,6 @@
 """یک فایل HTML تکی و خودبسنده از برنامه می‌سازد (بدون نیاز به سرور).
 
-اجرا:  python3 tools/build_single.py
+اجرا:  python3 tools/build_single.py [--logo logo.png --org "نام سازمان"]
 خروجی: dist/gas-incident-insurance.html  و  dist/fragment.html (بدون doctype، برای میزبانی درون‌صفحه‌ای)
 """
 import re
@@ -17,9 +17,19 @@ def module(path, ns, deps=""):
     return f"const {ns} = (() => {{\n{deps}{src}\nreturn {{ {', '.join(names)} }};\n}})();\n"
 
 
-def build():
+def logo_data_url(path):
+    import base64, mimetypes
+    mime = mimetypes.guess_type(path)[0] or "image/png"
+    return f"data:{mime};base64," + base64.b64encode(Path(path).read_bytes()).decode()
+
+
+def build(logo=None, org=""):
     css = (ROOT / "css/app.css").read_text(encoding="utf-8")
     wf = module("js/workflow.js", "W")
+    if logo:
+        # لوگو و نام سازمان به‌عنوان پیش‌فرض نسخه ساخته‌شده قرار می‌گیرد
+        wf = wf.replace("logoDataUrl: '',", f"logoDataUrl: '{logo_data_url(logo)}',", 1)
+        wf = wf.replace("orgName: '',", f"orgName: {org!r},", 1)
     store = module("js/store.js", "S", "const { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId } = W;\n")
     icons = module("js/icons.js", "I")
     app = (ROOT / "js/app.js").read_text(encoding="utf-8")
@@ -44,4 +54,9 @@ def build():
 
 
 if __name__ == "__main__":
-    build()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--logo", help="فایل لوگوی سازمان (PNG/SVG) برای قرار گرفتن در نسخه ساخته‌شده")
+    ap.add_argument("--org", default="", help="نام سازمان زیر لوگو")
+    a = ap.parse_args()
+    build(a.logo, a.org)

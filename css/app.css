@@ -104,6 +104,11 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .brand b { font-family: var(--f-display); font-weight: 400; font-size: 25px; line-height: 1.2; color: #fff; white-space: nowrap; }
 .brand small { display: block; font-size: 11.5px; opacity: .85; line-height: 1.3; white-space: nowrap; }
 
+/* لوگوی سازمان (بارگذاری‌شده توسط مدیر) روی زمینه سفید گرد */
+.org-logo { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; overflow: hidden; flex: none; background: #fff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
+.org-logo img { width: 100%; height: 100%; min-width: 0; object-fit: contain; display: block; }
+.org-name { font-size: 14px; font-weight: 700; opacity: .95; }
+
 /* ---------- بدنه ---------- */
 .page {
   max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px;

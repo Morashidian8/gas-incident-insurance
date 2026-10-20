@@ -74,11 +74,18 @@ function render() {
   if (tab) { const y = window.scrollY; tab.scrollIntoView({ block: 'nearest', inline: 'center' }); window.scrollTo({ top: y }); }
 }
 
+// اگر مدیر چیزی تنظیم نکرده باشد، مقدار پیش‌فرض نسخه ساخته‌شده (tools/build_single.py --logo) به کار می‌رود
+const brandSetting = k => (k in db.settings ? db.settings[k] : W.DEFAULT_SETTINGS[k]) || '';
+function logoHtml(size) {
+  const src = brandSetting('logoDataUrl');
+  return src ? `<span class="org-logo" style="width:${size}px;height:${size}px;padding:${Math.round(size * 0.12)}px"><img src="${esc(src)}" alt="${esc(brandSetting('orgName') || 'لوگوی سازمان')}"></span>` : brandMark(size);
+}
+
 function topbar() {
   const n = unreadNotifs().length;
   return `<header class="topbar"><div class="topbar-in">
     <button class="sq-btn" data-act="help" aria-label="راهنما و پرسش‌های متداول">${icon('help')}</button>
-    <div class="brand">${brandMark(42)}<div><b>بیمه حوادث گاز</b><small>${esc(W.ROLES[st.user?.role] || 'سامانه پرونده خسارت')}</small></div></div>
+    <div class="brand">${logoHtml(42)}<div><b>بیمه حوادث گاز</b><small>${esc(W.ROLES[st.user?.role] || 'سامانه پرونده خسارت')}</small></div></div>
     <button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>
   </div></header>`;
 }
@@ -175,6 +182,27 @@ function addFileBtn(target, label = 'افزودن', accept = 'image/*,applicatio
   return `<label class="add-file">${icon('upload')}<span>${label}</span><input type="file" multiple accept="${accept}" data-upload="${target}"></label>`;
 }
 
+// لوگو به‌صورت data URL در تنظیمات ذخیره می‌شود؛ تصاویر بزرگ به ۳۲۰ پیکسل کوچک می‌شوند.
+async function handleLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!/^image\/(png|jpeg|webp|svg\+xml)$/.test(file.type)) return toast('فقط PNG، JPG، WEBP یا SVG.', true);
+  let blob = file;
+  if (file.type !== 'image/svg+xml') {
+    try {
+      const bmp = await createImageBitmap(file);
+      const k = Math.min(1, 320 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+      blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    } catch { /* همان فایل اصلی */ }
+  }
+  if (blob.size > 400 * 1024) return toast('حجم لوگو زیاد است؛ فایلی کمتر از ۴۰۰ کیلوبایت انتخاب کنید.', true);
+  db.settings.logoDataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+  persist(); toast('لوگو ذخیره شد.'); render();
+}
+
 async function handleUpload(input) {
   const c = currentClaim();
   const target = input.dataset.upload;
@@ -207,7 +235,7 @@ const DEMO = [
   { u: 'admin', p: 'admin123', t: 'مدیر سامانه', s: 'کاربران، تنظیمات و گزارش', ic: 'settings' },
 ];
 function viewLogin() {
-  return `<div class="login-hero"><div class="login-hero-in">${brandMark(64)}
+  return `<div class="login-hero"><div class="login-hero-in">${logoHtml(84)}${brandSetting('orgName') ? `<div class="org-name">${esc(brandSetting('orgName'))}</div>` : ''}
       <h1>بیمه حوادث مشترکین گاز</h1>
       <p>ثبت، تکمیل و پیگیری پرونده خسارت حوادث ناشی از گاز طبیعی؛ از مشترک تا شرکت گاز و بیمه‌گر.</p></div></div>
     <main class="page narrow login-card">
@@ -843,9 +871,15 @@ function viewUsers() {
 }
 function viewSettings() {
   const s = db.settings;
-  const f = (k, l, h = '') => `<label class="fld"><span>${l}</span><input id="s-${k}" name="${k}" class="ltr" value="${typeof s[k] === 'number' ? nf.format(s[k]) : esc(fa(s[k]))}">${h ? `<small>${h}</small>` : ''}</label>`;
+  const f = (k, l, h = '') => `<label class="fld"><span>${l}</span><input id="s-${k}" name="${k}" class="${k === 'orgName' ? '' : 'ltr'}" value="${typeof s[k] === 'number' ? nf.format(s[k]) : esc(k === 'orgName' ? brandSetting('orgName') : fa(s[k]))}">${h ? `<small>${h}</small>` : ''}</label>`;
   return pageTitle('تنظیمات بیمه‌نامه') + `<form class="form" data-form="settings">
     <div class="note warn">${icon('alert')}<div>مقادیر پیش‌فرض نمونه‌اند. سقف تعهدات و فرانشیز را دقیقاً مطابق بیمه‌نامه سال جاری وارد کنید.</div></div>
+    <div class="fld"><span>لوگوی سازمان (صفحه ورود و نوار بالا)</span>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">${logoHtml(72)}
+        <label class="btn sm ghost" style="cursor:pointer">${icon('upload')} بارگذاری لوگو<input type="file" id="s-logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-logo hidden></label>
+        ${brandSetting('logoDataUrl') ? `<button class="btn sm red ghost" type="button" data-act="rmLogo">حذف لوگو</button>` : ''}</div>
+      <small>فایل رسمی لوگو را با PNG شفاف یا SVG بارگذاری کنید. بدون لوگو، نشان پیش‌فرض سامانه نمایش داده می‌شود.</small></div>
+    ${f('orgName', 'نام سازمان زیر لوگو', 'مثلاً: شرکت ملی گاز ایران — شرکت گاز استان تهران')}
     <div class="grid2">${f('policyNo', 'شماره بیمه‌نامه')}${f('policyStart', 'شروع')}${f('policyEnd', 'پایان')}${f('deductiblePercent', 'فرانشیز خسارت مالی (٪)')}</div>
     <div class="grid2">${f('propertyCapRial', 'سقف خسارت مالی (ریال)')}${f('medicalCapRial', 'سقف هزینه درمان (ریال)')}${f('deathCapRial', 'سقف فوت هر نفر (ریال)')}${f('reportWindowDays', 'مهلت اعلام حادثه (روز)')}</div>
     <div class="grid2">${f('gasSlaDays', 'مهلت بررسی شرکت گاز (روز)')}${f('insurerSlaDays', 'مهلت بررسی بیمه‌گر (روز)')}${f('fixSlaDays', 'مهلت رفع نقص مشترک (روز)')}</div>
@@ -1072,6 +1106,7 @@ const ACTS = {
       <label class="fld"><span>نقش</span><select id="sf-role" name="role"><option value="gas">کارشناس شرکت گاز</option><option value="insurer">کارشناس بیمه‌گر</option><option value="admin">مدیر سامانه</option></select></label></div>
       <label class="fld"><span>واحد سازمانی</span><input id="sf-org" name="org"></label>
       <div class="btns"><button class="btn green" type="submit">ساخت و صدور رمز موقت</button></div></form>`),
+  rmLogo: () => { db.settings.logoDataUrl = ''; persist(); toast('لوگو حذف شد.'); render(); },
   resetDemo: () => openSheet(`<h2>بازنشانی داده‌های نمایشی</h2><p class="lead">همه پرونده‌ها، کاربران و فایل‌های این مرورگر پاک و داده‌های نمونه دوباره ساخته می‌شود.</p>
       <div class="btns"><button class="btn red" data-act="resetDemoYes">بازنشانی</button><button class="btn ghost" data-act="closeSheet">انصراف</button></div>`),
   resetDemoYes: async () => { closeSheet(); db = await S.seed(); urlCache.clear(); st.user = db.users.find(u => u.role === 'admin'); sset('gii.user', st.user.id); toast('داده‌های نمونه بازنشانی شد.'); go('home'); },
@@ -1154,7 +1189,9 @@ const FORMS = {
   },
   settings: f => {
     const s = db.settings;
+    if (f.orgName) s.orgName = f.orgName.value.trim();
     for (const k of Object.keys(s)) {
+      if (k === 'orgName' || k === 'logoDataUrl') continue;
       if (!f[k]) continue;
       s[k] = typeof s[k] === 'number' ? num(f[k].value) : W.normalizeDigits(f[k].value).trim();
     }
@@ -1220,6 +1257,7 @@ function wire() {
   document.addEventListener('change', e => {
     const el = e.target;
     if (el.matches('input[type=file][data-upload]')) return handleUpload(el);
+    if (el.matches('input[type=file][data-logo]')) return handleLogo(el);
     if (el.matches('[data-kind]')) {
       const c = currentClaim(); const k = el.dataset.kind;
       c.damage.kinds = el.checked ? [...new Set([...c.damage.kinds, k])] : c.damage.kinds.filter(x => x !== k);

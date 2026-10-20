@@ -73,6 +73,9 @@ export const DEFAULT_SETTINGS = {
   policyNo: 'نمونه ۱۴۰۵/۴۲۲',
   policyStart: '1405/01/01',
   policyEnd: '1405/12/29',
+  // لوگو و نام سازمان در صفحه ورود و نوار بالا؛ مدیر در تنظیمات بارگذاری می‌کند
+  orgName: '',
+  logoDataUrl: '',
 };
 
 export function hasKind(c, k) { return !!(c.damage && c.damage.kinds && c.damage.kinds.includes(k)); }
