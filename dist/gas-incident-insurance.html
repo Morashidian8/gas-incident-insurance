@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-mode="app" data-other-url="site/">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -264,7 +264,9 @@ input[type=text], input[type=password], input[type=tel], input[type=number], inp
   width: 100%; background: var(--field); border: 1.5px solid var(--hair); border-radius: 12px; padding: 11px 13px; outline: none; min-width: 0;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--blue); background: var(--card); }
-input.ltr { direction: ltr; text-align: left; }
+/* ورودی‌های لاتین و عددی (نام کاربری، رمز، شبا، کد ملی): متن چپ‌به‌راست تایپ می‌شود ولی مثل بقیه فرم از راست چیده می‌شود */
+input.ltr { direction: ltr; text-align: right; }
+input.ltr::placeholder { direction: rtl; text-align: right; }
 textarea { resize: vertical; min-height: 92px; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip { border: 1.5px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 14px; font-size: 13.5px; display: inline-flex; gap: 6px; align-items: center; }
@@ -459,6 +461,90 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 @keyframes toastIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* پیوند جایگزین زیر فرم ورود اپ */
+.alt-link { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--blue); font-weight: 700; text-decoration: none; padding: 6px; }
+.alt-link .ic { width: 18px; height: 18px; }
+.btn.ghost-light { background: transparent; border-color: rgba(255, 255, 255, .75); color: #fff; text-decoration: none; }
+.btn.ghost-light:hover { background: rgba(255, 255, 255, .14); }
+
+/* ================= نسخه سایت (چیدمان رومیزی) ================= */
+.site-head { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--blue); color: #fff; }
+.site-head-in {
+  max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.site-head .brand b { font-size: 22px; }
+.site-nav { display: flex; gap: 4px; flex: 1; justify-content: center; min-width: 0; overflow-x: auto; }
+.site-link {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: #fff;
+  padding: 9px 14px; border-radius: 12px; font-weight: 700; font-size: 14.5px; text-decoration: none; white-space: nowrap;
+}
+.site-link:hover { background: rgba(255, 255, 255, .14); }
+.site-link.on { background: #fff; color: var(--blue); }
+.site-link .ic { width: 20px; height: 20px; }
+.site-link .dot { min-width: 20px; height: 20px; border-radius: 10px; background: var(--orange); color: #fff; font-size: 12px; line-height: 20px; text-align: center; padding: 0 5px; }
+.site-tools { display: flex; gap: 8px; align-items: center; }
+.site-tools .sq-btn { width: 42px; height: 42px; }
+@media (max-width: 860px) {
+  .site-nav { order: 3; flex-basis: 100%; justify-content: flex-start; }
+  .site-tools { margin-inline-start: auto; }
+}
+:root[data-mode="site"] .page { max-width: 1180px; padding-block-end: 48px; }
+:root[data-mode="site"] .page.narrow { max-width: 860px; }
+
+.site-foot { background: var(--card); border-top: 1px solid var(--hair); margin-top: 24px; }
+.site-foot-in {
+  max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 32px; align-items: center; justify-content: space-between;
+  padding-block: 20px calc(20px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.site-foot-in > div { display: flex; flex-direction: column; gap: 2px; }
+.site-foot-in a { color: var(--blue); font-weight: 700; text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+.site-foot-in small { color: var(--muted); flex-basis: 100%; }
+
+.land-hero { background: var(--blue); color: #fff; border-radius: 0 0 40px 40px; }
+.land-in { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.land-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 40px; align-items: center; padding-block: 44px 56px; }
+@media (max-width: 860px) { .land-grid { grid-template-columns: 1fr; gap: 24px; padding-block: 28px 36px; } }
+.land-copy { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; min-width: 0; }
+.land-copy h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 4vw, 42px); line-height: 1.35; }
+.land-copy p { margin: 0; opacity: .92; max-width: 52ch; font-size: 16px; }
+.land-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.land-chips span { display: inline-flex; gap: 6px; align-items: center; background: rgba(255, 255, 255, .16); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; font-weight: 700; }
+.land-chips .ic { width: 18px; height: 18px; }
+.land-app { flex: none; }
+.land-login .form { box-shadow: var(--shadow); border-color: transparent; color: var(--ink); }
+.land-body { gap: 34px; }
+.land-sec { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 90px; }
+.land-sec h2 { font-family: var(--f-display); font-weight: 400; font-size: 26px; color: var(--blue-deep); }
+:root[data-theme="dark"] .land-sec h2 { color: var(--blue); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .land-sec h2 { color: var(--blue); } }
+.land-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1000px) { .land-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .land-steps { grid-template-columns: 1fr; } }
+.land-steps li { position: relative; background: var(--card); border: 1.5px solid var(--line); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.land-steps .step-art .illo { width: 100%; max-width: 140px; height: auto; display: block; margin: 0 auto; }
+.land-steps .step-no { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 800; }
+.land-steps b { font-size: 16px; }
+.land-steps p { margin: 0; color: var(--muted); font-size: 13.5px; }
+.land-docs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1000px) { .land-docs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .land-docs { grid-template-columns: 1fr; } }
+.land-docs .ocard { padding: 14px 18px; }
+.land-docs b { color: var(--blue); }
+.land-docs ul { margin: 6px 0 0; padding-inline-start: 18px; font-size: 14px; }
+.land-note { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--amber); font-weight: 700; font-size: 14px; }
+.faq.ocard { padding: 4px 18px; }
+
+/* در سایت روی صفحه‌های پهن، برگه‌های کشویی پنجره وسط صفحه‌اند */
+@media (min-width: 760px) {
+  :root[data-mode="site"] .sheet {
+    left: 50%; right: auto; top: 50%; bottom: auto; width: min(560px, calc(100vw - 48px)); max-height: 84vh;
+    transform: translate(-50%, -50%); border-radius: 24px; padding-block: 20px; animation: fade .2s;
+  }
+  :root[data-mode="site"] .sheet .grab { display: none; }
+  :root[data-mode="site"] .toast { bottom: 24px; }
+}
 
 </style>
 <div id="app" aria-live="polite"></div>
@@ -1317,6 +1403,11 @@ const sset = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessio
 const lget = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lset = (k, v) => { try { localStorage.setItem(k, v); } catch { /* اختیاری */ } };
 
+// همان کد دو چهره دارد: «app» (اپ نصب‌شدنی موبایل) و «site» (سایت با چیدمان رومیزی).
+// نشانی طرف مقابل از ویژگی‌های data-* تگ html خوانده می‌شود (tools/build_single.py آنها را می‌نویسد).
+const MODE = document.documentElement.dataset.mode === 'site' ? 'site' : 'app';
+const OTHER_URL = location.protocol.startsWith('http') ? document.documentElement.dataset.otherUrl || (MODE === 'site' ? '../' : 'site/') : '';
+
 const st = { user: null, view: 'login', p: {}, open: new Set(['claim']), q: '', claimId: null };
 let db;
 
@@ -1365,10 +1456,12 @@ function go(view, p = {}) {
 
 function render() {
   const app = $('#app');
-  if (!st.user) { app.innerHTML = viewLogin(); return; }
-  if (st.user.mustChangePassword) { app.innerHTML = topbar() + `<main class="page narrow">${viewForcePassword()}</main>`; return; }
+  const site = MODE === 'site';
+  if (!st.user) { app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); return; }
+  if (st.user.mustChangePassword) { app.innerHTML = (site ? siteHeader() : topbar()) + `<main class="page narrow">${viewForcePassword()}</main>`; return; }
   const v = VIEWS[st.user.role][st.view] || VIEWS[st.user.role].home;
-  app.innerHTML = topbar() + `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>` + bottomNav();
+  const main = `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>`;
+  app.innerHTML = site ? siteHeader() + main + siteFooter() : topbar() + main + bottomNav();
   hydrateFiles(app);
   const tab = $('.tab.on');
   if (tab) { const y = window.scrollY; tab.scrollIntoView({ block: 'nearest', inline: 'center' }); window.scrollTo({ top: y }); }
@@ -1381,6 +1474,28 @@ function logoHtml(size) {
   return src ? `<span class="org-logo" style="width:${size}px;height:${size}px;padding:${Math.round(size * 0.12)}px"><img src="${esc(src)}" alt="${esc(brandSetting('orgName') || 'لوگوی سازمان')}"></span>` : brandMark(size);
 }
 
+function siteHeader() {
+  const u = st.user;
+  const n = u ? unreadNotifs().length : 0;
+  const nav = u ? navItems().map(i => `<button class="site-link ${i.on ? 'on' : ''}" data-nav="${i.id}" ${i.on ? 'aria-current="page"' : ''}>${icon(i.ic)}<span>${i.id === 'profile' ? esc(u.name) : i.label}</span>${i.dot ? `<span class="dot">${fa(i.dot)}</span>` : ''}</button>`).join('')
+    : `<a class="site-link" href="#steps">مراحل دریافت خسارت</a><a class="site-link" href="#docs">مدارک لازم</a><a class="site-link" href="#faq">پرسش‌های متداول</a>`;
+  return `<header class="site-head"><div class="site-head-in">
+    <div class="brand">${logoHtml(46)}<div><b>بیمه حوادث مشترکین گاز</b><small>${esc(u ? W.ROLES[u.role] : brandSetting('orgName') || 'سامانه پرونده خسارت')}</small></div></div>
+    <nav class="site-nav" aria-label="ناوبری اصلی">${nav}</nav>
+    <div class="site-tools">
+      <button class="sq-btn" data-act="help" aria-label="پرسش‌های متداول">${icon('help')}</button>
+      ${u ? `<button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>` : `<a class="btn sm ghost-light" href="#login">${icon('lock')} ورود</a>`}
+    </div>
+  </div></header>`;
+}
+function siteFooter() {
+  return `<footer class="site-foot"><div class="site-foot-in">
+    <div><b>اورژانس گاز: <span class="num">۱۹۴</span></b><span>در صورت بوی گاز، شیر اصلی را ببندید و از محل خارج شوید.</span></div>
+    ${OTHER_URL ? `<div><a href="${esc(OTHER_URL)}">${icon('sms')} نسخه اپ موبایل (قابل نصب روی گوشی)</a></div>` : ''}
+    <small>داده‌های نسخه نمایشی فقط در همین مرورگر ذخیره می‌شود و با اپ موبایل روی همین دستگاه مشترک است.</small>
+  </div></footer>`;
+}
+
 function topbar() {
   const n = unreadNotifs().length;
   return `<header class="topbar"><div class="topbar-in">
@@ -1390,16 +1505,19 @@ function topbar() {
   </div></header>`;
 }
 
-function bottomNav() {
+function navItems() {
   const r = st.user.role;
   const unread = totalUnreadMsgs();
-  const homeViews = ['home', 'sections', 'sec', 'track', 'register', 'registered', 'review', 'list', 'users', 'settings', 'reports', 'sms'];
-  const items = [
+  const homeViews = ['home', 'sections', 'sec', 'track', 'register', 'registered', 'review', 'users', 'settings', 'reports', 'sms'];
+  return [
     { id: 'home', label: 'خانه', ic: 'home', on: homeViews.includes(st.view) },
     ...(r !== 'subscriber' ? [{ id: 'list', label: 'پرونده‌ها', ic: 'inbox', on: st.view === 'list', hideSm: true }] : []),
     { id: 'messenger', label: 'پیام‌رسان', ic: 'send', on: ['inbox', 'thread'].includes(st.view), dot: unread },
     { id: 'profile', label: 'پروفایل', ic: 'user', on: false },
   ];
+}
+function bottomNav() {
+  const items = navItems();
   return `<nav class="bottomnav" aria-label="ناوبری اصلی"><div class="bottomnav-in">${items.map(i => `
     <button class="nav-btn ${i.on ? 'on' : ''} ${i.hideSm ? 'hide-sm' : ''}" data-nav="${i.id}" ${i.on ? 'aria-current="page"' : ''}>
       ${icon(i.ic)}<span class="lbl">${i.label}</span>${i.dot ? `<span class="dot">${fa(i.dot)}</span>` : ''}
@@ -1539,20 +1657,64 @@ function viewLogin() {
       <h1>بیمه حوادث مشترکین گاز</h1>
       <p>ثبت، تکمیل و پیگیری پرونده خسارت حوادث ناشی از گاز طبیعی؛ از مشترک تا شرکت گاز و بیمه‌گر.</p></div></div>
     <main class="page narrow login-card">
-      <form class="form" data-form="login" autocomplete="on">
-        <label class="fld"><span>نام کاربری</span><input id="lg-user" name="username" type="text" class="ltr" autocomplete="username" required placeholder="برای مشترکین: شماره اشتراک گاز"></label>
-        <label class="fld"><span>رمز عبور</span><input id="lg-pass" name="password" type="password" class="ltr" autocomplete="current-password" required></label>
-        <button class="btn" type="submit">${icon('lock')} ورود به سامانه</button>
-        <div class="note info">${icon('help')}<div>حساب مشترک را شرکت گاز پس از مراجعه حضوری شما می‌سازد و نام کاربری و رمز موقت را پیامک می‌کند.</div></div>
-      </form>
+      ${loginForm()}
       <div class="flow">
         <div>${icon('upload')}<b>مشترک</b>بارگذاری مدارک</div>
         <div>${icon('flame')}<b>شرکت گاز</b>بررسی و تأیید</div>
         <div>${icon('money')}<b>بیمه‌گر</b>ارزیابی و پرداخت</div>
       </div>
-      <div class="section-label">حساب‌های نمایشی</div>
+      ${demoRows()}
+      ${OTHER_URL ? `<a class="alt-link" href="${esc(OTHER_URL)}">${icon('eye')} اپ باز نمی‌شود؟ از طریق سایت وارد شوید</a>` : ''}
+    </main>`;
+}
+function loginForm() {
+  return `<form class="form" data-form="login" autocomplete="on" id="login">
+      <label class="fld" for="lg-user"><span>نام کاربری</span><input id="lg-user" name="username" type="text" class="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="برای مشترکین: شماره اشتراک گاز"></label>
+      <label class="fld" for="lg-pass"><span>رمز عبور</span><input id="lg-pass" name="password" type="password" class="ltr" autocomplete="current-password" required placeholder="رمز عبور یا رمز موقت پیامک‌شده"></label>
+      <button class="btn" type="submit">${icon('lock')} ورود به سامانه</button>
+      <div class="note info">${icon('help')}<div>حساب مشترک را شرکت گاز پس از مراجعه حضوری شما می‌سازد و نام کاربری و رمز موقت را پیامک می‌کند.</div></div>
+    </form>`;
+}
+function demoRows() {
+  return `<div class="section-label">حساب‌های نمایشی</div>
       <div class="rows">${DEMO.map((d, i) => `<button class="row" data-act="demoLogin" data-i="${i}">${icon(d.ic)}<span class="main"><span class="t">${d.t}</span><span class="s">${d.s}</span></span>${icon('chevL', 'chev')}</button>`).join('')}</div>
-      <p class="demo-tag">همه اشخاص، پرونده‌ها و مبالغ نسخه نمایشی ساختگی‌اند و فقط در همین مرورگر ذخیره می‌شوند.</p>
+      <p class="demo-tag">همه اشخاص، پرونده‌ها و مبالغ نسخه نمایشی ساختگی‌اند و فقط در همین مرورگر ذخیره می‌شوند.</p>`;
+}
+
+// صفحه نخست سایت: معرفی، ورود، مراحل، مدارک و پرسش‌ها
+function viewLanding() {
+  const steps = [
+    ['userPlus', 'var(--green)', 'مراجعه به شرکت گاز', 'با کارت ملی و گزارش آتش‌نشانی به امور حوادث شرکت گاز منطقه بروید. حساب شما ساخته و رمز موقت پیامک می‌شود.'],
+    ['folderUp', 'var(--blue)', 'تکمیل پرونده', 'وارد سامانه شوید؛ اطلاعات حادثه، خسارت‌ها، عکس‌ها، مدارک و شماره شبا را بارگذاری و ارسال کنید.'],
+    ['meter', 'var(--orange)', 'بررسی شرکت گاز', 'کارشناس گاز بازدید می‌کند و مدارک را بررسی می‌کند. اگر نقصی باشد، پیامک می‌گیرید و اصلاح می‌کنید.'],
+    ['trackRial', 'var(--violet)', 'ارزیابی بیمه‌گر', 'بیمه‌گر خسارت را ارزیابی و مبلغ را اعلام می‌کند. می‌توانید بپذیرید یا اعتراض کنید.'],
+    ['payment', 'var(--green)', 'پرداخت', 'مبلغ به حساب شبای شما واریز و شماره پیگیری پیامک می‌شود.'],
+  ];
+  const docs = [
+    ['همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه']],
+    ['آتش‌سوزی و انفجار', ['گزارش آتش‌نشانی', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
+    ['مصدومیت', ['پرونده پزشکی و صورت‌حساب بیمارستان', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+    ['فوت', ['گواهی فوت', 'گواهی انحصار وراثت و مدارک وراث', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+  ];
+  return `<section class="land-hero"><div class="land-in land-grid">
+      <div class="land-copy">
+        ${brandSetting('orgName') ? `<div class="org-name">${esc(brandSetting('orgName'))}</div>` : ''}
+        <h1>پرونده خسارت حادثه گاز را آنلاین تشکیل و پیگیری کنید</h1>
+        <p>پس از آتش‌سوزی، انفجار یا گازگرفتگی، مدارک را بدون رفت‌وآمد بارگذاری کنید و مراحل بررسی شرکت گاز و پرداخت بیمه‌گر را لحظه‌به‌لحظه ببینید.</p>
+        <div class="land-chips"><span>${icon('upload')} بارگذاری مدارک</span><span>${icon('flame')} بررسی شرکت گاز</span><span>${icon('money')} پرداخت بیمه‌گر</span></div>
+        ${OTHER_URL ? `<a class="btn ghost-light land-app" href="${esc(OTHER_URL)}">${icon('sms')} نصب اپ موبایل</a>` : ''}
+      </div>
+      <div class="land-login">${loginForm()}</div>
+    </div></section>
+    <main class="page land-body">
+      <section id="steps" class="land-sec"><h2>مراحل دریافت خسارت</h2>
+        <ol class="land-steps">${steps.map(([art, c, t, d], i) => `<li><div class="step-art">${illo(art, c, 'var(--blue)')}</div><span class="step-no">${fa(i + 1)}</span><b>${t}</b><p>${d}</p></li>`).join('')}</ol></section>
+      <section id="docs" class="land-sec"><h2>مدارک لازم</h2>
+        <div class="land-docs">${docs.map(([t, list]) => `<div class="ocard"><b>${t}</b><ul>${list.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')}</div>
+        <p class="land-note">${icon('alert')} تا ثبت عکس‌ها و بازدید کارشناس، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p></section>
+      <section id="faq" class="land-sec"><h2>پرسش‌های متداول</h2>
+        <div class="faq ocard">${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div></section>
+      <section class="land-sec">${demoRows()}</section>
     </main>`;
 }
 async function doLogin(username, password) {
@@ -2584,7 +2746,8 @@ async function boot() {
   st.user = uid ? db.users.find(u => u.id === uid && u.active) || null : null;
   if (st.user) { try { const v = JSON.parse(sget('gii.view') || 'null'); if (v) { st.view = v.view; st.p = v.p || {}; if (st.p.id) st.claimId = st.p.id; } } catch { /* نادیده */ } }
   render();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!st.user && location.hash) document.querySelector(location.hash)?.scrollIntoView();
+  if (MODE === 'app' && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 boot();
 

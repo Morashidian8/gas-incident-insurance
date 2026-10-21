@@ -17,6 +17,11 @@ const sset = (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessio
 const lget = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lset = (k, v) => { try { localStorage.setItem(k, v); } catch { /* اختیاری */ } };
 
+// همان کد دو چهره دارد: «app» (اپ نصب‌شدنی موبایل) و «site» (سایت با چیدمان رومیزی).
+// نشانی طرف مقابل از ویژگی‌های data-* تگ html خوانده می‌شود (tools/build_single.py آنها را می‌نویسد).
+const MODE = document.documentElement.dataset.mode === 'site' ? 'site' : 'app';
+const OTHER_URL = location.protocol.startsWith('http') ? document.documentElement.dataset.otherUrl || (MODE === 'site' ? '../' : 'site/') : '';
+
 const st = { user: null, view: 'login', p: {}, open: new Set(['claim']), q: '', claimId: null };
 let db;
 
@@ -65,10 +70,12 @@ function go(view, p = {}) {
 
 function render() {
   const app = $('#app');
-  if (!st.user) { app.innerHTML = viewLogin(); return; }
-  if (st.user.mustChangePassword) { app.innerHTML = topbar() + `<main class="page narrow">${viewForcePassword()}</main>`; return; }
+  const site = MODE === 'site';
+  if (!st.user) { app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); return; }
+  if (st.user.mustChangePassword) { app.innerHTML = (site ? siteHeader() : topbar()) + `<main class="page narrow">${viewForcePassword()}</main>`; return; }
   const v = VIEWS[st.user.role][st.view] || VIEWS[st.user.role].home;
-  app.innerHTML = topbar() + `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>` + bottomNav();
+  const main = `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>`;
+  app.innerHTML = site ? siteHeader() + main + siteFooter() : topbar() + main + bottomNav();
   hydrateFiles(app);
   const tab = $('.tab.on');
   if (tab) { const y = window.scrollY; tab.scrollIntoView({ block: 'nearest', inline: 'center' }); window.scrollTo({ top: y }); }
@@ -81,6 +88,28 @@ function logoHtml(size) {
   return src ? `<span class="org-logo" style="width:${size}px;height:${size}px;padding:${Math.round(size * 0.12)}px"><img src="${esc(src)}" alt="${esc(brandSetting('orgName') || 'لوگوی سازمان')}"></span>` : brandMark(size);
 }
 
+function siteHeader() {
+  const u = st.user;
+  const n = u ? unreadNotifs().length : 0;
+  const nav = u ? navItems().map(i => `<button class="site-link ${i.on ? 'on' : ''}" data-nav="${i.id}" ${i.on ? 'aria-current="page"' : ''}>${icon(i.ic)}<span>${i.id === 'profile' ? esc(u.name) : i.label}</span>${i.dot ? `<span class="dot">${fa(i.dot)}</span>` : ''}</button>`).join('')
+    : `<a class="site-link" href="#steps">مراحل دریافت خسارت</a><a class="site-link" href="#docs">مدارک لازم</a><a class="site-link" href="#faq">پرسش‌های متداول</a>`;
+  return `<header class="site-head"><div class="site-head-in">
+    <div class="brand">${logoHtml(46)}<div><b>بیمه حوادث مشترکین گاز</b><small>${esc(u ? W.ROLES[u.role] : brandSetting('orgName') || 'سامانه پرونده خسارت')}</small></div></div>
+    <nav class="site-nav" aria-label="ناوبری اصلی">${nav}</nav>
+    <div class="site-tools">
+      <button class="sq-btn" data-act="help" aria-label="پرسش‌های متداول">${icon('help')}</button>
+      ${u ? `<button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>` : `<a class="btn sm ghost-light" href="#login">${icon('lock')} ورود</a>`}
+    </div>
+  </div></header>`;
+}
+function siteFooter() {
+  return `<footer class="site-foot"><div class="site-foot-in">
+    <div><b>اورژانس گاز: <span class="num">۱۹۴</span></b><span>در صورت بوی گاز، شیر اصلی را ببندید و از محل خارج شوید.</span></div>
+    ${OTHER_URL ? `<div><a href="${esc(OTHER_URL)}">${icon('sms')} نسخه اپ موبایل (قابل نصب روی گوشی)</a></div>` : ''}
+    <small>داده‌های نسخه نمایشی فقط در همین مرورگر ذخیره می‌شود و با اپ موبایل روی همین دستگاه مشترک است.</small>
+  </div></footer>`;
+}
+
 function topbar() {
   const n = unreadNotifs().length;
   return `<header class="topbar"><div class="topbar-in">
@@ -90,16 +119,19 @@ function topbar() {
   </div></header>`;
 }
 
-function bottomNav() {
+function navItems() {
   const r = st.user.role;
   const unread = totalUnreadMsgs();
-  const homeViews = ['home', 'sections', 'sec', 'track', 'register', 'registered', 'review', 'list', 'users', 'settings', 'reports', 'sms'];
-  const items = [
+  const homeViews = ['home', 'sections', 'sec', 'track', 'register', 'registered', 'review', 'users', 'settings', 'reports', 'sms'];
+  return [
     { id: 'home', label: 'خانه', ic: 'home', on: homeViews.includes(st.view) },
     ...(r !== 'subscriber' ? [{ id: 'list', label: 'پرونده‌ها', ic: 'inbox', on: st.view === 'list', hideSm: true }] : []),
     { id: 'messenger', label: 'پیام‌رسان', ic: 'send', on: ['inbox', 'thread'].includes(st.view), dot: unread },
     { id: 'profile', label: 'پروفایل', ic: 'user', on: false },
   ];
+}
+function bottomNav() {
+  const items = navItems();
   return `<nav class="bottomnav" aria-label="ناوبری اصلی"><div class="bottomnav-in">${items.map(i => `
     <button class="nav-btn ${i.on ? 'on' : ''} ${i.hideSm ? 'hide-sm' : ''}" data-nav="${i.id}" ${i.on ? 'aria-current="page"' : ''}>
       ${icon(i.ic)}<span class="lbl">${i.label}</span>${i.dot ? `<span class="dot">${fa(i.dot)}</span>` : ''}
@@ -239,20 +271,64 @@ function viewLogin() {
       <h1>بیمه حوادث مشترکین گاز</h1>
       <p>ثبت، تکمیل و پیگیری پرونده خسارت حوادث ناشی از گاز طبیعی؛ از مشترک تا شرکت گاز و بیمه‌گر.</p></div></div>
     <main class="page narrow login-card">
-      <form class="form" data-form="login" autocomplete="on">
-        <label class="fld"><span>نام کاربری</span><input id="lg-user" name="username" type="text" class="ltr" autocomplete="username" required placeholder="برای مشترکین: شماره اشتراک گاز"></label>
-        <label class="fld"><span>رمز عبور</span><input id="lg-pass" name="password" type="password" class="ltr" autocomplete="current-password" required></label>
-        <button class="btn" type="submit">${icon('lock')} ورود به سامانه</button>
-        <div class="note info">${icon('help')}<div>حساب مشترک را شرکت گاز پس از مراجعه حضوری شما می‌سازد و نام کاربری و رمز موقت را پیامک می‌کند.</div></div>
-      </form>
+      ${loginForm()}
       <div class="flow">
         <div>${icon('upload')}<b>مشترک</b>بارگذاری مدارک</div>
         <div>${icon('flame')}<b>شرکت گاز</b>بررسی و تأیید</div>
         <div>${icon('money')}<b>بیمه‌گر</b>ارزیابی و پرداخت</div>
       </div>
-      <div class="section-label">حساب‌های نمایشی</div>
+      ${demoRows()}
+      ${OTHER_URL ? `<a class="alt-link" href="${esc(OTHER_URL)}">${icon('eye')} اپ باز نمی‌شود؟ از طریق سایت وارد شوید</a>` : ''}
+    </main>`;
+}
+function loginForm() {
+  return `<form class="form" data-form="login" autocomplete="on" id="login">
+      <label class="fld" for="lg-user"><span>نام کاربری</span><input id="lg-user" name="username" type="text" class="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="برای مشترکین: شماره اشتراک گاز"></label>
+      <label class="fld" for="lg-pass"><span>رمز عبور</span><input id="lg-pass" name="password" type="password" class="ltr" autocomplete="current-password" required placeholder="رمز عبور یا رمز موقت پیامک‌شده"></label>
+      <button class="btn" type="submit">${icon('lock')} ورود به سامانه</button>
+      <div class="note info">${icon('help')}<div>حساب مشترک را شرکت گاز پس از مراجعه حضوری شما می‌سازد و نام کاربری و رمز موقت را پیامک می‌کند.</div></div>
+    </form>`;
+}
+function demoRows() {
+  return `<div class="section-label">حساب‌های نمایشی</div>
       <div class="rows">${DEMO.map((d, i) => `<button class="row" data-act="demoLogin" data-i="${i}">${icon(d.ic)}<span class="main"><span class="t">${d.t}</span><span class="s">${d.s}</span></span>${icon('chevL', 'chev')}</button>`).join('')}</div>
-      <p class="demo-tag">همه اشخاص، پرونده‌ها و مبالغ نسخه نمایشی ساختگی‌اند و فقط در همین مرورگر ذخیره می‌شوند.</p>
+      <p class="demo-tag">همه اشخاص، پرونده‌ها و مبالغ نسخه نمایشی ساختگی‌اند و فقط در همین مرورگر ذخیره می‌شوند.</p>`;
+}
+
+// صفحه نخست سایت: معرفی، ورود، مراحل، مدارک و پرسش‌ها
+function viewLanding() {
+  const steps = [
+    ['userPlus', 'var(--green)', 'مراجعه به شرکت گاز', 'با کارت ملی و گزارش آتش‌نشانی به امور حوادث شرکت گاز منطقه بروید. حساب شما ساخته و رمز موقت پیامک می‌شود.'],
+    ['folderUp', 'var(--blue)', 'تکمیل پرونده', 'وارد سامانه شوید؛ اطلاعات حادثه، خسارت‌ها، عکس‌ها، مدارک و شماره شبا را بارگذاری و ارسال کنید.'],
+    ['meter', 'var(--orange)', 'بررسی شرکت گاز', 'کارشناس گاز بازدید می‌کند و مدارک را بررسی می‌کند. اگر نقصی باشد، پیامک می‌گیرید و اصلاح می‌کنید.'],
+    ['trackRial', 'var(--violet)', 'ارزیابی بیمه‌گر', 'بیمه‌گر خسارت را ارزیابی و مبلغ را اعلام می‌کند. می‌توانید بپذیرید یا اعتراض کنید.'],
+    ['payment', 'var(--green)', 'پرداخت', 'مبلغ به حساب شبای شما واریز و شماره پیگیری پیامک می‌شود.'],
+  ];
+  const docs = [
+    ['همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه']],
+    ['آتش‌سوزی و انفجار', ['گزارش آتش‌نشانی', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
+    ['مصدومیت', ['پرونده پزشکی و صورت‌حساب بیمارستان', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+    ['فوت', ['گواهی فوت', 'گواهی انحصار وراثت و مدارک وراث', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+  ];
+  return `<section class="land-hero"><div class="land-in land-grid">
+      <div class="land-copy">
+        ${brandSetting('orgName') ? `<div class="org-name">${esc(brandSetting('orgName'))}</div>` : ''}
+        <h1>پرونده خسارت حادثه گاز را آنلاین تشکیل و پیگیری کنید</h1>
+        <p>پس از آتش‌سوزی، انفجار یا گازگرفتگی، مدارک را بدون رفت‌وآمد بارگذاری کنید و مراحل بررسی شرکت گاز و پرداخت بیمه‌گر را لحظه‌به‌لحظه ببینید.</p>
+        <div class="land-chips"><span>${icon('upload')} بارگذاری مدارک</span><span>${icon('flame')} بررسی شرکت گاز</span><span>${icon('money')} پرداخت بیمه‌گر</span></div>
+        ${OTHER_URL ? `<a class="btn ghost-light land-app" href="${esc(OTHER_URL)}">${icon('sms')} نصب اپ موبایل</a>` : ''}
+      </div>
+      <div class="land-login">${loginForm()}</div>
+    </div></section>
+    <main class="page land-body">
+      <section id="steps" class="land-sec"><h2>مراحل دریافت خسارت</h2>
+        <ol class="land-steps">${steps.map(([art, c, t, d], i) => `<li><div class="step-art">${illo(art, c, 'var(--blue)')}</div><span class="step-no">${fa(i + 1)}</span><b>${t}</b><p>${d}</p></li>`).join('')}</ol></section>
+      <section id="docs" class="land-sec"><h2>مدارک لازم</h2>
+        <div class="land-docs">${docs.map(([t, list]) => `<div class="ocard"><b>${t}</b><ul>${list.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')}</div>
+        <p class="land-note">${icon('alert')} تا ثبت عکس‌ها و بازدید کارشناس، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p></section>
+      <section id="faq" class="land-sec"><h2>پرسش‌های متداول</h2>
+        <div class="faq ocard">${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div></section>
+      <section class="land-sec">${demoRows()}</section>
     </main>`;
 }
 async function doLogin(username, password) {
@@ -1284,6 +1360,7 @@ async function boot() {
   st.user = uid ? db.users.find(u => u.id === uid && u.active) || null : null;
   if (st.user) { try { const v = JSON.parse(sget('gii.view') || 'null'); if (v) { st.view = v.view; st.p = v.p || {}; if (st.p.id) st.claimId = st.p.id; } } catch { /* نادیده */ } }
   render();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!st.user && location.hash) document.querySelector(location.hash)?.scrollIntoView();
+  if (MODE === 'app' && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 boot();

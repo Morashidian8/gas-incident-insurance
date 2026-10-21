@@ -72,22 +72,36 @@ def build(logo=None, org=""):
     out = ROOT / "dist"
     out.mkdir(exist_ok=True)
     (out / "fragment.html").write_text(head + body, encoding="utf-8")
-    (out / "gas-incident-insurance.html").write_text(
-        '<!doctype html>\n<html lang="fa" dir="rtl">\n<head>\n<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
-        + pwa + head + "</head>\n<body>\n" + body_full + "</body>\n</html>\n", encoding="utf-8")
-    # پوشه قابل انتشار روی هر میزبان https (مثلاً GitHub Pages) و نصب روی صفحه اصلی گوشی
+
+    def page(mode, other_url, extra_head, title):
+        return ('<!doctype html>\n'
+                f'<html lang="fa" dir="rtl" data-mode="{mode}" data-other-url="{other_url}">\n<head>\n<meta charset="utf-8">\n'
+                '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+                + extra_head + head.replace("<title>بیمه حوادث مشترکین گاز</title>", f"<title>{title}</title>")
+                + "</head>\n<body>\n" + (body_full if mode == "app" else body) + "</body>\n</html>\n")
+
+    app_html = page("app", "site/", pwa, "بیمه حوادث مشترکین گاز")
+    site_html = page("site", "../", '<meta name="theme-color" content="#3a8cc3">\n<link rel="icon" href="../icons/icon-192.png" type="image/png">\n',
+                     "سامانه بیمه حوادث مشترکین گاز")
+    # فایل‌های تکی برای باز کردن مستقیم روی دستگاه
+    (out / "gas-incident-insurance.html").write_text(app_html, encoding="utf-8")
+    (out / "gas-incident-insurance-site.html").write_text(site_html, encoding="utf-8")
+    # پوشه قابل انتشار روی هر میزبان https (مثلاً GitHub Pages):
+    #   /       اپ نصب‌شدنی روی صفحه اصلی گوشی
+    #   /site/  سایت با چیدمان رومیزی، برای کسی که اپ برایش باز نمی‌شود
     import shutil
     site = out / "pwa"
     if site.exists():
         shutil.rmtree(site)
     (site / "icons").mkdir(parents=True)
-    shutil.copy(out / "gas-incident-insurance.html", site / "index.html")
+    (site / "site").mkdir()
+    (site / "index.html").write_text(app_html, encoding="utf-8")
+    (site / "site" / "index.html").write_text(site_html, encoding="utf-8")
     shutil.copy(ROOT / "manifest.webmanifest", site)
     for f in (ROOT / "icons").glob("*.png"):
         shutil.copy(f, site / "icons")
     (site / "sw.js").write_text(SW, encoding="utf-8")
-    print("dist/gas-incident-insurance.html ساخته شد")
+    print("ساخته شد: dist/pwa (اپ و /site/) و فایل‌های تکی در dist/")
 
 
 if __name__ == "__main__":
