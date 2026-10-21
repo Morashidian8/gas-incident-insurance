@@ -36,6 +36,20 @@ python3 -m http.server 8000
 
 > نسخه فعلی همه داده‌ها را در مرورگر همان دستگاه نگه می‌دارد. برای کار واقعی بین مشترک، شرکت گاز و بیمه‌گر، به سرور نیاز است (بخش ۱۱ سند طراحی).
 
+## نسخه وردپرس (با سرور واقعی)
+
+افزونه `wordpress/gas-incident-insurance` همین اپ و سایت را روی وردپرس اجرا می‌کند و داده‌ها را روی سرور نگه می‌دارد. پس مشترک، شرکت گاز و بیمه‌گر از هر دستگاهی روی یک پرونده کار می‌کنند.
+
+| | |
+|---|---|
+| آزمایش بدون هاست | https://playground.wordpress.net/?blueprint-url=https://morashidian8.github.io/gas-incident-insurance/wp/blueprint.json — وردپرس کامل داخل مرورگر، با افزونه و داده نمایشی |
+| فایل نصب | `dist/gas-incident-insurance-wp.zip` یا https://morashidian8.github.io/gas-incident-insurance/wp/gas-incident-insurance.zip |
+| نصب روی هاست | افزونه‌ها ← افزودن ← بارگذاری افزونه؛ جزئیات و نیازمندی‌های سرور در `wordpress/gas-incident-insurance/readme.txt` |
+
+- قواعد گردش کار در `includes/workflow.php` برگردان `js/workflow.js` است و `wordpress/tests/workflow-test.php` همان سناریوهای تست مرورگر را روی آن اجرا می‌کند.
+- اپ در وردپرس از `js/backend-wp.js` (REST زیر `/wp-json/gii/v1/`) و در حالت مستقل از `js/backend-local.js` استفاده می‌کند.
+- ساخت افزونه: `python3 tools/build_wp.py --logo assets/logo.png --org "شرکت ملی گاز ایران"`.
+
 ## اپ و سایت
 
 همین برنامه دو نسخه دارد که داده‌شان روی هر دستگاه مشترک است:
@@ -72,6 +86,9 @@ site.html               پوسته سایت (همان کد با data-mode="site"
 css/app.css             سبک بصری (نوار آبی، کارت‌های خطی، کاشی‌های تصویری، برگه‌های کشویی، حالت تیره)
 js/workflow.js          منطق خالص: وضعیت‌ها، انتقال‌ها، مدارک لازم، اعتبارسنجی، تاریخ شمسی، محاسبه خسارت
 js/store.js             ذخیره‌سازی محلی، فایل‌ها، اعلان، پیامک شبیه‌سازی‌شده و داده نمونه
+js/backend-local.js     عملیات داده در حالت مستقل (همین مرورگر)
+js/backend-wp.js        همان عملیات از راه REST افزونه وردپرس
+wordpress/              افزونه وردپرس و تست‌های PHP
 js/icons.js             آیکون‌های خطی و تصویرسازی کاشی‌ها (دست‌ساز، SVG)
 js/app.js               رابط کاربری همه نقش‌ها
 sw.js, manifest.webmanifest   نصب و کار آفلاین
@@ -82,7 +99,8 @@ docs/DESIGN.md                سند طراحی
 ## تست
 
 ```bash
-npm test
+npm test                              # قواعد گردش کار (مرورگر)
+php wordpress/tests/workflow-test.php  # همان قواعد روی سرور وردپرس
 ```
 
 تست‌ها کد ملی، شبا، تبدیل تاریخ شمسی، شرط ارسال، چرخه کامل پرونده (نقص، اصلاح، استعلام بیمه‌گر، ارزیابی، پرداخت)، فرانشیز و سقف، و فهرست مدارک لازم را بررسی می‌کنند.

@@ -39,8 +39,8 @@ self.addEventListener('fetch', e => {
 """
 
 
-def build(logo=None, org=""):
-    css = (ROOT / "css/app.css").read_text(encoding="utf-8")
+def bundle_js(logo=None, org=""):
+    """همه ماژول‌ها در یک اسکریپت معمولی (بدون import)؛ برای فایل تکی، GitHub Pages و افزونه وردپرس."""
     wf = module("js/workflow.js", "W")
     if logo:
         # لوگو و نام سازمان به‌عنوان پیش‌فرض نسخه ساخته‌شده قرار می‌گیرد
@@ -48,11 +48,19 @@ def build(logo=None, org=""):
         wf = wf.replace("orgName: '',", f"orgName: {org!r},", 1)
     store = module("js/store.js", "S", "const { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId } = W;\n")
     icons = module("js/icons.js", "I")
+    local = module("js/backend-local.js", "LOCAL")
+    wpb = module("js/backend-wp.js", "WPB")
     app = (ROOT / "js/app.js").read_text(encoding="utf-8")
     app = re.sub(r"^import .*?;\n", "", app, flags=re.M)
-    js_full = wf + store + icons + "{\nconst { icon, illo, brandMark } = I;\n" + app + "\n}\n"
+    return wf + store + icons + local + wpb + "{\nconst { icon, illo, brandMark } = I;\n" + app + "\n}\n"
+
+
+def build(logo=None, org=""):
+    css = (ROOT / "css/app.css").read_text(encoding="utf-8")
+    js_full = bundle_js(logo, org)
     # نسخه درون‌صفحه‌ای سرویس‌ورکر ندارد
-    js = js_full.replace("navigator.serviceWorker.register('sw.js')", "Promise.reject()")
+    js = js_full.replace("navigator.serviceWorker.register(", "Promise.reject(")
+    assert js != js_full, "ثبت سرویس‌ورکر در app.js پیدا نشد"
     head = """<title>بیمه حوادث مشترکین گاز</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">

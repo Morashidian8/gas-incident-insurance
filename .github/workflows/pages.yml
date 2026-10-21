@@ -1,6 +1,6 @@
 name: انتشار اپ روی GitHub Pages
 
-# با هر push روی main، تست‌ها اجرا، نسخه قابل نصب با لوگوی سازمان ساخته
+# با هر push روی main، تست‌ها اجرا، نسخه قابل نصب با لوگوی سازمان و افزونه وردپرس ساخته
 # و روی GitHub Pages منتشر می‌شود. نشانی: https://<owner>.github.io/<repo>/
 on:
   push:
@@ -25,7 +25,13 @@ jobs:
         with:
           node-version: "22"
       - run: npm test
+      - name: تست‌ها و بررسی نحو افزونه وردپرس
+        run: |
+          php wordpress/tests/workflow-test.php
+          for f in $(find wordpress -name '*.php'); do php -l "$f" > /dev/null || exit 1; done
       - run: python3 tools/build_single.py --logo assets/logo.png --org "شرکت ملی گاز ایران"
+      # افزونه و blueprint آزمایش در WordPress Playground زیر /wp/ منتشر می‌شود
+      - run: python3 tools/build_wp.py --logo assets/logo.png --org "شرکت ملی گاز ایران"
       - uses: actions/configure-pages@v5
         with:
           enablement: true

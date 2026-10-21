@@ -1,6 +1,11 @@
 import * as W from './workflow.js';
 import * as S from './store.js';
+import * as LOCAL from './backend-local.js';
+import * as WPB from './backend-wp.js';
 import { icon, illo, brandMark } from './icons.js';
+
+// داخل وردپرس (افزونه) داده‌ها روی سرور است؛ در غیر این صورت همین مرورگر.
+const B = window.GII_WP ? WPB : LOCAL;
 
 // ================= ابزارها =================
 const $ = (s, r = document) => r.querySelector(s);
@@ -27,7 +32,30 @@ let db;
 
 const userById = id => db.users.find(u => u.id === id);
 const claimById = id => db.claims.find(c => c.id === id);
-function persist() { S.save(); }
+// ذخیره ویرایش فیلدهای پرونده؛ در وردپرس با تأخیر کوتاه به سرور فرستاده می‌شود
+function saveClaim(c = currentClaim()) { if (c) B.saveClaim(c).catch(e => toast(e.message, true)); }
+// داده را از پشتیبان دوباره می‌خواند (در حالت محلی همان شیء است)
+async function sync() {
+  db = await B.refresh();
+  const id = B.meId();
+  st.user = id ? db.users.find(u => u.id === id) || null : null;
+}
+// یک عمل پشتیبان را اجرا می‌کند، داده را تازه می‌کند و در صورت خطا پیام می‌دهد؛ نتیجه یا undefined
+async function run(fn, okMsg) {
+  try {
+    const r = await fn();
+    await sync();
+    if (okMsg) toast(okMsg);
+    return r ?? true;
+  } catch (e) {
+    toast(e.message, true);
+    if (e.status === 401 || e.status === 403) { await sync().catch(() => {}); render(); }
+    return undefined;
+  }
+}
+const demoOn = () => B.kind === 'local' || !!db.demo;
+// در وردپرس فهرست حساب‌های نمایشی را سرور می‌دهد (فقط وقتی حالت نمایشی روشن است)
+const demoList = () => (B.kind === 'wp' ? db.demoAccounts || [] : DEMO);
 
 function visibleClaims(u = st.user) {
   if (!u) return [];
@@ -61,7 +89,7 @@ function unreadMsgs(c) {
   return visibleMsgs(c).filter(m => m.byId !== st.user.id && m.at > r).length;
 }
 function totalUnreadMsgs() { return visibleClaims().reduce((a, c) => a + unreadMsgs(c), 0); }
-function markRead(c) { (db.reads[st.user.id] ||= {})[c.id] = new Date().toISOString(); persist(); }
+function markRead(c) { B.markRead(c); }
 
 // ================= ناوبری و رندر =================
 function go(view, p = {}) {
@@ -200,8 +228,8 @@ async function hydrateFiles(root) {
   for (const img of root.querySelectorAll('img[data-file]')) {
     const id = img.dataset.file;
     if (!urlCache.has(id)) {
-      const blob = await S.getFile(id);
-      if (!blob) { img.alt = 'فایل در این دستگاه موجود نیست'; continue; }
+      const blob = await B.getFile(img.dataset.claim, id).catch(() => null);
+      if (!blob) { img.alt = 'فایل در دسترس نیست'; continue; }
       urlCache.set(id, URL.createObjectURL(blob));
     }
     img.src = urlCache.get(id);
@@ -211,7 +239,7 @@ function thumb(c, id, removable) {
   const f = c.files[id] || { name: 'فایل', type: '' };
   const isImg = f.type.startsWith('image/');
   return `<div class="thumb"><button class="link" style="all:unset;cursor:pointer;display:block;width:100%;height:100%" data-act="viewFile" data-file="${id}" data-claim="${c.id}" aria-label="نمایش ${esc(f.name)}">
-    ${isImg ? `<img data-file="${id}" alt="${esc(f.name)}">` : `<div class="pdf">${icon('doc')}${esc(f.name)}</div>`}</button>
+    ${isImg ? `<img data-file="${id}" data-claim="${c.id}" alt="${esc(f.name)}">` : `<div class="pdf">${icon('doc')}${esc(f.name)}</div>`}</button>
     ${removable ? `<button class="rm" data-act="rmFile" data-file="${id}" aria-label="حذف">${icon('trash')}</button>` : ''}</div>`;
 }
 function addFileBtn(target, label = 'افزودن', accept = 'image/*,application/pdf') {
@@ -235,8 +263,8 @@ async function handleLogo(input) {
     } catch { /* همان فایل اصلی */ }
   }
   if (blob.size > 400 * 1024) return toast('حجم لوگو زیاد است؛ فایلی کمتر از ۴۰۰ کیلوبایت انتخاب کنید.', true);
-  db.settings.logoDataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
-  persist(); toast('لوگو ذخیره شد.'); render();
+  const logoDataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+  await run(() => B.saveSettings({ logoDataUrl }), 'لوگو ذخیره شد.'); render();
 }
 
 async function handleUpload(input) {
@@ -249,14 +277,10 @@ async function handleUpload(input) {
     if (!/^image\/|application\/pdf/.test(file.type)) { toast(`«${file.name}» پذیرفته نشد؛ فقط عکس یا PDF.`, true); continue; }
     if (file.size > 15 * 1024 * 1024) { toast(`«${file.name}» بیش از ۱۵ مگابایت است.`, true); continue; }
     const blob = await S.compressImage(file);
-    const id = S.uid('f');
-    await S.putFile(id, blob);
-    c.files[id] = { name: file.name, type: blob.type || file.type, size: blob.size, at: new Date().toISOString(), by: st.user.role };
-    if (target === 'photos') c.photos.push(id);
-    else (c.docs[target] ||= []).push(id);
-    added++;
+    const name = blob === file ? file.name : file.name.replace(/\.\w+$/, '') + '.jpg';
+    try { await B.upload(c, target, blob, name); added++; } catch (e) { toast(`«${file.name}»: ${e.message}`, true); }
   }
-  persist();
+  await sync().catch(() => {});
   if (added) toast(`${fa(added)} فایل بارگذاری شد.`);
   render();
 }
@@ -296,8 +320,9 @@ function loginForm() {
     </form>`;
 }
 function demoRows() {
+  if (!demoOn()) return '';
   return `<div class="section-label">حساب‌های نمایشی</div>
-      <div class="rows">${DEMO.map((d, i) => `<button class="row" data-act="demoLogin" data-i="${i}">${icon(d.ic)}<span class="main"><span class="t">${d.t}</span><span class="s">${d.s}</span></span>${icon('chevL', 'chev')}</button>`).join('')}</div>
+      <div class="rows">${demoList().map((d, i) => `<button class="row" data-act="demoLogin" data-i="${i}">${icon(d.ic)}<span class="main"><span class="t">${d.t}</span><span class="s">${d.s}</span></span>${icon('chevL', 'chev')}</button>`).join('')}</div>
       <p class="demo-tag">همه اشخاص، پرونده‌ها و مبالغ نسخه نمایشی ساختگی‌اند و فقط در همین مرورگر ذخیره می‌شوند.</p>`;
 }
 
@@ -404,12 +429,8 @@ function viewLanding() {
 }
 
 async function doLogin(username, password) {
-  const uname = W.normalizeDigits(username).trim();
-  const u = db.users.find(x => x.username.toLowerCase() === uname.toLowerCase());
-  if (!u || u.pwHash !== await S.hashPw(u.username, password)) { toast('نام کاربری یا رمز عبور نادرست است.', true); return; }
-  if (!u.active) { toast('این حساب غیرفعال شده است. با شرکت گاز تماس بگیرید.', true); return; }
-  st.user = u; st.claimId = null; sset('gii.user', u.id);
-  u.lastLoginAt = new Date().toISOString(); persist();
+  if (!await run(() => B.login(username, password))) return;
+  st.claimId = null;
   go('home');
 }
 
@@ -1071,7 +1092,7 @@ function adminHome() {
     ${tile({ go: 'reports', color: 'violet', art: 'chart', a: 'var(--violet)', b: 'var(--orange)', title: 'گزارش‌ها', sub: 'آمار وضعیت و عملکرد', btn: 'ورود' })}
     ${tile({ go: 'list', p: { f: 'all' }, art: 'inbox', a: 'var(--blue)', b: 'var(--orange)', title: 'همه پرونده‌ها', sub: 'جستجو و مشاهده', btn: 'ورود', count: db.claims.length })}
     ${tile({ go: 'sms', color: 'orange', art: 'sms', a: 'var(--orange)', b: 'var(--blue)', title: 'پیامک‌ها', sub: 'گزارش پیامک‌های ارسالی', btn: 'ورود', count: db.sms.length })}
-    ${tile({ act: 'resetDemo', color: 'red', art: 'timeline', a: 'var(--red)', b: 'var(--orange)', title: 'بازنشانی نمایشی', sub: 'بازگشت به داده‌های نمونه', btn: 'بازنشانی' })}
+    ${!demoOn() ? '' : tile({ act: 'resetDemo', color: 'red', art: 'timeline', a: 'var(--red)', b: 'var(--orange)', title: 'بازنشانی نمایشی', sub: 'بازگشت به داده‌های نمونه', btn: 'بازنشانی' })}
   </div></div>`;
 }
 function viewUsers() {
@@ -1120,7 +1141,10 @@ function viewReports() {
     <div class="form"><b>پرونده‌ها بر اساس وضعیت</b><div class="stat-bars">${counts.map(([k, n]) => `<div class="sbar"><span>${W.STATUS[k].short}</span><span class="track"><span class="fill" style="width:${(n / max) * 100}%;display:block"></span></span><b class="num">${fa(n)}</b></div>`).join('')}</div></div>`;
 }
 function viewSms() {
-  return pageTitle('پیامک‌های ارسالی', 'در نسخه نمایشی پیامک واقعی ارسال نمی‌شود') + `<div class="rows">${db.sms.map(s => `<div class="row">${icon('sms')}<span class="main"><span class="t num" dir="ltr" style="text-align:right">${fa(s.mobile)}</span><span class="s">${esc(s.text)}</span><span class="s">${fdt(s.at)}</span></span></div>`).join('') || '<div class="empty">پیامکی نیست.</div>'}</div>`;
+  // در وردپرس هر پیامک وضعیت ارسال دارد: logged (فقط ثبت)، sent (ارسال شد) یا failed (خطا)
+  const st_ = s => !s.status ? '' : s.status === 'sent' ? '<span class="badge ok">ارسال شد</span>' : s.status === 'logged' ? '<span class="badge neutral">فقط ثبت</span>' : `<span class="badge bad" title="${esc(s.status)}">خطا در ارسال</span>`;
+  const sub = B.kind === 'local' ? 'در نسخه نمایشی پیامک واقعی ارسال نمی‌شود' : 'سامانه پیامک در پیشخوان وردپرس ← بیمه حوادث گاز تنظیم می‌شود';
+  return pageTitle('پیامک‌های ارسالی', sub) + `<div class="rows">${db.sms.map(s => `<div class="row">${icon('sms')}<span class="main"><span class="t num" dir="ltr" style="text-align:right">${fa(s.mobile)}</span><span class="s">${esc(s.text)}</span><span class="s">${fdt(s.at)}</span></span>${st_(s)}</div>`).join('') || '<div class="empty">پیامکی نیست.</div>'}</div>`;
 }
 
 const VIEWS = {
@@ -1161,8 +1185,8 @@ function profileSheet() {
 function notifSheet() {
   const list = myNotifs().slice(0, 40);
   openSheet(`<h2>اعلان‌ها</h2>${list.length ? `<div class="rows">${list.map(n => `<button class="row ${n.readBy.includes(st.user.id) ? 'muted' : ''}" data-act="openNotif" data-id="${n.id}">${icon('bell')}<span class="main"><span class="t">${esc(n.text)}</span><span class="s">${fdt(n.at)}</span></span>${icon('chevL', 'chev')}</button>`).join('')}</div>` : `<div class="empty">${illo('timeline')}اعلانی ندارید.</div>`}`);
-  for (const n of list) if (!n.readBy.includes(st.user.id)) n.readBy.push(st.user.id);
-  persist();
+  const unread = list.filter(n => !n.readBy.includes(st.user.id)).map(n => n.id);
+  if (unread.length) B.readNotifs(unread).catch(() => {});
   const dot = $('.topbar [data-act=notifs] .dot'); if (dot) dot.remove();
 }
 function pickClaimSheet() {
@@ -1173,24 +1197,6 @@ function pickClaimSheet() {
 }
 
 // ================= عمل‌های پرونده =================
-function afterAction(c, id, note) {
-  const sub = userById(c.subscriberId);
-  const t = text => S.notify({ toUser: sub.id, text, claimId: c.id });
-  const sms = text => S.sendSms(sub.mobile, text);
-  switch (id) {
-    case 'submit': S.notify({ toRole: 'gas', text: `پرونده ${c.code} ${c.submitCount > 1 ? 'پس از رفع نقص دوباره' : ''} ارسال شد.`, claimId: c.id }); break;
-    case 'gas_return': t(`برای پرونده ${c.code} نقص اعلام شد.`); sms(`مشترک گرامی، پرونده ${c.code} نیاز به اصلاح دارد. لطفاً وارد سامانه شوید.`); break;
-    case 'gas_forward': S.notify({ toRole: 'insurer', text: `پرونده ${c.code} از شرکت گاز دریافت شد.`, claimId: c.id }); t(`پرونده ${c.code} برای بیمه‌گر ارسال شد.`); sms(`پرونده ${c.code} تأیید و برای بیمه‌گر ارسال شد.`); break;
-    case 'gas_answer': S.notify({ toRole: 'insurer', text: `شرکت گاز به استعلام پرونده ${c.code} پاسخ داد.`, claimId: c.id }); break;
-    case 'ins_start': t(`بیمه‌گر بررسی پرونده ${c.code} را آغاز کرد.`); break;
-    case 'ins_query': S.notify({ toRole: 'gas', text: `بیمه‌گر برای پرونده ${c.code} مدارک تکمیلی خواست.`, claimId: c.id }); break;
-    case 'ins_assess': t(`مبلغ خسارت پرونده ${c.code} تعیین شد.`); sms(`مبلغ خسارت پرونده ${c.code} تعیین شد. برای تأیید یا اعتراض وارد سامانه شوید.`); break;
-    case 'accept': S.notify({ toRole: 'insurer', text: `مشترک مبلغ پرونده ${c.code} را پذیرفت.`, claimId: c.id }); break;
-    case 'object': S.notify({ toRole: 'insurer', text: `مشترک به مبلغ پرونده ${c.code} اعتراض کرد.`, claimId: c.id }); break;
-    case 'ins_pay': t(`خسارت پرونده ${c.code} واریز شد.`); sms(`خسارت پرونده ${c.code} به مبلغ ${nf.format(c.payment.amount)} ریال واریز شد. پیگیری: ${c.payment.ref}`); break;
-    case 'gas_reject': case 'ins_reject': t(`پرونده ${c.code} رد شد.`); sms(`پرونده ${c.code} مشمول پوشش تشخیص داده نشد. دلیل: ${note}`); S.notify({ toRole: id === 'gas_reject' ? 'insurer' : 'gas', text: `پرونده ${c.code} رد شد.`, claimId: c.id }); break;
-  }
-}
 function actionSheet(id) {
   const c = currentClaim();
   const a = W.ACTIONS[id];
@@ -1203,17 +1209,12 @@ function actionSheet(id) {
       <div class="btns"><button class="btn ${/reject/.test(id) ? 'red' : 'green'}" type="submit" ${err ? 'disabled' : ''}>تأیید</button><button class="btn ghost" type="button" data-act="closeSheet">انصراف</button></div>
     </form>`);
 }
-function runAction(id, note) {
+async function runAction(id, note) {
   const c = currentClaim();
-  if (id === 'ins_pay' && c.payment) c.payment.amount = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0).payable;
-  try {
-    const next = W.applyAction(c, id, st.user, note);
-    Object.assign(c, next);
-    afterAction(c, id, note);
-    persist(); closeSheet();
-    toast(W.STATUS[c.status].label);
-    if (st.user.role === 'subscriber') go('track'); else render();
-  } catch (e) { toast(e.message, true); }
+  if (!await run(() => B.action(c, id, note))) return;
+  closeSheet();
+  toast(W.STATUS[claimById(c.id).status].label);
+  if (st.user.role === 'subscriber') go('track'); else render();
 }
 
 function setPath(obj, path, val) {
@@ -1226,14 +1227,17 @@ function setPath(obj, path, val) {
 // ================= رویدادها =================
 const ACTS = {
   forgot: () => forgotSheet('id'),
-  otpResend: async () => { if (!rst) return forgotSheet('id'); await sendOtp(rst.username, rst.mobile); forgotSheet('code'); toast('کد تازه ارسال شد.'); },
+  otpResend: async () => {
+    if (!rst) return forgotSheet('id');
+    try { await sendOtp(rst.username, rst.mobile); forgotSheet('code'); toast('کد تازه ارسال شد.'); } catch (e) { forgotSheet('code', e.message); }
+  },
   jGo: el => { const j = $('.journey'); j.dataset.play = '0'; jSet(+el.dataset.i); },
   jStep: el => { const j = $('.journey'); j.dataset.play = '0'; jSet(+j.dataset.i + +el.dataset.d); },
   jPlay: () => { const j = $('.journey'); j.dataset.play = j.dataset.play === '1' ? '0' : '1'; jSet(+j.dataset.i); },
   toggle: el => { const k = el.dataset.key; st.open.has(k) ? st.open.delete(k) : st.open.add(k); render(); },
   help: helpSheet, guide: guideSheet, notifs: notifSheet, closeSheet,
-  demoLogin: el => { const d = DEMO[+el.dataset.i]; doLogin(d.u, d.p); },
-  logout: () => { closeSheet(); st.user = null; sset('gii.user', null); sset('gii.view', null); render(); },
+  demoLogin: el => { const d = demoList()[+el.dataset.i]; doLogin(d.u, d.p); },
+  logout: async () => { closeSheet(); await run(() => B.logout()); st.user = null; sset('gii.view', null); st.view = 'home'; render(); },
   theme: () => {
     const next = isDark() ? 'light' : 'dark';
     document.documentElement.dataset.theme = next; lset('gii.theme', next); profileSheet();
@@ -1259,40 +1263,32 @@ const ACTS = {
   doAction: el => actionSheet(el.dataset.action),
   viewFile: async el => {
     const c = claimById(el.dataset.claim); const id = el.dataset.file; const f = c.files[id];
-    const blob = await S.getFile(id); if (!blob) { toast('فایل در این دستگاه موجود نیست.', true); return; }
+    const blob = await B.getFile(c.id, id).catch(() => null); if (!blob) { toast('فایل در دسترس نیست.', true); return; }
     if (!urlCache.has(id)) urlCache.set(id, URL.createObjectURL(blob));
     const url = urlCache.get(id);
     openSheet(`<h2 style="font-size:16px;overflow-wrap:anywhere">${esc(f.name)}</h2><p class="lead">${fdt(f.at)} · ${fa(Math.ceil(f.size / 1024))} کیلوبایت</p>
       <div class="viewer">${f.type.startsWith('image/') ? `<img src="${url}" alt="${esc(f.name)}">` : `<div class="note info">${icon('doc')}<div>پیش‌نمایش PDF در این صفحه ممکن نیست. <a href="${url}" target="_blank" rel="noopener">باز کردن فایل</a></div></div>`}</div>
       <button class="btn ghost" data-act="closeSheet">بستن</button>`);
   },
-  rmFile: el => {
-    const c = currentClaim(); const id = el.dataset.file;
-    c.photos = c.photos.filter(x => x !== id);
-    for (const k in c.docs) c.docs[k] = c.docs[k].filter(x => x !== id);
-    delete c.files[id]; persist(); render();
-  },
+  rmFile: async el => { await run(() => B.removeFile(currentClaim(), el.dataset.file)); render(); },
   addItem: el => {
     const c = currentClaim(); const k = el.dataset.key;
     (c.damage[k] ||= []).push(k === 'items' ? { title: '', qty: 1, amount: '' } : k === 'injured' ? { name: '', relation: '', hospital: '', amount: '' } : { name: '', nationalId: '', relation: '' });
-    persist(); render();
+    saveClaim(c); render();
   },
-  rmItem: el => { const c = currentClaim(); c.damage[el.dataset.key].splice(+el.dataset.i, 1); persist(); render(); },
+  rmItem: el => { const c = currentClaim(); c.damage[el.dataset.key].splice(+el.dataset.i, 1); saveClaim(c); render(); },
   saveReply: el => {
     const c = currentClaim(); const d = c.deficiencies.find(x => x.id === el.dataset.id);
     const v = $(`#rep-${d.id}`).value.trim(); if (!v) { toast('متن پاسخ را بنویسید.', true); return; }
-    d.reply = v; d.replyAt = new Date().toISOString(); d.replyBy = st.user.name; persist(); toast('پاسخ ثبت شد.'); render();
+    run(() => B.defect(c, d.id, 'reply', v), 'پاسخ ثبت شد.').then(render);
   },
   flag: el => openSheet(`<h2>اعلام نقص</h2><p class="lead">${esc(el.dataset.title)}</p>
     <form class="form" data-form="defect" data-target="${esc(el.dataset.target)}" data-title="${esc(el.dataset.title)}" style="border:0;padding:0">
       <label class="fld"><span>شرح نقص</span><textarea id="def-note2" name="note" required placeholder="دقیقاً بنویسید چه چیزی باید اصلاح یا اضافه شود."></textarea></label>
       <div class="btns"><button class="btn orange" type="submit">ثبت نقص</button><button class="btn ghost" type="button" data-act="closeSheet">انصراف</button></div></form>`),
-  defAccept: el => { const c = currentClaim(); const d = c.deficiencies.find(x => x.id === el.dataset.id); d.status = 'closed'; d.closedAt = new Date().toISOString(); persist(); render(); },
-  defReject: el => {
-    const c = currentClaim(); const d = c.deficiencies.find(x => x.id === el.dataset.id);
-    d.note = d.note + ' | پاسخ قبلی کافی نبود: ' + d.reply; d.reply = ''; d.at = new Date().toISOString(); persist(); render();
-  },
-  defDelete: el => { const c = currentClaim(); c.deficiencies = c.deficiencies.filter(x => x.id !== el.dataset.id); persist(); render(); },
+  defAccept: el => run(() => B.defect(currentClaim(), el.dataset.id, 'accept')).then(render),
+  defReject: el => run(() => B.defect(currentClaim(), el.dataset.id, 'reject')).then(render),
+  defDelete: el => run(() => B.defect(currentClaim(), el.dataset.id, 'delete')).then(render),
   prefillAssess: () => {
     const c = currentClaim(); c.assessment ||= { adjuster: st.user.name, visitDate: '', note: '', items: [] };
     const d = c.damage;
@@ -1301,34 +1297,33 @@ const ACTS = {
       ...(d.injured || []).map(i => ({ category: 'medical', title: 'درمان: ' + i.name, claimed: num(i.amount), approved: num(i.amount) })),
       ...(d.deceased || []).map(i => ({ category: 'death', title: 'فوت: ' + i.name, claimed: db.settings.deathCapRial, approved: db.settings.deathCapRial })),
     ];
-    persist(); render();
+    saveClaim(c); render();
   },
-  addAssess: () => { const c = currentClaim(); c.assessment ||= { adjuster: st.user.name, visitDate: '', note: '', items: [] }; c.assessment.items.push({ category: 'property', title: '', claimed: 0, approved: 0 }); persist(); render(); },
-  rmAssess: el => { const c = currentClaim(); c.assessment.items.splice(+el.dataset.i, 1); persist(); render(); },
+  addAssess: () => { const c = currentClaim(); c.assessment ||= { adjuster: st.user.name, visitDate: '', note: '', items: [] }; c.assessment.items.push({ category: 'property', title: '', claimed: 0, approved: 0 }); saveClaim(c); render(); },
+  rmAssess: el => { const c = currentClaim(); c.assessment.items.splice(+el.dataset.i, 1); saveClaim(c); render(); },
   copyCred: el => {
     const text = el.dataset.text;
     navigator.clipboard?.writeText(text).then(() => toast('رونوشت شد.'), () => toast('رونوشت ممکن نشد؛ متن را دستی انتخاب کنید.', true));
   },
-  resetSubPw: async el => resetPassword(userById(el.dataset.id)),
-  resetPw: async el => resetPassword(userById(el.dataset.id)),
-  toggleUser: el => { const u = userById(el.dataset.id); u.active = !u.active; persist(); render(); },
+  resetSubPw: el => resetPassword(el.dataset.id),
+  resetPw: el => resetPassword(el.dataset.id),
+  toggleUser: el => run(() => B.toggleUser(el.dataset.id)).then(render),
   addStaff: () => openSheet(`<h2>کاربر جدید کارکنان</h2><form class="form" data-form="staff" style="border:0;padding:0">
       <label class="fld"><span>نام و نام خانوادگی</span><input id="sf-name" name="name" required></label>
       <div class="grid2"><label class="fld"><span>نام کاربری</span><input id="sf-user" name="username" class="ltr" required></label>
       <label class="fld"><span>نقش</span><select id="sf-role" name="role"><option value="gas">کارشناس شرکت گاز</option><option value="insurer">کارشناس بیمه‌گر</option><option value="admin">مدیر سامانه</option></select></label></div>
       <label class="fld"><span>واحد سازمانی</span><input id="sf-org" name="org"></label>
       <div class="btns"><button class="btn green" type="submit">ساخت و صدور رمز موقت</button></div></form>`),
-  rmLogo: () => { db.settings.logoDataUrl = ''; persist(); toast('لوگو حذف شد.'); render(); },
+  rmLogo: () => run(() => B.saveSettings({ logoDataUrl: '' }), 'لوگو حذف شد.').then(render),
   resetDemo: () => openSheet(`<h2>بازنشانی داده‌های نمایشی</h2><p class="lead">همه پرونده‌ها، کاربران و فایل‌های این مرورگر پاک و داده‌های نمونه دوباره ساخته می‌شود.</p>
       <div class="btns"><button class="btn red" data-act="resetDemoYes">بازنشانی</button><button class="btn ghost" data-act="closeSheet">انصراف</button></div>`),
-  resetDemoYes: async () => { closeSheet(); db = await S.seed(); urlCache.clear(); st.user = db.users.find(u => u.role === 'admin'); sset('gii.user', st.user.id); toast('داده‌های نمونه بازنشانی شد.'); go('home'); },
+  resetDemoYes: async () => { closeSheet(); if (!await run(() => B.resetDemo(), 'داده‌های نمونه بازنشانی شد.')) return; urlCache.clear(); go('home'); },
 };
 
 // ---------- بازیابی رمز عبور (فراموشی رمز) ----------
 // کاربر نام کاربری و موبایل ثبت‌شده را وارد می‌کند، کد ۶ رقمی پیامکی می‌گیرد و رمز تازه می‌گذارد.
 // کد فقط به‌صورت هش نگه داشته می‌شود، ۲ دقیقه اعتبار دارد و حداکثر ۵ بار می‌شود امتحانش کرد.
 // پیام مرحله اول برای حساب موجود و ناموجود یکسان است تا وجود حساب لو نرود.
-const OTP_TTL = 120000, OTP_TRIES = 5;
 let rst = null, otpTick = null;
 function forgotSheet(step = 'id', err = '') {
   clearInterval(otpTick);
@@ -1344,7 +1339,7 @@ function forgotSheet(step = 'id', err = '') {
     return;
   }
   if (step === 'code') {
-    const last = rst.userId ? db.sms.find(x => x.mobile === rst.mobile) : null;
+    const last = rst.demoSms ? { text: rst.demoSms } : null;
     openSheet(`<h2>کد تأیید</h2><p class="lead">اگر نام کاربری و موبایل درست باشد، کد ۶ رقمی به <span class="num" dir="ltr">${fa(rst.mobile.replace(/^(\d{4})\d{4}/, '$1****'))}</span> پیامک شده است.</p>${e}
       ${last ? `<div class="sms-demo">${icon('sms')}<div><b>پیامک نمایشی</b>${esc(last.text)}</div></div>` : ''}
       <form class="form flat" data-form="forgotCode">
@@ -1358,7 +1353,7 @@ function forgotSheet(step = 'id', err = '') {
       const el = $('#otp-left'); if (!el) { clearInterval(otpTick); return; }
       el.textContent = left ? `اعتبار کد: ${fa(Math.floor(left / 60))}:${fa(String(left % 60).padStart(2, '0'))}` : 'کد منقضی شد؛ دوباره ارسال کنید.';
       el.classList.toggle('over', !left);
-      const r = $('#otp-resend'); if (r) r.disabled = left > OTP_TTL / 2000;
+      const r = $('#otp-resend'); if (r) r.disabled = left > rst.ttl / 2000;
     };
     tick(); otpTick = setInterval(tick, 1000);
     return;
@@ -1370,20 +1365,19 @@ function forgotSheet(step = 'id', err = '') {
       <button class="btn green" type="submit">ذخیره رمز و بازگشت به ورود</button>
     </form>`);
 }
+// کد را پشتیبان می‌سازد و پیامک می‌کند؛ اینجا فقط زمان اعتبار و (در حالت نمایشی) متن پیامک نگه داشته می‌شود
 async function sendOtp(username, mobile) {
-  const u = db.users.find(x => x.active && x.mobile && x.username.toLowerCase() === username.toLowerCase() && x.mobile === mobile);
-  const code = String(100000 + Math.floor(Math.random() * 900000));
-  rst = { username, mobile, userId: u?.id || null, exp: Date.now() + OTP_TTL, tries: 0, ok: false, hash: u ? await S.hashPw(u.username, 'otp:' + code) : '' };
-  if (u) { S.sendSms(mobile, `کد بازیابی رمز سامانه بیمه حوادث گاز: ${code} — این کد را به هیچ‌کس ندهید.`); persist(); }
+  const r = await B.forgotStart(username, mobile);
+  rst = { username, mobile, ...r };
 }
 
-async function resetPassword(u) {
-  const pw = S.tempPassword();
-  u.pwHash = await S.hashPw(u.username, pw); u.mustChangePassword = true; u.active = true;
-  if (u.mobile) S.sendSms(u.mobile, `رمز موقت جدید سامانه بیمه حوادث گاز: ${pw}`);
-  persist();
-  openSheet(`<h2>رمز موقت صادر شد</h2><div class="cred"><div class="line"><span>نام کاربری</span><code>${esc(u.username)}</code></div><div class="line"><span>رمز موقت</span><code>${pw}</code></div>
-    <small>${u.mobile ? 'به ' + fa(u.mobile) + ' پیامک شد (شبیه‌سازی). ' : ''}کاربر در ورود بعدی باید رمز را تغییر دهد.</small></div><button class="btn ghost" data-act="closeSheet">بستن</button>`);
+function credSheet(r, title = 'رمز موقت صادر شد') {
+  openSheet(`<h2>${title}</h2><div class="cred"><div class="line"><span>نام کاربری</span><code>${esc(r.username)}</code></div><div class="line"><span>رمز موقت</span><code>${esc(r.password)}</code></div>
+    <small>${r.mobile ? 'به ' + fa(r.mobile) + ' پیامک شد. ' : ''}کاربر در ورود بعدی باید رمز را تغییر دهد.</small></div><button class="btn ghost" data-act="closeSheet">بستن</button>`);
+}
+async function resetPassword(id) {
+  const r = await run(() => B.resetUserPw(id));
+  if (r) { credSheet(r); render(); }
 }
 
 const FORMS = {
@@ -1391,73 +1385,57 @@ const FORMS = {
   forgotId: async f => {
     const username = W.normalizeDigits(f.username.value).trim(), mobile = W.normalizeDigits(f.mobile.value).trim();
     if (!W.isValidMobile(mobile)) return forgotSheet('id', 'شماره موبایل را ۱۱ رقمی و با ۰۹ وارد کنید.');
-    await sendOtp(username, mobile);
+    try { await sendOtp(username, mobile); } catch (e) { return forgotSheet('id', e.message); }
     forgotSheet('code');
   },
   forgotCode: async f => {
     if (!rst) return forgotSheet('id');
-    if (Date.now() > rst.exp) return forgotSheet('code', 'کد منقضی شده است؛ «ارسال دوباره» را بزنید.');
-    if (++rst.tries > OTP_TRIES) { rst = null; return forgotSheet('id', 'تعداد تلاش‌ها زیاد بود. دوباره از اول شروع کنید.'); }
-    const u = rst.userId && userById(rst.userId);
-    const code = W.normalizeDigits(f.code.value).trim();
-    if (!u || await S.hashPw(u.username, 'otp:' + code) !== rst.hash) return forgotSheet('code', `کد نادرست است. ${fa(OTP_TRIES - rst.tries)} بار دیگر می‌توانید امتحان کنید.`);
-    rst.ok = true; forgotSheet('new');
+    try { await B.forgotVerify(f.code.value); } catch (e) {
+      if (e.restart) { rst = null; return forgotSheet('id', e.message); }
+      return forgotSheet('code', e.message);
+    }
+    forgotSheet('new');
   },
   forgotNew: async f => {
-    const u = rst?.ok && userById(rst.userId);
-    if (!u) return forgotSheet('id');
-    if (f.p1.value.length < 6) return forgotSheet('new', 'رمز باید دست‌کم ۶ نویسه باشد.');
     if (f.p1.value !== f.p2.value) return forgotSheet('new', 'تکرار رمز با رمز جدید یکسان نیست.');
-    u.pwHash = await S.hashPw(u.username, f.p1.value); u.mustChangePassword = false;
-    S.sendSms(u.mobile, 'رمز عبور حساب شما در سامانه بیمه حوادث گاز تغییر کرد. اگر شما این کار را نکرده‌اید، با شرکت گاز تماس بگیرید.');
-    S.notify({ toUser: u.id, text: 'رمز عبور حساب شما با کد پیامکی بازیابی شد.' });
-    persist(); rst = null; closeSheet();
-    const lu = $('#lg-user'); if (lu) { lu.value = u.username; $('#lg-pass').value = ''; $('#lg-pass').focus(); }
+    let username;
+    try { username = await B.forgotReset(f.p1.value); } catch (e) {
+      if (e.restart) { rst = null; return forgotSheet('id', e.message); }
+      return forgotSheet('new', e.message);
+    }
+    rst = null; closeSheet();
+    const lu = $('#lg-user'); if (lu) { lu.value = username; $('#lg-pass').value = ''; $('#lg-pass').focus(); }
     toast('رمز جدید ذخیره شد. با آن وارد شوید.');
   },
   newpw: async f => {
     if (f.p1.value !== f.p2.value) return toast('تکرار رمز با رمز جدید یکسان نیست.', true);
-    if (f.p1.value.length < 6) return toast('رمز باید دست‌کم ۶ نویسه باشد.', true);
-    if (await S.hashPw(st.user.username, f.p1.value) === st.user.pwHash) return toast('رمز جدید نباید با رمز موقت یکی باشد.', true);
-    st.user.pwHash = await S.hashPw(st.user.username, f.p1.value); st.user.mustChangePassword = false; persist(); toast('رمز ذخیره شد.'); go('home');
+    if (await run(() => B.setPassword({ next: f.p1.value }), 'رمز ذخیره شد.')) go('home');
   },
   changepw: async f => {
-    if (await S.hashPw(st.user.username, f.p0.value) !== st.user.pwHash) return toast('رمز فعلی نادرست است.', true);
     if (f.p1.value !== f.p2.value) return toast('تکرار رمز یکسان نیست.', true);
-    st.user.pwHash = await S.hashPw(st.user.username, f.p1.value); persist(); closeSheet(); toast('رمز تغییر کرد.');
+    if (await run(() => B.setPassword({ current: f.p0.value, next: f.p1.value }), 'رمز تغییر کرد.')) closeSheet();
   },
-  msg: f => {
+  msg: async f => {
     const c = claimById(f.dataset.id); const text = f.text.value.trim(); if (!text) return;
     const internal = !!(f.internal && f.internal.checked);
-    c.messages.push({ id: S.uid('m'), at: new Date().toISOString(), by: st.user.name, byId: st.user.id, role: st.user.role, text, internal });
-    if (st.user.role === 'subscriber') { S.notify({ toRole: 'gas', text: `پیام جدید از مشترک در پرونده ${c.code}`, claimId: c.id }); if (c.forwardedAt) S.notify({ toRole: 'insurer', text: `پیام جدید از مشترک در پرونده ${c.code}`, claimId: c.id }); }
-    else if (!internal) S.notify({ toUser: c.subscriberId, text: `پیام جدید از ${W.ROLES[st.user.role]} در پرونده ${c.code}`, claimId: c.id });
-    else S.notify({ toRole: st.user.role === 'gas' ? 'insurer' : 'gas', text: `یادداشت داخلی جدید در پرونده ${c.code}`, claimId: c.id });
-    markRead(c); render();
+    if (!await run(() => B.message(c, text, internal))) return;
+    markRead(claimById(c.id)); render();
     const t = $('#msg-text'); if (t) t.focus();
   },
   action: f => runAction(f.dataset.action, f.note.value.trim()),
-  fin: f => {
+  fin: async f => {
     const c = currentClaim(); const step = f.dataset.step;
     const v = k => (f[k] ? W.normalizeDigits(f[k].value).trim() : '');
     const data = step === 'fin_review' ? { reviewer: f.reviewer.value.trim(), shebaMatch: f.shebaMatch.checked, note: f.note.value.trim() }
       : step === 'fin_voucher' ? { voucherNo: v('voucherNo'), date: v('date'), amount: +v('amount') }
       : { method: f.method.value, ref: v('ref'), date: v('date') };
-    try {
-      Object.assign(c, W.applyFinance(c, step, data, st.user));
-    } catch (e) { return toast(e.message, true); }
-    const sub = userById(c.subscriberId);
-    const msg = step === 'fin_review' ? `بررسی مالی پرونده ${c.code} انجام و شبای شما تأیید شد.`
-      : step === 'fin_voucher' ? `حواله پرداخت خسارت پرونده ${c.code} به شماره ${data.voucherNo} و مبلغ ${nf.format(data.amount)} ریال صادر شد.`
-      : `دستور پرداخت خسارت پرونده ${c.code} از طریق ${W.TRANSFER_METHODS[data.method].label} به بانک ارسال شد. پیگیری: ${data.ref}`;
-    S.notify({ toUser: sub.id, text: msg, claimId: c.id });
-    if (step !== 'fin_review') S.sendSms(sub.mobile, msg);
-    persist(); toast(W.FIN_STAGES.find(x => x.id === c.finance.stage).label + ' — ثبت شد.'); render();
+    if (!await run(() => B.finance(c, step, data))) return;
+    toast(W.FIN_STAGES.find(x => x.id === claimById(c.id).finance.stage).label + ' — ثبت شد.'); render();
   },
-  defect: f => {
+  defect: async f => {
     const c = currentClaim(); const note = f.note.value.trim(); if (!note) return;
-    c.deficiencies.push({ id: S.uid('d'), target: f.dataset.target || 'general', title: f.dataset.title || (st.user.role === 'insurer' ? 'درخواست بیمه‌گر' : 'نقص عمومی'), note, by: st.user.role, byName: st.user.name, at: new Date().toISOString(), status: 'open', reply: '' });
-    persist(); closeSheet(); toast('ثبت شد. برای اعلام به ' + (st.user.role === 'insurer' ? 'شرکت گاز «درخواست مدارک تکمیلی»' : 'مشترک «اعلام نقص و بازگشت»') + ' را بزنید.'); render();
+    if (!await run(() => B.addDefect(c, { target: f.dataset.target || 'general', title: f.dataset.title || '', note }))) return;
+    closeSheet(); toast('ثبت شد. برای اعلام به ' + (st.user.role === 'insurer' ? 'شرکت گاز «درخواست مدارک تکمیلی»' : 'مشترک «اعلام نقص و بازگشت»') + ' را بزنید.'); render();
   },
   register: async f => {
     const v = k => W.normalizeDigits(f[k].value).trim();
@@ -1471,46 +1449,21 @@ const FORMS = {
     else if (d > new Date()) errs.push('تاریخ حادثه در آینده است');
     if (v('address').length < 10) errs.push('نشانی کامل');
     if (errs.length) return toast('بررسی کنید: ' + errs.join('، '), true);
-    let u = db.users.find(x => x.role === 'subscriber' && (x.nationalId === v('nationalId') || x.subscriptionNo === v('subscriptionNo')));
-    const existing = !!u; let pw = null;
-    if (u && u.nationalId !== v('nationalId')) return toast('این شماره اشتراک با کد ملی دیگری ثبت شده است.', true);
-    if (!u) {
-      if (db.users.some(x => x.username === v('subscriptionNo'))) return toast('نام کاربری تکراری است.', true);
-      pw = S.tempPassword();
-      u = { id: S.uid('u'), role: 'subscriber', username: v('subscriptionNo'), name: v('name'), nationalId: v('nationalId'), subscriptionNo: v('subscriptionNo'), mobile: v('mobile'), address: v('address'), active: true, mustChangePassword: true, createdAt: new Date().toISOString(), pwHash: await S.hashPw(v('subscriptionNo'), pw) };
-      db.users.push(u);
-    }
-    db.seq += 1;
-    const now = new Date().toISOString();
-    const late = W.daysBetween(d, new Date()) > db.settings.reportWindowDays;
-    const c = {
-      id: S.uid('c'), code: W.claimCode(db.seq), subscriberId: u.id, createdBy: st.user.id, createdAt: now, status: 'draft', statusAt: now, submitCount: 0,
-      incident: { date: W.jalaliString(d), time: '', type: f.type.value, placeType: 'residential', address: v('address'), postalCode: '', description: '', fireReportNo: '', policeReportNo: '' },
-      damage: { kinds: [], items: [], injured: [], deceased: [] }, photos: [], docs: {}, files: {}, bank: { sheba: '', holder: u.name }, declaration: false,
-      deficiencies: [], messages: [], gasReport: {}, assessment: null, payment: null,
-      timeline: [{ at: now, by: st.user.name, role: 'gas', action: 'create', label: existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک', note: [f.note.value.trim(), late ? `اعلام با تأخیر: بیش از ${db.settings.reportWindowDays} روز پس از حادثه` : ''].filter(Boolean).join(' — ') }],
-    };
-    db.claims.push(c);
-    S.sendSms(u.mobile, pw ? `مشترک گرامی، پرونده خسارت ${c.code} تشکیل شد. نام کاربری: ${u.username} — رمز موقت: ${pw}` : `مشترک گرامی، پرونده خسارت ${c.code} برای شما تشکیل شد. با حساب قبلی وارد شوید.`);
-    S.notify({ toUser: u.id, text: `پرونده ${c.code} تشکیل شد. لطفاً اطلاعات و مدارک را تکمیل کنید.`, claimId: c.id });
-    persist();
-    go('registered', { claimId: c.id, username: u.username, password: pw, existing });
+    const r = await run(() => B.register({ name: v('name'), nationalId: v('nationalId'), subscriptionNo: v('subscriptionNo'), mobile: v('mobile'), date: W.jalaliString(d), type: f.type.value, address: v('address'), note: f.note.value.trim() }));
+    if (r) go('registered', r);
   },
-  settings: f => {
-    const s = db.settings;
-    if (f.orgName) s.orgName = f.orgName.value.trim();
+  settings: async f => {
+    const s = db.settings; const patch = {};
+    if (f.orgName) patch.orgName = f.orgName.value.trim();
     for (const k of Object.keys(s)) {
-      if (k === 'orgName' || k === 'logoDataUrl') continue;
-      if (!f[k]) continue;
-      s[k] = typeof s[k] === 'number' ? num(f[k].value) : W.normalizeDigits(f[k].value).trim();
+      if (k === 'orgName' || k === 'logoDataUrl' || !f[k]) continue;
+      patch[k] = typeof s[k] === 'number' ? num(f[k].value) : W.normalizeDigits(f[k].value).trim();
     }
-    persist(); toast('تنظیمات ذخیره شد.'); render();
+    await run(() => B.saveSettings(patch), 'تنظیمات ذخیره شد.'); render();
   },
   staff: async f => {
-    const username = f.username.value.trim();
-    if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) return toast('این نام کاربری وجود دارد.', true);
-    const u = { id: S.uid('u'), role: f.role.value, username, name: f.name.value.trim(), org: f.org.value.trim(), active: true, mustChangePassword: true, createdAt: new Date().toISOString(), pwHash: '' };
-    db.users.push(u); await resetPassword(u); render();
+    const r = await run(() => B.addStaff({ username: f.username.value.trim(), name: f.name.value.trim(), role: f.role.value, org: f.org.value.trim() }));
+    if (r) { credSheet(r, 'کاربر ساخته شد'); render(); }
   },
 };
 
@@ -1525,7 +1478,7 @@ function onBind(el) {
   if (path.startsWith('assessment')) c.assessment ||= { adjuster: '', visitDate: '', note: '', items: [] };
   if (path.startsWith('payment')) c.payment ||= {};
   setPath(c, path, val);
-  persist();
+  saveClaim(c);
   // بخش‌هایی که نمایش وابسته دارند دوباره رسم می‌شوند
   if (/\.amount$/.test(path)) {
     const d = c.damage; const t = $('#dmgTotal');
@@ -1573,7 +1526,7 @@ function wire() {
       if (el.checked && k === 'property' && !c.damage.items.length) c.damage.items.push({ title: '', qty: 1, amount: '' });
       if (el.checked && k === 'medical' && !c.damage.injured.length) c.damage.injured.push({ name: '', relation: '', hospital: '', amount: '' });
       if (el.checked && k === 'death' && !c.damage.deceased.length) c.damage.deceased.push({ name: '', nationalId: '', relation: '' });
-      persist(); render(); return;
+      saveClaim(c); render(); return;
     }
     if (el.matches('[data-bind]')) onBind(el);
   });
@@ -1587,14 +1540,23 @@ function wire() {
 // ================= راه‌اندازی =================
 async function boot() {
   const t = lget('gii.theme'); if (t) document.documentElement.dataset.theme = t;
-  db = S.load();
-  if (!db || db.version !== S.DB_VERSION) db = await S.seed();
+  try { db = await B.boot(); } catch (e) {
+    $('#app').innerHTML = `<main class="page narrow"><div class="note bad">${icon('alert')}<div><b>سامانه در دسترس نیست</b>${esc(e.message)}</div></div></main>`;
+    return;
+  }
   wire();
-  const uid = sget('gii.user');
+  const uid = B.meId();
   st.user = uid ? db.users.find(u => u.id === uid && u.active) || null : null;
   if (st.user) { try { const v = JSON.parse(sget('gii.view') || 'null'); if (v) { st.view = v.view; st.p = v.p || {}; if (st.p.id) st.claimId = st.p.id; } } catch { /* نادیده */ } }
   render();
   if (!st.user && location.hash) document.querySelector(location.hash)?.scrollIntoView();
-  if (MODE === 'app' && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (MODE === 'app' && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register(window.GII_WP?.sw || 'sw.js').catch(() => {});
+  // در وردپرس دیگران هم پرونده را تغییر می‌دهند؛ هنگام بازگشت به صفحه و هر دقیقه داده تازه می‌شود
+  if (B.kind === 'wp') {
+    const idle = () => !$('#sheet') && !document.activeElement?.matches('input, textarea, select');
+    const tick = () => { if (st.user && idle() && document.visibilityState === 'visible') sync().then(render).catch(() => {}); };
+    document.addEventListener('visibilitychange', tick);
+    setInterval(tick, 60000);
+  }
 }
 boot();
