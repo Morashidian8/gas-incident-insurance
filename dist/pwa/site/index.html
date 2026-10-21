@@ -463,78 +463,275 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .btn.ghost-light { background: transparent; border-color: rgba(255, 255, 255, .75); color: #fff; text-decoration: none; }
 .btn.ghost-light:hover { background: rgba(255, 255, 255, .14); }
 
-/* ================= نسخه سایت (چیدمان رومیزی) ================= */
-.site-head { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--blue); color: #fff; }
+/* ================= پنل مالی (از قبول مبلغ تا واریز) ================= */
+.ok-txt { color: var(--green); display: inline-flex; gap: 4px; align-items: center; }
+.ok-txt .ic { width: 16px; height: 16px; }
+.note.as-link { width: 100%; border: 0; text-align: right; cursor: pointer; color: inherit; align-items: center; }
+.note.as-link > div { flex: 1; }
+.note.as-link .chev { color: var(--blue); }
+.fin-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fin-head h2 { font-size: 17px; display: flex; gap: 8px; align-items: center; }
+.fin-head h2 .ic { color: var(--blue); }
+.fin-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fin-sum > div { background: var(--field); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fin-sum span { font-size: 12px; color: var(--muted); }
+.fin-sum b { font-size: 14.5px; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .fin-sum { grid-template-columns: 1fr; } }
+.fin-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.fin-steps li { position: relative; display: flex; gap: 12px; padding-bottom: 16px; }
+.fin-steps li::before { content: ""; position: absolute; right: 15px; top: 34px; bottom: 0; width: 2px; background: var(--hair); }
+.fin-steps li:last-child { padding-bottom: 0; }
+.fin-steps li:last-child::before { display: none; }
+.fin-steps li.done::before { background: var(--green); }
+.fin-dot { width: 32px; height: 32px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 14px; background: var(--well); color: var(--muted); z-index: 1; }
+.fin-dot .ic { width: 17px; height: 17px; }
+.fin-steps li.done .fin-dot { background: var(--green); color: #fff; }
+.fin-steps li.on .fin-dot { background: var(--ember, #f26b21); color: #fff; animation: pulse 1.8s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(242, 107, 33, .45); } 100% { box-shadow: 0 0 0 12px rgba(242, 107, 33, 0); } }
+.fin-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.fin-steps li.todo .fin-body b { color: var(--muted); }
+.fin-body .muted { font-size: 13px; }
+.fin-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 4px 0 0; background: var(--field); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; }
+.fin-kv dt { color: var(--muted); }
+.fin-kv dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.receipt { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; border: 2px dashed var(--green); border-radius: 16px; padding: 12px 14px; background: var(--green-tint); }
+.receipt > div { display: flex; gap: 8px; align-items: center; color: var(--green); }
+
+/* ================= نسخه سایت =================
+   چیدمان: سرصفحه سرمه‌ای چسبان؛ قهرمان تیره با درخشش شعله آبی گاز و نارنجی اخگر؛
+   نوار روشن «مسیر پرونده» با موشن‌گرافی؛ کاشی‌های مدارک رنگی؛ پرسش‌ها دوستونه؛ پاصفحه سرمه‌ای. */
+:root {
+  --navy: #0b2340;
+  --navy-2: #123a63;
+  --ember: #f26b21;
+  --ember-2: #ff8f3f;
+  --sky: #5fb3ec;
+  --site-ink-light: #e8f1fa;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+:root[data-mode="site"] body::before { background: var(--navy); }
+:root[data-mode="site"] .page { max-width: 1180px; padding-block-end: 48px; }
+:root[data-mode="site"] .page.narrow { max-width: 860px; }
+:root[data-mode="site"] .pill-bar:not(.green):not(.orange):not(.red) { background: linear-gradient(110deg, var(--navy), var(--navy-2) 60%, #1d5d93); }
+
+.eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .3px; color: var(--ember); }
+.eyebrow.light { color: var(--ember-2); }
+.btn.ember { background: var(--ember); border-color: var(--ember); color: #fff; text-decoration: none; box-shadow: 0 8px 22px rgba(242, 107, 33, .35); }
+.btn.ember:hover { background: #e05d15; }
+.btn.ghost-light { background: transparent; border-color: rgba(255, 255, 255, .55); color: #fff; text-decoration: none; }
+.btn.ghost-light:hover { background: rgba(255, 255, 255, .1); }
+.alt-link { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--blue); font-weight: 700; text-decoration: none; padding: 6px; }
+.alt-link .ic { width: 18px; height: 18px; }
+.link.forgot { align-self: flex-start; display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; margin-top: -4px; }
+.link.forgot .ic { width: 17px; height: 17px; }
+.muted { color: var(--muted); }
+.form.flat { border: 0; padding: 0; }
+.otp { font-size: 24px; letter-spacing: 10px; text-align: center !important; font-variant-numeric: tabular-nums; }
+.otp-left { font-size: 13px; color: var(--muted); text-align: center; }
+.otp-left.over { color: var(--red); font-weight: 700; }
+.sms-demo { display: flex; gap: 10px; background: var(--green-tint); border-radius: 14px; padding: 10px 12px; font-size: 13.5px; }
+.sms-demo .ic { color: var(--green); }
+.sms-demo b { display: block; font-size: 12px; color: var(--green); }
+
+/* سرصفحه */
+.site-head { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--navy); color: #fff; box-shadow: 0 1px 0 rgba(255, 255, 255, .06); }
 .site-head-in {
   max-width: 1180px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.site-head .brand b { font-size: 22px; }
-.site-nav { display: flex; gap: 4px; flex: 1; justify-content: center; min-width: 0; overflow-x: auto; }
+.site-head .brand b { font-size: 21px; }
+.site-nav { display: flex; gap: 2px; flex: 1; justify-content: center; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .site-link {
-  position: relative; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: #fff;
+  position: relative; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: rgba(255, 255, 255, .82);
   padding: 9px 14px; border-radius: 12px; font-weight: 700; font-size: 14.5px; text-decoration: none; white-space: nowrap;
 }
-.site-link:hover { background: rgba(255, 255, 255, .14); }
-.site-link.on { background: #fff; color: var(--blue); }
+.site-link:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.site-link.on { color: #fff; background: rgba(255, 255, 255, .1); }
+.site-link.on::after { content: ""; position: absolute; inset: auto 14px 3px; height: 3px; border-radius: 3px; background: var(--ember); }
 .site-link .ic { width: 20px; height: 20px; }
-.site-link .dot { min-width: 20px; height: 20px; border-radius: 10px; background: var(--orange); color: #fff; font-size: 12px; line-height: 20px; text-align: center; padding: 0 5px; }
+.site-link .dot { min-width: 20px; height: 20px; border-radius: 10px; background: var(--ember); color: #fff; font-size: 12px; line-height: 20px; text-align: center; padding: 0 5px; }
 .site-tools { display: flex; gap: 8px; align-items: center; }
-.site-tools .sq-btn { width: 42px; height: 42px; }
+.site-tools .sq-btn { width: 42px; height: 42px; background: rgba(255, 255, 255, .1); color: #fff; box-shadow: none; }
+.site-tools .sq-btn:hover { background: rgba(255, 255, 255, .18); }
 @media (max-width: 860px) {
   .site-nav { order: 3; flex-basis: 100%; justify-content: flex-start; }
   .site-tools { margin-inline-start: auto; }
+  .site-head .brand small { display: none; }
 }
-:root[data-mode="site"] .page { max-width: 1180px; padding-block-end: 48px; }
-:root[data-mode="site"] .page.narrow { max-width: 860px; }
 
-.site-foot { background: var(--card); border-top: 1px solid var(--hair); margin-top: 24px; }
+/* قهرمان */
+.hero { position: relative; overflow: hidden; background: var(--navy); color: var(--site-ink-light); }
+.hero::before {
+  content: ""; position: absolute; inset: 0; opacity: .5; pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .05) 1px, transparent 1px);
+  background-size: 44px 44px; mask-image: radial-gradient(ellipse at 70% 40%, #000 20%, transparent 75%);
+}
+.hero-glow { position: absolute; inset: 0; pointer-events: none; }
+.hero-glow::before, .hero-glow::after { content: ""; position: absolute; border-radius: 50%; filter: blur(60px); }
+.hero-glow::before { width: 520px; height: 520px; top: -180px; right: -120px; background: radial-gradient(circle, rgba(76, 143, 232, .55), transparent 65%); animation: drift 14s ease-in-out infinite alternate; }
+.hero-glow::after { width: 420px; height: 420px; bottom: -200px; left: 8%; background: radial-gradient(circle, rgba(242, 107, 33, .45), transparent 65%); animation: drift 18s ease-in-out infinite alternate-reverse; }
+@keyframes drift { from { transform: translate(0, 0) scale(1); } to { transform: translate(-40px, 30px) scale(1.12); } }
+.hero-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 48px; align-items: center; padding-block: 56px 72px; }
+@media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 28px; padding-block: 32px 44px; } }
+.hero-copy { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; min-width: 0; }
+.hero-copy h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(32px, 4.6vw, 54px); line-height: 1.3; color: #fff; }
+.hero-copy h1 em { font-style: normal; color: var(--ember-2); position: relative; white-space: nowrap; }
+.hero-copy h1 em::after { content: ""; position: absolute; inset: auto 0 .06em; height: .14em; border-radius: 1em; background: var(--ember); opacity: .45; }
+.hero-copy p { margin: 0; max-width: 52ch; font-size: 16.5px; opacity: .85; }
+.hero-facts { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-facts li { display: flex; align-items: center; gap: 10px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); border-radius: 14px; padding: 8px 14px 8px 12px; }
+.hero-facts b { font-family: var(--f-display); font-weight: 400; font-size: 24px; color: var(--sky); display: grid; place-items: center; line-height: 1; }
+.hero-facts b .ic { width: 24px; height: 24px; }
+.hero-facts span { font-size: 13.5px; font-weight: 700; }
+.hero-cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.hero-cta .btn { flex: none; }
+.glass { background: var(--card); color: var(--ink); border-radius: 26px; padding: 22px; box-shadow: 0 30px 70px rgba(0, 0, 0, .35); display: flex; flex-direction: column; gap: 6px; position: relative; }
+.glass::before { content: ""; position: absolute; inset: -1px; border-radius: 27px; padding: 1px; background: linear-gradient(140deg, var(--ember), transparent 40%, var(--sky)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+.glass h2 { font-size: 19px; }
+.glass .form { border: 0; padding: 0; }
+
+/* بخش‌ها */
+.band { background: linear-gradient(180deg, var(--card), var(--canvas)); border-bottom: 1px solid var(--hair); }
+.sec { padding-block: 56px 8px; display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 80px; }
+.sec-head { display: flex; flex-direction: column; gap: 6px; max-width: 640px; }
+.sec-head h2, .j-head h2, .faq-aside h2 { font-family: var(--f-display); font-weight: 400; font-size: clamp(26px, 3vw, 34px); line-height: 1.35; color: var(--ink); }
+.sec-head p, .j-head p { margin: 0; color: var(--muted); }
+.doc-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 1000px) { .doc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) { .doc-grid { grid-template-columns: 1fr; } }
+.doc-tile { --c: var(--blue); background: var(--card); border-radius: 22px; padding: 20px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--hair); box-shadow: 0 10px 30px rgba(12, 35, 64, .06); transition: transform .2s, box-shadow .2s; }
+.doc-tile:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(12, 35, 64, .12); }
+.doc-tile.ember { --c: var(--ember); } .doc-tile.violet { --c: var(--violet); } .doc-tile.green { --c: var(--green); }
+.doc-ic { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; color: #fff; background: var(--c); box-shadow: 0 8px 18px color-mix(in srgb, var(--c) 35%, transparent); }
+.doc-ic .ic { width: 26px; height: 26px; }
+.doc-tile h3 { font-size: 17px; }
+.doc-tile ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; font-size: 14px; }
+.doc-tile li { display: flex; gap: 8px; align-items: flex-start; }
+.doc-tile li .ic { width: 17px; height: 17px; color: var(--c); margin-top: 4px; }
+.warn-line { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--amber); font-weight: 700; font-size: 14px; }
+
+.faq-split { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .faq-split { grid-template-columns: 1fr; } }
+.faq-aside { background: var(--navy); color: var(--site-ink-light); border-radius: 26px; padding: 28px; display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden; }
+.faq-aside::after { content: ""; position: absolute; width: 260px; height: 260px; left: -80px; bottom: -120px; border-radius: 50%; background: radial-gradient(circle, rgba(242, 107, 33, .4), transparent 65%); }
+.faq-aside h2 { color: #fff; }
+.faq-aside p { margin: 0; opacity: .8; }
+.sos { display: flex; gap: 12px; align-items: center; margin-top: 10px; position: relative; z-index: 1; }
+.sos > span { width: 50px; height: 50px; border-radius: 16px; background: var(--ember); display: grid; place-items: center; color: #fff; }
+.sos b { display: block; font-size: 13px; opacity: .8; }
+.sos .num { font-family: var(--f-display); font-size: 30px; line-height: 1.1; color: #fff; }
+.faq-list { background: var(--card); border-radius: 22px; border: 1px solid var(--hair); padding: 6px 20px; }
+.faq-list details { border-bottom: 1px solid var(--hair); padding: 14px 0; }
+.faq-list details:last-child { border-bottom: 0; }
+.faq-list summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 700; cursor: pointer; }
+.faq-list summary::-webkit-details-marker { display: none; }
+.faq-list summary .ic { color: var(--ember); transition: transform .2s; flex: none; }
+.faq-list details[open] summary .ic { transform: rotate(180deg); }
+.faq-list p { margin: 8px 0 0; color: var(--muted); }
+.land-demo { padding-block-end: 40px; }
+:root[data-mode="site"] .land-demo .rows { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+:root[data-mode="site"] .land-demo .row { border-bottom: 1px solid var(--hair); border-inline-start: 1px solid var(--hair); }
+@media (max-width: 860px) { :root[data-mode="site"] .land-demo .rows { grid-template-columns: 1fr; } :root[data-mode="site"] .land-demo .row { border-inline-start: 0; } }
+
+/* فاصله زیر برچسب شناور مرحله فعال در گوشی */
+@media (max-width: 640px) { .j-track { padding-bottom: 26px; } }
+
+/* پاصفحه */
+.site-foot { background: var(--navy); color: var(--site-ink-light); margin-top: 40px; }
 .site-foot-in {
-  max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 32px; align-items: center; justify-content: space-between;
-  padding-block: 20px calc(20px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 24px 40px;
+  padding-block: 36px 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.site-foot-in > div { display: flex; flex-direction: column; gap: 2px; }
-.site-foot-in a { color: var(--blue); font-weight: 700; text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
-.site-foot-in small { color: var(--muted); flex-basis: 100%; }
+@media (max-width: 760px) { .site-foot-in { grid-template-columns: 1fr; } }
+.foot-brand { display: flex; gap: 12px; align-items: center; }
+.foot-brand b { display: block; font-family: var(--f-display); font-weight: 400; font-size: 20px; color: #fff; }
+.foot-brand span { font-size: 13.5px; opacity: .75; }
+.foot-col { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.foot-col > b { color: #fff; }
+.foot-col span { opacity: .75; }
+.foot-big { font-family: var(--f-display); font-size: 34px; line-height: 1.1; color: var(--ember-2); opacity: 1 !important; }
+.foot-col a { color: var(--site-ink-light); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; opacity: .85; }
+.foot-col a:hover { opacity: 1; color: #fff; }
+.foot-col a .ic { width: 18px; height: 18px; }
+.foot-note { max-width: 1180px; margin: 0 auto; font-size: 12.5px; opacity: .55; border-top: 1px solid rgba(255, 255, 255, .1);
+  padding-block: 14px calc(14px + env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
-.land-hero { background: var(--blue); color: #fff; border-radius: 0 0 40px 40px; }
-.land-in { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-.land-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 40px; align-items: center; padding-block: 44px 56px; }
-@media (max-width: 860px) { .land-grid { grid-template-columns: 1fr; gap: 24px; padding-block: 28px 36px; } }
-.land-copy { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; min-width: 0; }
-.land-copy h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(28px, 4vw, 42px); line-height: 1.35; }
-.land-copy p { margin: 0; opacity: .92; max-width: 52ch; font-size: 16px; }
-.land-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.land-chips span { display: inline-flex; gap: 6px; align-items: center; background: rgba(255, 255, 255, .16); border-radius: 999px; padding: 6px 12px; font-size: 13.5px; font-weight: 700; }
-.land-chips .ic { width: 18px; height: 18px; }
-.land-app { flex: none; }
-.land-login .form { box-shadow: var(--shadow); border-color: transparent; color: var(--ink); }
-.land-body { gap: 34px; }
-.land-sec { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 90px; }
-.land-sec h2 { font-family: var(--f-display); font-weight: 400; font-size: 26px; color: var(--blue-deep); }
-:root[data-theme="dark"] .land-sec h2 { color: var(--blue); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .land-sec h2 { color: var(--blue); } }
-.land-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 1000px) { .land-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .land-steps { grid-template-columns: 1fr; } }
-.land-steps li { position: relative; background: var(--card); border: 1.5px solid var(--line); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 6px; }
-.land-steps .step-art .illo { width: 100%; max-width: 140px; height: auto; display: block; margin: 0 auto; }
-.land-steps .step-no { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; display: grid; place-items: center; font-weight: 800; }
-.land-steps b { font-size: 16px; }
-.land-steps p { margin: 0; color: var(--muted); font-size: 13.5px; }
-.land-docs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-@media (max-width: 1000px) { .land-docs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .land-docs { grid-template-columns: 1fr; } }
-.land-docs .ocard { padding: 14px 18px; }
-.land-docs b { color: var(--blue); }
-.land-docs ul { margin: 6px 0 0; padding-inline-start: 18px; font-size: 14px; }
-.land-note { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--amber); font-weight: 700; font-size: 14px; }
-.faq.ocard { padding: 4px 18px; }
+/* ================= موشن‌گرافی مسیر پرونده ================= */
+.journey { --j-ms: 4200ms; max-width: 1180px; margin: 0 auto; padding-block: 48px 40px; display: flex; flex-direction: column; gap: 26px; scroll-margin-top: 70px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.journey.compact { padding: 0; gap: 16px; }
+.j-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.j-head > div { display: flex; flex-direction: column; gap: 6px; }
+.j-track { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); padding-top: 40px; }
+.j-rail { position: absolute; top: 64px; inset-inline: calc(100% / var(--n) / 2); height: 6px; border-radius: 6px; background: var(--hair); overflow: hidden; }
+.j-fill { height: 100%; width: calc(var(--p) * 100%); border-radius: 6px; background: linear-gradient(270deg, var(--blue), var(--green) 55%, var(--ember)); transition: width .9s cubic-bezier(.65, 0, .35, 1); }
+.j-token {
+  position: absolute; top: 0; z-index: 2; width: 34px; height: 34px; border-radius: 11px; background: var(--ember); color: #fff; display: grid; place-items: center;
+  right: calc(100% / var(--n) / 2 + (100% - 100% / var(--n)) * var(--p)); transform: translateX(50%);
+  transition: right .9s cubic-bezier(.65, 0, .35, 1); box-shadow: 0 8px 18px rgba(242, 107, 33, .45); animation: bob 1.6s ease-in-out infinite;
+}
+.j-token .ic { width: 20px; height: 20px; }
+@keyframes bob { 50% { margin-top: -5px; } }
+.j-st { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; background: none; border: 0; padding: 0 4px; color: var(--muted); text-align: center; }
+.j-dot { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 18px; background: var(--card); border: 3px solid var(--hair); color: var(--muted); transition: all .4s; }
+.j-lbl { font-size: 13px; font-weight: 700; line-height: 1.5; transition: color .4s; }
+.j-st.done .j-dot { border-color: var(--green); color: var(--green); }
+.j-st.on .j-dot { border-color: var(--ember); background: var(--ember); color: #fff; transform: scale(1.12); box-shadow: 0 0 0 8px color-mix(in srgb, var(--ember) 18%, transparent); }
+.j-st.on .j-lbl { color: var(--ink); }
+.j-st:hover .j-dot { border-color: var(--blue); }
+.journey.compact .j-dot { width: 40px; height: 40px; font-size: 15px; }
+.journey.compact .j-track { padding-top: 34px; }
+.journey.compact .j-rail { top: 51px; }
+.journey.compact .j-token { top: 0; width: 28px; height: 28px; }
+@media (max-width: 640px) {
+  .j-dot { width: 40px; height: 40px; font-size: 15px; }
+  .j-track { padding-top: 34px; }
+  .j-rail { top: 51px; }
+  .j-token { top: 0; width: 28px; height: 28px; }
+  .j-lbl { display: none; }
+  .j-st.on .j-lbl { display: block; position: absolute; top: 46px; white-space: nowrap; font-size: 12px; }
+}
+.journey.compact .j-lbl { display: none; }
+.j-stage { display: grid; }
+.j-card {
+  grid-area: 1 / 1; display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 28px; align-items: center;
+  background: var(--card); border-radius: 26px; padding: 24px 28px; border: 1px solid var(--hair); box-shadow: 0 18px 44px rgba(12, 35, 64, .08);
+  opacity: 0; visibility: hidden; transform: translateY(14px); transition: opacity .5s, transform .5s, visibility 0s .5s;
+}
+.j-card.on { opacity: 1; visibility: visible; transform: none; transition: opacity .5s .15s, transform .5s .15s; }
+.j-card.on .j-art .illo { animation: pop .7s .2s both; }
+@keyframes pop { from { transform: scale(.8) rotate(-4deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.j-art { background: radial-gradient(circle at 50% 60%, var(--blue-tint), transparent 70%); border-radius: 20px; padding: 10px; }
+.j-art .illo { width: 100%; max-width: 240px; height: auto; display: block; margin: 0 auto; }
+.j-txt { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; min-width: 0; }
+.j-txt h3 { font-size: 22px; display: flex; gap: 10px; align-items: center; }
+.j-txt h3 .num { width: 34px; height: 34px; border-radius: 10px; background: var(--navy); color: #fff; display: grid; place-items: center; font-size: 16px; flex: none; }
+.j-txt p { margin: 0; color: var(--muted); font-size: 15px; max-width: 60ch; }
+.j-who { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; font-weight: 800; color: var(--blue-deep); background: var(--blue-tint); border-radius: 999px; padding: 3px 12px; }
+.j-who .ic { width: 16px; height: 16px; }
+.j-when { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; font-weight: 700; color: var(--ember); }
+.j-when .ic { width: 18px; height: 18px; }
+.j-loop { display: flex; gap: 10px; align-items: center; background: var(--amber-tint); color: var(--amber); border-radius: 14px; padding: 8px 12px; font-size: 13.5px; font-weight: 700; }
+.j-loop svg { width: 54px; flex: none; }
+.j-card.on .j-loop path:first-child { animation: dash 1.2s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -20; } }
+.journey.compact .j-card { grid-template-columns: 1fr; gap: 10px; padding: 16px; box-shadow: none; }
+.journey.compact .j-art .illo { max-width: 150px; }
+@media (max-width: 700px) { .j-card { grid-template-columns: 1fr; gap: 12px; padding: 18px; } .j-art .illo { max-width: 170px; } }
+.j-ctrl { display: flex; gap: 8px; align-items: center; justify-content: center; }
+.j-btn { width: 42px; height: 42px; border-radius: 13px; border: 1px solid var(--hair); background: var(--card); color: var(--ink); display: grid; place-items: center; }
+.j-btn:hover { border-color: var(--blue); color: var(--blue); }
+.j-btn.play .ic:last-child, .journey[data-play="0"] .j-btn.play .ic:first-child { display: none; }
+.journey[data-play="0"] .j-btn.play .ic:last-child { display: block; }
+.j-timer { width: 120px; height: 4px; border-radius: 4px; background: var(--hair); overflow: hidden; }
+.j-timer span { display: block; height: 100%; width: 0; background: var(--ember); }
+.j-timer span.run { animation: fillbar var(--j-ms) linear forwards; }
+@keyframes fillbar { to { width: 100%; } }
 
 /* در سایت روی صفحه‌های پهن، برگه‌های کشویی پنجره وسط صفحه‌اند */
 @media (min-width: 760px) {
   :root[data-mode="site"] .sheet {
-    left: 50%; right: auto; top: 50%; bottom: auto; width: min(560px, calc(100vw - 48px)); max-height: 84vh;
+    left: 50%; right: auto; top: 50%; bottom: auto; width: min(600px, calc(100vw - 48px)); max-height: 86vh;
     transform: translate(-50%, -50%); border-radius: 24px; padding-block: 20px; animation: fade .2s;
   }
   :root[data-mode="site"] .sheet .grab { display: none; }
@@ -832,8 +1029,11 @@ const ACTIONS = {
   ins_reject:   { role: 'insurer', from: ['insurer_review', 'objection'], to: 'rejected', label: 'رد پرونده', needsNote: true },
   accept:       { role: 'subscriber', from: ['assessed'], to: 'payment', label: 'قبول مبلغ و درخواست پرداخت' },
   object:       { role: 'subscriber', from: ['assessed'], to: 'objection', label: 'اعتراض به مبلغ', needsNote: true },
-  ins_pay:      { role: 'insurer', from: ['payment'], to: 'paid', label: 'ثبت پرداخت',
-                  guard: c => (c.payment && c.payment.ref && c.payment.date) ? null : 'شماره پیگیری و تاریخ واریز را وارد کنید.' },
+  ins_pay:      { role: 'insurer', from: ['payment'], to: 'paid', label: 'ثبت واریز',
+                  guard: c => {
+                    if (finStage(c) !== 'bank') return 'پیش از ثبت واریز، بررسی مالی، صدور حواله و ارسال به بانک باید انجام شود.';
+                    return (c.payment && c.payment.ref && c.payment.date) ? null : 'شماره پیگیری بانکی و تاریخ واریز را وارد کنید.';
+                  } },
 };
 
 function availableActions(c, role) {
@@ -899,7 +1099,56 @@ function claimCode(seq, date = new Date()) {
   return `GZ-${toJalali(date).jy}-${String(seq).padStart(6, '0')}`;
 }
 
-return { ROLES, STATUS, STEPS, INCIDENT_TYPES, PLACE_TYPES, DAMAGE_KINDS, DOC_TYPES, MIN_PHOTOS, DEFAULT_SETTINGS, hasKind, requiredDocs, visibleDocs, normalizeDigits, isValidNationalId, isValidMobile, isValidSheba, toJalali, jalaliString, parseJalali, daysBetween, sectionIssues, missingForSubmit, openDeficiencies, gasReportIssues, computePayable, ACTIONS, availableActions, canDo, applyAction, waitingOn, slaInfo, claimCode };
+// ---------- فرایند مالی پس از قبول مبلغ ----------
+// در وضعیت «payment» پرونده این زیرمرحله‌ها را به ترتیب طی می‌کند و هر کدام جزئیاتش را نگه می‌دارد.
+const FIN_STAGES = [
+  { id: 'accepted', label: 'تأیید مبلغ توسط مشترک', short: 'تأیید مبلغ' },
+  { id: 'review', label: 'بررسی مالی و استعلام شبا', short: 'بررسی مالی' },
+  { id: 'voucher', label: 'صدور حواله پرداخت', short: 'حواله صادر شد' },
+  { id: 'bank', label: 'ارسال دستور پرداخت به بانک', short: 'ارسال به بانک' },
+  { id: 'paid', label: 'واریز به حساب ذی‌نفع', short: 'واریز شد' },
+];
+const TRANSFER_METHODS = {
+  paya: { label: 'پایا', eta: 'معمولاً در چرخه‌های پایای همان روز یا روز کاری بعد به حساب می‌نشیند' },
+  satna: { label: 'ساتنا', eta: 'معمولاً در همان روز کاری به حساب می‌نشیند' },
+};
+
+function finStage(c) {
+  if (c.status === 'paid') return 'paid';
+  if (c.status !== 'payment') return null;
+  return (c.finance && c.finance.stage) || 'accepted';
+}
+
+const FIN_STEPS = {
+  fin_review: { from: 'accepted', to: 'review', label: 'بررسی مالی و استعلام شبا انجام شد',
+    check: d => (!d.reviewer ? 'نام بررسی‌کننده مالی را وارد کنید.' : !d.shebaMatch ? 'تطبیق شبا با نام ذی‌نفع باید تأیید شود.' : null) },
+  fin_voucher: { from: 'review', to: 'voucher', label: 'حواله پرداخت صادر شد',
+    check: d => (!d.voucherNo ? 'شماره حواله را وارد کنید.' : !parseJalali(d.date) ? 'تاریخ صدور حواله معتبر نیست.' : !(d.amount > 0) ? 'مبلغ حواله باید بیشتر از صفر باشد.' : null) },
+  fin_bank: { from: 'voucher', to: 'bank', label: 'دستور پرداخت به بانک ارسال شد',
+    check: d => (!TRANSFER_METHODS[d.method] ? 'روش انتقال (پایا یا ساتنا) را انتخاب کنید.' : !d.ref ? 'شماره پیگیری دستور پرداخت را وارد کنید.' : !parseJalali(d.date) ? 'تاریخ ارسال معتبر نیست.' : null) },
+};
+const FIN_ACTIONS = FIN_STEPS;
+
+// یک گام مالی را اعمال می‌کند و پرونده جدید برمی‌گرداند.
+function applyFinance(claim, step, data, actor, now = new Date()) {
+  const f = FIN_STEPS[step];
+  if (!f) throw new Error('گام مالی نامعتبر');
+  if (actor.role !== 'insurer') throw new Error('فقط کارشناس بیمه‌گر گام‌های مالی را ثبت می‌کند.');
+  if (finStage(claim) !== f.from) throw new Error('این گام مالی به ترتیب نیست.');
+  const err = f.check(data);
+  if (err) throw new Error(err);
+  const c = structuredClone(claim);
+  const at = now.toISOString();
+  c.finance = { ...(c.finance || {}), stage: f.to, [f.to]: { ...data, at, by: actor.name } };
+  if (f.to === 'voucher') c.payment = { ...(c.payment || {}), amount: data.amount };
+  const note = f.to === 'review' ? (data.note || '')
+    : f.to === 'voucher' ? `حواله ${data.voucherNo} به مبلغ ${data.amount} ریال`
+    : `${TRANSFER_METHODS[data.method].label} — پیگیری ${data.ref}`;
+  c.timeline.push({ at, by: actor.name, role: actor.role, action: step, label: f.label, note });
+  return c;
+}
+
+return { ROLES, STATUS, STEPS, INCIDENT_TYPES, PLACE_TYPES, DAMAGE_KINDS, DOC_TYPES, MIN_PHOTOS, DEFAULT_SETTINGS, hasKind, requiredDocs, visibleDocs, normalizeDigits, isValidNationalId, isValidMobile, isValidSheba, toJalali, jalaliString, parseJalali, daysBetween, sectionIssues, missingForSubmit, openDeficiencies, gasReportIssues, computePayable, ACTIONS, availableActions, canDo, applyAction, waitingOn, slaInfo, claimCode, FIN_STAGES, TRANSFER_METHODS, finStage, FIN_ACTIONS, applyFinance };
 })();
 const S = (() => {
 const { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId } = W;
@@ -907,6 +1156,8 @@ const { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId 
 // در نسخه عملیاتی این لایه با API سرور جایگزین می‌شود (docs/DESIGN.md بخش معماری).
 
 const KEY = 'gii.db.v1';
+// با تغییر ساختار داده نمایشی بالا می‌رود تا مرورگرهای قبلی داده نمونه تازه بگیرند
+const DB_VERSION = 2;
 let db = null;
 
 function uid(p = 'id') { return p + '-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
@@ -1028,7 +1279,7 @@ async function seed() {
   await clearFiles();
   const now = new Date();
   db = {
-    version: 1, seq: 0, settings: { ...DEFAULT_SETTINGS },
+    version: DB_VERSION, seq: 0, settings: { ...DEFAULT_SETTINGS },
     users: [], claims: [], notifications: [], sms: [], reads: {},
   };
   const mk = async (u, pw) => { const user = { id: uid('u'), active: true, mustChangePassword: false, createdAt: daysAgo(40).toISOString(), ...u, pwHash: await hashPw(u.username, pw) }; db.users.push(user); return user; };
@@ -1044,6 +1295,7 @@ async function seed() {
     ['زهرا موسوی', '038765432', '1089123456', '09127778899', 'تهران، شهرری، خیابان فداییان اسلام، پلاک ۳'],
     ['محسن نوری', '047654321', '1091234567', '09129990011', 'شهریار، خیابان ولیعصر، کوچه یاس، پلاک ۱۱'],
     ['فاطمه جعفری', '056543219', '1013579246', '09124443322', 'تهران، تهرانپارس، فلکه دوم، پلاک ۷۰'],
+    ['علیرضا تهرانی', '065432198', '1024681357', '09121234567', 'تهران، ونک، خیابان ملاصدرا، پلاک ۱۸'],
   ];
   const users = [];
   for (const [name, b9, subNo, mobile, address] of subs) {
@@ -1155,6 +1407,35 @@ async function seed() {
   c6.assessment = { adjuster: 'مهندس نادر شریفی', visitDate: jalaliString(daysAgo(55)), note: '', at: daysAgo(50).toISOString(),
     items: [{ category: 'property', title: 'آبگرمکن و لوله‌کشی', claimed: 140000000, approved: 128000000 }, { category: 'property', title: 'بازسازی دیوار پارکینگ', claimed: 90000000, approved: 90000000 }] };
   c6.payment = { ref: '140506118842', date: jalaliString(daysAgo(41)), amount: 196200000 };
+  c6.acceptedAt = daysAgo(49).toISOString();
+  c6.finance = {
+    stage: 'bank',
+    review: { reviewer: 'واحد مالی بیمه‌گر', shebaMatch: true, note: '', at: daysAgo(47).toISOString(), by: ins.name },
+    voucher: { voucherNo: 'H-1405-000006', date: jalaliString(daysAgo(45)), amount: 196200000, at: daysAgo(45).toISOString(), by: ins.name },
+    bank: { method: 'paya', ref: 'P-77810452', date: jalaliString(daysAgo(42)), at: daysAgo(42).toISOString(), by: ins.name },
+  };
+  c6.timeline.splice(c6.timeline.length - 1, 0,
+    { at: daysAgo(47, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_review', label: 'بررسی مالی و استعلام شبا انجام شد', note: '' },
+    { at: daysAgo(45, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_voucher', label: 'حواله پرداخت صادر شد', note: 'حواله H-1405-000006' },
+    { at: daysAgo(42, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_bank', label: 'دستور پرداخت به بانک ارسال شد', note: 'پایا — پیگیری P-77810452' });
+
+  // ۷) قبول مبلغ و حواله صادر شده — نمایش مراحل مالی برای مشترک
+  const c7 = await claim(users[6], {
+    age: 40, status: 'payment', fill: true, gasReport: true,
+    incident: { description: 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', fireReportNo: '۴۷۲۲۵' },
+    damage: { items: [{ title: 'پکیج و لوله‌کشی', qty: 1, amount: 210000000 }, { title: 'کابینت و سقف کاذب', qty: 1, amount: 260000000 }] },
+    steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36], ['gas_start', 'شروع بررسی', 'gas', 35], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 9], ['fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6], ['fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007']],
+    extra: { submitCount: 1, acceptedAt: daysAgo(9).toISOString() },
+  });
+  c7.assessment = { adjuster: 'مهندس نادر شریفی', visitDate: jalaliString(daysAgo(25)), note: 'سقف کاذب با استهلاک ۱۵٪ محاسبه شد.', at: daysAgo(12).toISOString(),
+    items: [{ category: 'property', title: 'پکیج و لوله‌کشی', claimed: 210000000, approved: 195000000 }, { category: 'property', title: 'کابینت و سقف کاذب', claimed: 260000000, approved: 221000000 }] };
+  c7.finance = {
+    stage: 'voucher',
+    review: { reviewer: 'واحد مالی بیمه‌گر', shebaMatch: true, note: 'شبا با کد ملی ذی‌نفع تطبیق داده شد.', at: daysAgo(6).toISOString(), by: ins.name },
+    voucher: { voucherNo: 'H-1405-000007', date: jalaliString(daysAgo(2)), amount: 374400000, at: daysAgo(2).toISOString(), by: ins.name },
+  };
+  c7.payment = { amount: 374400000 };
+  notify({ toUser: users[6].id, text: `حواله پرداخت خسارت پرونده ${c7.code} به شماره H-1405-000007 صادر شد.`, claimId: c7.id });
 
   notify({ toRole: 'gas', text: `پرونده ${db.claims[3].code} از سوی مشترک ارسال شد.`, claimId: db.claims[3].id });
   notify({ toUser: users[0].id, text: `برای پرونده ${c1.code} نقص اعلام شد. لطفاً اصلاح و دوباره ارسال کنید.`, claimId: c1.id });
@@ -1166,7 +1447,7 @@ async function seed() {
   return db;
 }
 
-return { uid, getDb, save, load, putFile, getFile, clearFiles, compressImage, hashPw, tempPassword, notify, sendSms, seed };
+return { DB_VERSION, uid, getDb, save, load, putFile, getFile, clearFiles, compressImage, hashPw, tempPassword, notify, sendSms, seed };
 })();
 const I = (() => {
 // آیکون‌های خطی ۲۴×۲۴ و تصویرسازی کاشی‌ها — همه دست‌ساز و بدون وابستگی.
@@ -1215,6 +1496,9 @@ const P = {
   support: '<path d="M5 13.5V12a7 7 0 0 1 14 0v1.5"/><rect x="3.5" y="13" width="3.5" height="5.5" rx="1.4"/><rect x="17" y="13" width="3.5" height="5.5" rx="1.4"/><path d="M19 18.5c0 1.5-1.5 2.3-4 2.3"/>',
   swap: '<path d="M7 4.5 4 7.5l3 3M4 7.5h12M17 13.5l3 3-3 3M20 16.5H8"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
+  pause: '<rect x="7" y="5.5" width="3.4" height="13" rx="1"/><rect x="13.6" y="5.5" width="3.4" height="13" rx="1"/>',
+  play: '<path d="M16.5 6v12L7.5 12z" fill="currentColor"/>',
+  receipt: '<path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/>',
   refresh: '<path d="M19.5 11A7.5 7.5 0 0 0 6.2 7.2L4.5 9M4.5 13a7.5 7.5 0 0 0 13.3 3.8l1.7-1.8"/><path d="M4.5 4.8V9h4.2M19.5 19.2V15h-4.2"/>',
 };
 
@@ -1420,7 +1704,11 @@ function currentClaim() {
   const mine = visibleClaims();
   return mine.find(c => c.id === st.claimId) || mine.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || null;
 }
-function badge(c) { const s = W.STATUS[c.status]; return `<span class="badge ${s.tone}">${esc(s.short)}</span>`; }
+function badge(c) {
+  const s = W.STATUS[c.status];
+  const label = c.status === 'payment' ? W.FIN_STAGES.find(x => x.id === W.finStage(c)).short : s.short;
+  return `<span class="badge ${s.tone}">${esc(label)}</span>`;
+}
 function slaBadge(c) {
   const s = W.slaInfo(c, db.settings);
   if (!s) return '';
@@ -1452,7 +1740,7 @@ function go(view, p = {}) {
 function render() {
   const app = $('#app');
   const site = MODE === 'site';
-  if (!st.user) { app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); return; }
+  if (!st.user) { app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); if (site) startJourney(); return; }
   if (st.user.mustChangePassword) { app.innerHTML = (site ? siteHeader() : topbar()) + `<main class="page narrow">${viewForcePassword()}</main>`; return; }
   const v = VIEWS[st.user.role][st.view] || VIEWS[st.user.role].home;
   const main = `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>`;
@@ -1473,22 +1761,22 @@ function siteHeader() {
   const u = st.user;
   const n = u ? unreadNotifs().length : 0;
   const nav = u ? navItems().map(i => `<button class="site-link ${i.on ? 'on' : ''}" data-nav="${i.id}" ${i.on ? 'aria-current="page"' : ''}>${icon(i.ic)}<span>${i.id === 'profile' ? esc(u.name) : i.label}</span>${i.dot ? `<span class="dot">${fa(i.dot)}</span>` : ''}</button>`).join('')
-    : `<a class="site-link" href="#steps">مراحل دریافت خسارت</a><a class="site-link" href="#docs">مدارک لازم</a><a class="site-link" href="#faq">پرسش‌های متداول</a>`;
-  return `<header class="site-head"><div class="site-head-in">
-    <div class="brand">${logoHtml(46)}<div><b>بیمه حوادث مشترکین گاز</b><small>${esc(u ? W.ROLES[u.role] : brandSetting('orgName') || 'سامانه پرونده خسارت')}</small></div></div>
+    : `<a class="site-link" href="#journey">مسیر پرونده</a><a class="site-link" href="#docs">مدارک لازم</a><a class="site-link" href="#faq">پرسش‌ها</a>`;
+  return `<header class="site-head ${u ? '' : 'on-hero'}"><div class="site-head-in">
+    <div class="brand">${logoHtml(44)}<div><b>بیمه حوادث مشترکین گاز</b><small>${esc(u ? W.ROLES[u.role] : brandSetting('orgName') || 'سامانه پرونده خسارت')}</small></div></div>
     <nav class="site-nav" aria-label="ناوبری اصلی">${nav}</nav>
     <div class="site-tools">
       <button class="sq-btn" data-act="help" aria-label="پرسش‌های متداول">${icon('help')}</button>
-      ${u ? `<button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>` : `<a class="btn sm ghost-light" href="#login">${icon('lock')} ورود</a>`}
+      ${u ? `<button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>` : `<a class="btn sm ember" href="#login">${icon('lock')} ورود</a>`}
     </div>
   </div></header>`;
 }
 function siteFooter() {
   return `<footer class="site-foot"><div class="site-foot-in">
-    <div><b>اورژانس گاز: <span class="num">۱۹۴</span></b><span>در صورت بوی گاز، شیر اصلی را ببندید و از محل خارج شوید.</span></div>
-    ${OTHER_URL ? `<div><a href="${esc(OTHER_URL)}">${icon('sms')} نسخه اپ موبایل (قابل نصب روی گوشی)</a></div>` : ''}
-    <small>داده‌های نسخه نمایشی فقط در همین مرورگر ذخیره می‌شود و با اپ موبایل روی همین دستگاه مشترک است.</small>
-  </div></footer>`;
+    <div class="foot-brand">${logoHtml(52)}<div><b>بیمه حوادث مشترکین گاز</b><span>تشکیل، تکمیل و پیگیری آنلاین پرونده خسارت حوادث گاز طبیعی</span></div></div>
+    <div class="foot-col"><b>اورژانس گاز</b><span class="foot-big num">۱۹۴</span><span>بوی گاز؟ شیر اصلی را ببندید، کلید برق نزنید و از محل خارج شوید.</span></div>
+    <div class="foot-col"><b>دسترسی</b>${OTHER_URL ? `<a href="${esc(OTHER_URL)}">${icon('sms')} اپ موبایل قابل نصب</a>` : ''}<a href="#journey">${icon('history')} مسیر پرونده</a><a href="#faq">${icon('help')} پرسش‌های متداول</a></div>
+  </div><div class="foot-note">داده‌های نسخه نمایشی فقط در همین مرورگر ذخیره می‌شود و با اپ موبایل روی همین دستگاه مشترک است.</div></footer>`;
 }
 
 function topbar() {
@@ -1569,7 +1857,7 @@ function openSheet(html) {
   const f = root.querySelector('textarea, input:not([type=hidden])');
   if (f) setTimeout(() => f.focus(), 50);
 }
-function closeSheet() { const s = $('#sheet'); if (s) s.remove(); }
+function closeSheet() { const s = $('#sheet'); if (s) s.remove(); clearInterval(otpTick); }
 
 // ================= فایل‌ها =================
 const urlCache = new Map();
@@ -1643,6 +1931,7 @@ const DEMO = [
   { u: '1023456789', p: '123456', t: 'مشترک — پرونده دارای نقص', s: 'حمید رضایی', ic: 'alert' },
   { u: '1045678912', p: '123456', t: 'مشترک — منتظر تأیید مبلغ', s: 'مریم احمدی', ic: 'money' },
   { u: '1067891234', p: '123456', t: 'مشترک — ورود اول با رمز موقت', s: 'رضا کریمی', ic: 'key' },
+  { u: '1024681357', p: '123456', t: 'مشترک — حواله صادر شده', s: 'علیرضا تهرانی', ic: 'receipt' },
   { u: 'gas', p: 'gas123', t: 'کارشناس شرکت گاز', s: 'سارا کاظمی', ic: 'flame' },
   { u: 'bime', p: 'bime123', t: 'کارشناس بیمه‌گر', s: 'علی محمدی', ic: 'shield' },
   { u: 'admin', p: 'admin123', t: 'مدیر سامانه', s: 'کاربران، تنظیمات و گزارش', ic: 'settings' },
@@ -1666,6 +1955,7 @@ function loginForm() {
   return `<form class="form" data-form="login" autocomplete="on" id="login">
       <label class="fld" for="lg-user"><span>نام کاربری</span><input id="lg-user" name="username" type="text" class="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="برای مشترکین: شماره اشتراک گاز"></label>
       <label class="fld" for="lg-pass"><span>رمز عبور</span><input id="lg-pass" name="password" type="password" class="ltr" autocomplete="current-password" required placeholder="رمز عبور یا رمز موقت پیامک‌شده"></label>
+      <button class="link forgot" type="button" data-act="forgot">${icon('key')} رمز عبور را فراموش کرده‌ام</button>
       <button class="btn" type="submit">${icon('lock')} ورود به سامانه</button>
       <div class="note info">${icon('help')}<div>حساب مشترک را شرکت گاز پس از مراجعه حضوری شما می‌سازد و نام کاربری و رمز موقت را پیامک می‌کند.</div></div>
     </form>`;
@@ -1676,42 +1966,108 @@ function demoRows() {
       <p class="demo-tag">همه اشخاص، پرونده‌ها و مبالغ نسخه نمایشی ساختگی‌اند و فقط در همین مرورگر ذخیره می‌شوند.</p>`;
 }
 
-// صفحه نخست سایت: معرفی، ورود، مراحل، مدارک و پرسش‌ها
-function viewLanding() {
-  const steps = [
-    ['userPlus', 'var(--green)', 'مراجعه به شرکت گاز', 'با کارت ملی و گزارش آتش‌نشانی به امور حوادث شرکت گاز منطقه بروید. حساب شما ساخته و رمز موقت پیامک می‌شود.'],
-    ['folderUp', 'var(--blue)', 'تکمیل پرونده', 'وارد سامانه شوید؛ اطلاعات حادثه، خسارت‌ها، عکس‌ها، مدارک و شماره شبا را بارگذاری و ارسال کنید.'],
-    ['meter', 'var(--orange)', 'بررسی شرکت گاز', 'کارشناس گاز بازدید می‌کند و مدارک را بررسی می‌کند. اگر نقصی باشد، پیامک می‌گیرید و اصلاح می‌کنید.'],
-    ['trackRial', 'var(--violet)', 'ارزیابی بیمه‌گر', 'بیمه‌گر خسارت را ارزیابی و مبلغ را اعلام می‌کند. می‌توانید بپذیرید یا اعتراض کنید.'],
-    ['payment', 'var(--green)', 'پرداخت', 'مبلغ به حساب شبای شما واریز و شماره پیگیری پیامک می‌شود.'],
+// ---------- مسیر پرونده (موشن‌گرافی مراحل) ----------
+// شش ایستگاه از حادثه تا واریز؛ نشانگر پرونده روی مسیر حرکت می‌کند و کارت هر مرحله جایگزین قبلی می‌شود.
+// مهلت‌ها از تنظیمات مدیر خوانده می‌شود تا با قرارداد جاری یکی باشد.
+function journeySteps() {
+  const s = db.settings;
+  return [
+    { art: 'houseFire', a: '#f26b21', b: '#3a8cc3', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، با کارت ملی و گزارش آتش‌نشانی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
+    { art: 'sms', a: '#3a8cc3', b: '#1f9d57', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
+    { art: 'folderUp', a: '#1f9d57', b: '#3a8cc3', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
+    { art: 'meter', a: '#f2a024', b: '#3a8cc3', who: 'شرکت گاز', t: 'بازدید و بررسی شرکت گاز', d: 'کارشناس از محل بازدید و مدارک را بررسی می‌کند، سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
+    { art: 'trackRial', a: '#6d5bd0', b: '#3a8cc3', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
+    { art: 'payment', a: '#1f9d57', b: '#f26b21', who: 'مشترک و بیمه‌گر', t: 'تأیید مبلغ و واریز', d: 'مبلغ را می‌پذیرید یا با دلیل اعتراض می‌کنید. پس از تأیید، خسارت به شبای شما واریز و شماره پیگیری پیامک می‌شود.', when: 'پس از تأیید شما' },
   ];
-  const docs = [
-    ['همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه']],
-    ['آتش‌سوزی و انفجار', ['گزارش آتش‌نشانی', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
-    ['مصدومیت', ['پرونده پزشکی و صورت‌حساب بیمارستان', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
-    ['فوت', ['گواهی فوت', 'گواهی انحصار وراثت و مدارک وراث', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
-  ];
-  return `<section class="land-hero"><div class="land-in land-grid">
-      <div class="land-copy">
-        ${brandSetting('orgName') ? `<div class="org-name">${esc(brandSetting('orgName'))}</div>` : ''}
-        <h1>پرونده خسارت حادثه گاز را آنلاین تشکیل و پیگیری کنید</h1>
-        <p>پس از آتش‌سوزی، انفجار یا گازگرفتگی، مدارک را بدون رفت‌وآمد بارگذاری کنید و مراحل بررسی شرکت گاز و پرداخت بیمه‌گر را لحظه‌به‌لحظه ببینید.</p>
-        <div class="land-chips"><span>${icon('upload')} بارگذاری مدارک</span><span>${icon('flame')} بررسی شرکت گاز</span><span>${icon('money')} پرداخت بیمه‌گر</span></div>
-        ${OTHER_URL ? `<a class="btn ghost-light land-app" href="${esc(OTHER_URL)}">${icon('sms')} نصب اپ موبایل</a>` : ''}
-      </div>
-      <div class="land-login">${loginForm()}</div>
-    </div></section>
-    <main class="page land-body">
-      <section id="steps" class="land-sec"><h2>مراحل دریافت خسارت</h2>
-        <ol class="land-steps">${steps.map(([art, c, t, d], i) => `<li><div class="step-art">${illo(art, c, 'var(--blue)')}</div><span class="step-no">${fa(i + 1)}</span><b>${t}</b><p>${d}</p></li>`).join('')}</ol></section>
-      <section id="docs" class="land-sec"><h2>مدارک لازم</h2>
-        <div class="land-docs">${docs.map(([t, list]) => `<div class="ocard"><b>${t}</b><ul>${list.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')}</div>
-        <p class="land-note">${icon('alert')} تا ثبت عکس‌ها و بازدید کارشناس، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p></section>
-      <section id="faq" class="land-sec"><h2>پرسش‌های متداول</h2>
-        <div class="faq ocard">${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div></section>
-      <section class="land-sec">${demoRows()}</section>
-    </main>`;
 }
+function journeyHtml(compact = false) {
+  const steps = journeySteps();
+  return `<section class="journey ${compact ? 'compact' : ''}" id="journey" data-i="0" style="--n:${steps.length};--p:0" aria-roledescription="نمایش مرحله‌به‌مرحله">
+    ${compact ? '' : `<div class="j-head"><div><span class="eyebrow">مسیر پرونده شما</span><h2>از تشکیل پرونده تا دریافت خسارت</h2><p>شش ایستگاه، با مهلت هر مرحله و اینکه کار دست کیست.</p></div></div>`}
+    <div class="j-track" role="tablist" aria-label="مراحل پرونده">
+      <div class="j-rail"><div class="j-fill"></div></div>
+      <div class="j-token" aria-hidden="true">${icon('doc')}</div>
+      ${steps.map((st_, i) => `<button class="j-st" role="tab" data-act="jGo" data-i="${i}" aria-label="مرحله ${fa(i + 1)}: ${st_.t}"><span class="j-dot">${fa(i + 1)}</span><span class="j-lbl">${st_.t}</span></button>`).join('')}
+    </div>
+    <div class="j-stage" aria-live="polite">${steps.map((st_, i) => `<article class="j-card" data-k="${i}">
+        <div class="j-art">${illo(st_.art, st_.a, st_.b)}</div>
+        <div class="j-txt"><span class="j-who">${icon(st_.who === 'بیمه‌گر' ? 'shield' : st_.who === 'شرکت گاز' ? 'flame' : 'user')} ${st_.who}</span>
+          <h3><span class="num">${fa(i + 1)}</span> ${st_.t}</h3><p>${st_.d}</p>
+          <span class="j-when">${icon('clock')} ${st_.when}</span>
+          ${st_.loop ? `<div class="j-loop"><svg viewBox="0 0 64 28" aria-hidden="true"><path d="M58 22C58 6 6 6 6 22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5 5"/><path d="M2 16l4 7 5-6" fill="none" stroke="currentColor" stroke-width="2.5"/></svg><span>${st_.loop}</span></div>` : ''}
+        </div></article>`).join('')}</div>
+    <div class="j-ctrl">
+      <button class="j-btn" data-act="jStep" data-d="-1" aria-label="مرحله قبل">${icon('chevR')}</button>
+      <button class="j-btn play" data-act="jPlay" aria-label="توقف یا پخش">${icon('pause')}${icon('play')}</button>
+      <button class="j-btn" data-act="jStep" data-d="1" aria-label="مرحله بعد">${icon('chevL')}</button>
+      <div class="j-timer"><span></span></div>
+    </div>
+  </section>`;
+}
+const J_MS = 4200;
+let jTimer = null;
+function jSet(i) {
+  const j = $('.journey'); if (!j) return;
+  const n = journeySteps().length;
+  i = (i + n) % n;
+  j.dataset.i = i;
+  j.style.setProperty('--p', i / (n - 1));
+  j.querySelectorAll('.j-st').forEach((b, k) => { b.classList.toggle('done', k < i); b.classList.toggle('on', k === i); b.setAttribute('aria-selected', k === i); });
+  j.querySelectorAll('.j-card').forEach((c, k) => { c.classList.toggle('on', k === i); c.setAttribute('aria-hidden', k !== i); });
+  const bar = j.querySelector('.j-timer span');
+  bar.classList.remove('run'); void bar.offsetWidth;
+  if (j.dataset.play === '1') bar.classList.add('run');
+}
+function startJourney() {
+  clearInterval(jTimer); jTimer = null;
+  const j = $('.journey'); if (!j) return;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  j.dataset.play = reduced ? '0' : '1';
+  j.style.setProperty('--j-ms', J_MS + 'ms');
+  jSet(0);
+  jTimer = setInterval(() => {
+    const jj = $('.journey');
+    if (!jj) { clearInterval(jTimer); jTimer = null; return; }
+    if (jj.dataset.play === '1' && !document.hidden) jSet(+jj.dataset.i + 1);
+  }, J_MS);
+}
+
+// صفحه نخست سایت: معرفی و ورود، مسیر پرونده، مدارک، پرسش‌ها
+function viewLanding() {
+  const docs = [
+    ['doc', 'blue', 'همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه']],
+    ['flame', 'ember', 'آتش‌سوزی و انفجار', ['گزارش آتش‌نشانی', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
+    ['people', 'violet', 'مصدومیت', ['پرونده پزشکی و صورت‌حساب بیمارستان', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+    ['alert', 'green', 'فوت', ['گواهی فوت', 'گواهی انحصار وراثت و مدارک وراث', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+  ];
+  return `<section class="hero"><div class="hero-glow" aria-hidden="true"></div><div class="wrap hero-grid">
+      <div class="hero-copy">
+        ${brandSetting('orgName') ? `<span class="eyebrow light">${esc(brandSetting('orgName'))}</span>` : ''}
+        <h1>خسارت حادثه گاز را <em>بی‌رفت‌وآمد</em> پیگیری کنید</h1>
+        <p>پس از آتش‌سوزی، انفجار یا گازگرفتگی، مدارک را آنلاین بفرستید و ببینید پرونده‌تان در شرکت گاز و نزد بیمه‌گر به کجا رسیده است.</p>
+        <ul class="hero-facts">
+          <li><b class="num">۶</b><span>ایستگاه شفاف تا واریز</span></li>
+          <li><b>${icon('sms')}</b><span>پیامک در هر مرحله</span></li>
+          <li><b>${icon('alert')}</b><span>اعلام دقیق هر نقص</span></li>
+        </ul>
+        <div class="hero-cta"><a class="btn ember" href="#journey">${icon('history')} مسیر پرونده را ببینید</a>${OTHER_URL ? `<a class="btn ghost-light" href="${esc(OTHER_URL)}">${icon('sms')} اپ موبایل</a>` : ''}</div>
+      </div>
+      <div class="hero-login"><div class="glass"><h2>ورود به سامانه</h2>${loginForm()}</div></div>
+    </div></section>
+    <div class="band">${journeyHtml()}</div>
+    <section id="docs" class="wrap sec">
+      <div class="sec-head"><span class="eyebrow">پیش از شروع</span><h2>مدارک لازم</h2><p>سامانه فهرست دقیق را بر اساس نوع حادثه و خسارت شما می‌سازد؛ این خلاصه برای آمادگی است.</p></div>
+      <div class="doc-grid">${docs.map(([ic, tone, t, list]) => `<article class="doc-tile ${tone}"><span class="doc-ic">${icon(ic)}</span><h3>${t}</h3><ul>${list.map(x => `<li>${icon('check')}${x}</li>`).join('')}</ul></article>`).join('')}</div>
+      <p class="warn-line">${icon('alert')} تا ثبت عکس‌ها و بازدید کارشناس، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p>
+    </section>
+    <section id="faq" class="wrap sec faq-split">
+      <div class="faq-aside"><span class="eyebrow light">پاسخ سریع</span><h2>پرسش‌های متداول</h2><p>پاسخ رایج‌ترین پرسش‌ها درباره پوشش، مدارک، نقص پرونده و اعتراض.</p>
+        <div class="sos"><span>${icon('flame')}</span><div><b>اورژانس گاز</b><span class="num">۱۹۴</span></div></div></div>
+      <div class="faq faq-list">${FAQ.map(([q, a]) => `<details><summary>${q}${icon('chevD')}</summary><p>${a}</p></details>`).join('')}</div>
+    </section>
+    <section class="wrap sec land-demo">${demoRows()}</section>`;
+}
+
 async function doLogin(username, password) {
   const uname = W.normalizeDigits(username).trim();
   const u = db.users.find(x => x.username.toLowerCase() === uname.toLowerCase());
@@ -1754,7 +2110,8 @@ function subHome() {
   const multi = visibleClaims().length > 1;
   let bar;
   if (c.status === 'paid') bar = `<div class="pill-bar green"><span>مبلغ پرداخت‌شده:</span><span class="amt num">${money(c.payment?.amount || pay)}</span></div>`;
-  else if (['assessed', 'payment', 'objection'].includes(c.status)) bar = `<div class="pill-bar"><span>مبلغ تعیین‌شده خسارت:</span><span class="amt num">${money(pay)}</span></div>`;
+  else if (c.status === 'payment') bar = `<div class="pill-bar"><span>${esc(W.FIN_STAGES.find(x => x.id === W.finStage(c)).label)}:</span><span class="amt num">${money(c.payment?.amount || pay)}</span></div>`;
+  else if (['assessed', 'objection'].includes(c.status)) bar = `<div class="pill-bar"><span>مبلغ تعیین‌شده خسارت:</span><span class="amt num">${money(pay)}</span></div>`;
   else if (c.status === 'returned') bar = `<div class="pill-bar orange"><span>نقص پرونده:</span><span class="amt">${fa(W.openDeficiencies(c).length)} مورد</span></div>`;
   else if (c.status === 'rejected') bar = `<div class="pill-bar red"><span>وضعیت پرونده:</span><span class="amt">رد شده</span></div>`;
   else bar = `<div class="pill-bar"><span>وضعیت پرونده:</span><span class="amt">${esc(status.short)}</span></div>`;
@@ -1774,6 +2131,7 @@ function subHome() {
   ${bar}
   ${c.status === 'returned' ? `<div class="note warn">${icon('alert')}<div><b>شرکت گاز پرونده را برای اصلاح برگردانده است</b>
       <ul>${W.openDeficiencies(c).map(d => `<li>${esc(d.title)}: ${esc(d.note)}${d.reply ? ' — <i>پاسخ داده شد</i>' : ''}</li>`).join('')}</ul></div></div>` : ''}
+  ${['payment', 'paid'].includes(c.status) ? `<button class="note info as-link" data-go="track">${icon('receipt')}<div><b>${c.status === 'paid' ? 'رسید واریز خسارت' : 'پرداخت در جریان است'}</b>مراحل مالی، شماره حواله و پیگیری بانکی را در «پیگیری پرونده» ببینید.</div>${icon('chevL', 'chev')}</button>` : ''}
   ${c.status === 'assessed' ? `<div class="note info">${icon('money')}<div><b>مبلغ خسارت شما تعیین شد</b>برای دیدن جزئیات و قبول یا اعتراض، «پیگیری پرونده» را باز کنید.</div></div>` : ''}
   <div class="well">
     <div class="tiles">
@@ -1954,9 +2312,78 @@ function offerBlock(c) {
     ${c.assessment.note ? `<div class="note info">${icon('chat')}<div><b>توضیح ارزیاب (${esc(c.assessment.adjuster)})</b>${esc(c.assessment.note)}</div></div>` : ''}
     ${c.objection ? `<div class="note warn">${icon('alert')}<div><b>اعتراض مشترک — ${fdate(c.objection.at)}</b>${esc(c.objection.note)}</div></div>` : ''}
     ${c.status === 'assessed' && st.user.role === 'subscriber' ? `<div class="btns"><button class="btn green" data-act="doAction" data-action="accept">${icon('check')} قبول مبلغ</button><button class="btn ghost" data-act="doAction" data-action="object">اعتراض به مبلغ</button></div>` : ''}
-    ${c.status === 'paid' ? `<div class="note ok">${icon('checkC')}<div><b>واریز شد</b>شماره پیگیری <span class="num">${fa(c.payment.ref)}</span> — تاریخ ${fa(c.payment.date)}</div></div>` : ''}
-    ${c.status === 'payment' ? `<div class="note info">${icon('clock')}<div>درخواست پرداخت ثبت شد. پس از واریز، شماره پیگیری اینجا و با پیامک اعلام می‌شود.</div></div>` : ''}
+  </div>${financeBlock(c)}`;
+}
+
+// ---------- پنل مالی: از قبول مبلغ تا واریز ----------
+const maskSheba = v => v ? `${v.slice(0, 4)} •••• •••• ${v.slice(-4)}` : '—';
+const FIN_WAIT = {
+  review: 'واحد مالی بیمه‌گر مدارک پرداخت را کنترل و شبای شما را با نام ذی‌نفع تطبیق می‌دهد.',
+  voucher: 'پس از بررسی مالی، حواله پرداخت به نام شما صادر می‌شود.',
+  bank: 'حواله برای انتقال پایا یا ساتنا به بانک فرستاده می‌شود.',
+  paid: 'مبلغ به حساب شبای شما واریز و شماره پیگیری بانکی پیامک می‌شود.',
+};
+function finDetails(c, id) {
+  const f = c.finance || {};
+  const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
+  const num_ = v => `<span class="num" dir="ltr">${esc(fa(v))}</span>`;
+  if (id === 'accepted') return [['تاریخ تأیید شما', fdt(c.acceptedAt)], ['مبلغ پذیرفته‌شده', money(r.payable)]];
+  if (id === 'review' && f.review) return [['بررسی‌کننده', esc(f.review.reviewer)], ['تطبیق شبا با نام ذی‌نفع', `<span class="ok-txt">${icon('check')} تأیید شد</span>`], ['زمان بررسی', fdt(f.review.at)], ...(f.review.note ? [['توضیح', esc(f.review.note)]] : [])];
+  if (id === 'voucher' && f.voucher) return [['شماره حواله', num_(f.voucher.voucherNo)], ['تاریخ صدور', fa(f.voucher.date)], ['مبلغ حواله', money(f.voucher.amount)], ['صادرکننده', esc(f.voucher.by)]];
+  if (id === 'bank' && f.bank) return [['روش انتقال', W.TRANSFER_METHODS[f.bank.method].label], ['پیگیری دستور پرداخت', num_(f.bank.ref)], ['تاریخ ارسال به بانک', fa(f.bank.date)], ['زمان تقریبی واریز', W.TRANSFER_METHODS[f.bank.method].eta]];
+  if (id === 'paid' && c.status === 'paid') return [['شماره پیگیری بانکی', num_(c.payment.ref)], ['تاریخ واریز', fa(c.payment.date)], ['مبلغ واریزی', money(c.payment.amount)], ['حساب مقصد', `<span class="num" dir="ltr">${maskSheba(c.bank.sheba)}</span>`], ['صاحب حساب', esc(c.bank.holder)]];
+  return null;
+}
+function financeBlock(c) {
+  const stage = W.finStage(c);
+  if (!stage || !c.assessment) return '';
+  const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
+  const due = c.payment?.amount || r.payable;
+  const paid = c.status === 'paid' ? due : 0;
+  const cur = W.FIN_STAGES.findIndex(x => x.id === stage);
+  const receipt = c.status === 'paid' ? `رسید واریز خسارت — پرونده ${c.code}\nمبلغ: ${nf.format(c.payment.amount)} ریال\nتاریخ واریز: ${c.payment.date}\nپیگیری بانکی: ${c.payment.ref}\nحواله: ${c.finance?.voucher?.voucherNo || '—'}\nحساب مقصد: ${maskSheba(c.bank.sheba)} — ${c.bank.holder}` : '';
+  return `<div class="form fin">
+    <div class="fin-head"><h2>${icon('receipt')} وضعیت مالی و پرداخت</h2><span class="badge ${c.status === 'paid' ? 'ok' : 'accent'}">${W.FIN_STAGES[cur].short}</span></div>
+    <div class="fin-sum">
+      <div><span>خسارت نهایی تأییدشده</span><b class="num">${money(due)}</b></div>
+      <div><span>پرداخت‌شده</span><b class="num ok-txt">${money(paid)}</b></div>
+      <div><span>مانده</span><b class="num">${money(due - paid)}</b></div>
+    </div>
+    <ol class="fin-steps">${W.FIN_STAGES.map((fs, i) => {
+      const cls = c.status === 'paid' || i < cur ? 'done' : i === cur ? 'on' : 'todo';
+      const det = cls !== 'todo' ? finDetails(c, fs.id) : null;
+      return `<li class="${cls}"><span class="fin-dot">${cls === 'done' ? icon('check') : fa(i + 1)}</span><div class="fin-body"><b>${fs.label}</b>
+        ${det ? `<dl class="fin-kv">${det.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : `<span class="muted">${cls === 'on' ? 'در حال انجام — ' : ''}${FIN_WAIT[fs.id] || ''}</span>`}</div></li>`;
+    }).join('')}</ol>
+    ${receipt ? `<div class="receipt"><div>${icon('checkC')}<b>خسارت به حساب شما واریز شد</b></div><button class="btn sm ghost" data-act="copyCred" data-text="${esc(receipt)}">${icon('copy')} رونوشت رسید</button></div>` : ''}
   </div>`;
+}
+function finForm(c) {
+  if (st.user.role !== 'insurer' || c.status !== 'payment') return '';
+  const stage = W.finStage(c);
+  const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
+  const today = fa(W.jalaliString(new Date()));
+  const sub = userById(c.subscriberId);
+  if (stage === 'accepted') return `<form class="form" data-form="fin" data-step="fin_review"><b>گام بعد: بررسی مالی و استعلام شبا</b>
+    <label class="fld" for="fn-rev"><span>بررسی‌کننده مالی</span><input id="fn-rev" name="reviewer" value="${esc(st.user.name)}" required></label>
+    <label class="check"><input type="checkbox" id="fn-sheba" name="shebaMatch"><span>استعلام شد: شبای <span class="num" dir="ltr">${esc(c.bank.sheba)}</span> به نام «${esc(c.bank.holder)}» است و با ذی‌نفع پرونده (${esc(sub?.name || '')}) مطابقت دارد.</span></label>
+    <label class="fld" for="fn-note"><span>توضیح (اختیاری)</span><textarea id="fn-note" name="note" style="min-height:60px"></textarea></label>
+    <button class="btn green" type="submit">${icon('check')} ثبت بررسی مالی</button></form>`;
+  if (stage === 'review') return `<form class="form" data-form="fin" data-step="fin_voucher"><b>گام بعد: صدور حواله پرداخت</b>
+    <div class="grid2"><label class="fld" for="fn-vno"><span>شماره حواله</span><input id="fn-vno" name="voucherNo" class="ltr" required value="H-${W.toJalali(new Date()).jy}-${esc(c.code.slice(-6))}"></label>
+    <label class="fld" for="fn-vdate"><span>تاریخ صدور</span><input id="fn-vdate" name="date" class="ltr" required value="${today}"></label></div>
+    <div class="sumline total"><span>مبلغ حواله (طبق ارزیابی)</span><b>${money(r.payable)}</b></div><input type="hidden" name="amount" value="${r.payable}">
+    <button class="btn green" type="submit">${icon('receipt')} صدور حواله</button></form>`;
+  if (stage === 'voucher') return `<form class="form" data-form="fin" data-step="fin_bank"><b>گام بعد: ارسال دستور پرداخت به بانک</b>
+    <div class="grid2"><label class="fld" for="fn-m"><span>روش انتقال</span><select id="fn-m" name="method">${Object.entries(W.TRANSFER_METHODS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+    <label class="fld" for="fn-ref"><span>شماره پیگیری دستور پرداخت</span><input id="fn-ref" name="ref" class="ltr" required></label>
+    <label class="fld" for="fn-bdate"><span>تاریخ ارسال</span><input id="fn-bdate" name="date" class="ltr" required value="${today}"></label></div>
+    <small class="muted">مقصد: <span class="num" dir="ltr">${esc(c.bank.sheba)}</span> — ${esc(c.bank.holder)}</small>
+    <button class="btn green" type="submit">${icon('send')} ثبت ارسال به بانک</button></form>`;
+  return `<div class="form"><b>گام آخر: ثبت واریز</b>
+    <div class="grid2">${field('شماره پیگیری بانکی واریز', 'payment.ref', fa(c.payment?.ref), { req: true, ltr: true })}${field('تاریخ واریز', 'payment.date', fa(c.payment?.date), { req: true, ltr: true, ph: today })}</div>
+    <div class="sumline total"><span>مبلغ واریزی</span><b>${money(c.payment?.amount || r.payable)}</b></div>
+    <button class="btn green" data-act="doAction" data-action="ins_pay">${icon('checkC')} ثبت واریز و اطلاع به مشترک</button></div>`;
 }
 
 function timelineBlock(c) {
@@ -2247,11 +2674,7 @@ function reviewAssess(c) {
   const a = c.assessment || { adjuster: '', visitDate: '', note: '', items: [] };
   const r = W.computePayable(a.items, db.settings, c.damage.deceased?.length || 0);
   const cat = { property: 'مالی', medical: 'درمان', death: 'فوت' };
-  const payForm = role === 'insurer' && c.status === 'payment' ? `<div class="form"><b>ثبت پرداخت</b>
-      <div class="grid2">${field('شماره پیگیری واریز', 'payment.ref', fa(c.payment?.ref), { req: true, ltr: true })}${field('تاریخ واریز', 'payment.date', fa(c.payment?.date), { req: true, ltr: true, ph: '۱۴۰۵/۰۸/۱۰' })}</div>
-      <div class="sumline total"><span>مبلغ واریزی</span><b>${money(r.payable)}</b></div>
-      <small>شماره شبا: <span dir="ltr" class="num">${esc(c.bank.sheba)}</span> — ${esc(c.bank.holder)}</small></div>` : '';
-  if (dis) return offerBlock(c) + payForm;
+  if (dis) return offerBlock(c) + finForm(c);
   return `<div class="form">
     ${c.objection && c.status === 'objection' ? `<div class="note warn">${icon('alert')}<div><b>اعتراض مشترک</b>${esc(c.objection.note)}</div></div>` : ''}
     <div class="grid2">${field('ارزیاب خسارت', 'assessment.adjuster', a.adjuster, { req: true })}${field('تاریخ بازدید ارزیاب', 'assessment.visitDate', fa(a.visitDate), { ltr: true, ph: '۱۴۰۵/۰۷/۲۸' })}</div>
@@ -2386,16 +2809,8 @@ function helpSheet() {
     <div class="support"><span class="av">${icon('support')}</span>اورژانس گاز: <span class="num">۱۹۴</span></div>`);
 }
 function guideSheet() {
-  openSheet(`<h2>مراحل پرونده</h2><ul class="tl">
-    <li><div class="t">۱. مراجعه به شرکت گاز</div><div class="s">ثبت مشترک، تشکیل پرونده و پیامک نام کاربری و رمز موقت</div></li>
-    <li><div class="t">۲. تکمیل پرونده توسط مشترک</div><div class="s">اطلاعات حادثه، خسارت‌ها، عکس‌ها، مدارک و شبا؛ سپس ارسال</div></li>
-    <li><div class="t">۳. بررسی شرکت گاز</div><div class="s">بازدید کارشناس، بررسی مدارک؛ در صورت نقص، بازگشت به مشترک</div></li>
-    <li><div class="t">۴. بررسی بیمه‌گر</div><div class="s">ارزیابی خسارت؛ در صورت نیاز درخواست مدارک تکمیلی از طریق شرکت گاز</div></li>
-    <li><div class="t">۵. تأیید مبلغ و پرداخت</div><div class="s">قبول یا اعتراض مشترک، سپس واریز به شبا و اعلام شماره پیگیری</div></li></ul>`);
-}
-function isDark() {
-  const t = document.documentElement.dataset.theme;
-  return t ? t === 'dark' : !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  openSheet(`<h2>مسیر پرونده</h2><p class="lead">از تشکیل پرونده تا دریافت خسارت</p>${journeyHtml(true)}`);
+  startJourney();
 }
 function profileSheet() {
   const dark = isDark();
@@ -2475,6 +2890,11 @@ function setPath(obj, path, val) {
 
 // ================= رویدادها =================
 const ACTS = {
+  forgot: () => forgotSheet('id'),
+  otpResend: async () => { if (!rst) return forgotSheet('id'); await sendOtp(rst.username, rst.mobile); forgotSheet('code'); toast('کد تازه ارسال شد.'); },
+  jGo: el => { const j = $('.journey'); j.dataset.play = '0'; jSet(+el.dataset.i); },
+  jStep: el => { const j = $('.journey'); j.dataset.play = '0'; jSet(+j.dataset.i + +el.dataset.d); },
+  jPlay: () => { const j = $('.journey'); j.dataset.play = j.dataset.play === '1' ? '0' : '1'; jSet(+j.dataset.i); },
   toggle: el => { const k = el.dataset.key; st.open.has(k) ? st.open.delete(k) : st.open.add(k); render(); },
   help: helpSheet, guide: guideSheet, notifs: notifSheet, closeSheet,
   demoLogin: el => { const d = DEMO[+el.dataset.i]; doLogin(d.u, d.p); },
@@ -2569,6 +2989,59 @@ const ACTS = {
   resetDemoYes: async () => { closeSheet(); db = await S.seed(); urlCache.clear(); st.user = db.users.find(u => u.role === 'admin'); sset('gii.user', st.user.id); toast('داده‌های نمونه بازنشانی شد.'); go('home'); },
 };
 
+// ---------- بازیابی رمز عبور (فراموشی رمز) ----------
+// کاربر نام کاربری و موبایل ثبت‌شده را وارد می‌کند، کد ۶ رقمی پیامکی می‌گیرد و رمز تازه می‌گذارد.
+// کد فقط به‌صورت هش نگه داشته می‌شود، ۲ دقیقه اعتبار دارد و حداکثر ۵ بار می‌شود امتحانش کرد.
+// پیام مرحله اول برای حساب موجود و ناموجود یکسان است تا وجود حساب لو نرود.
+const OTP_TTL = 120000, OTP_TRIES = 5;
+let rst = null, otpTick = null;
+function forgotSheet(step = 'id', err = '') {
+  clearInterval(otpTick);
+  const e = err ? `<div class="note bad">${icon('alert')}<div>${esc(err)}</div></div>` : '';
+  if (step === 'id') {
+    openSheet(`<h2>بازیابی رمز عبور</h2><p class="lead">کد تأیید به موبایلی که در شرکت گاز ثبت کرده‌اید پیامک می‌شود.</p>${e}
+      <form class="form flat" data-form="forgotId">
+        <label class="fld" for="fg-user"><span>نام کاربری</span><input id="fg-user" name="username" class="ltr" required autocomplete="username" placeholder="برای مشترکین: شماره اشتراک گاز" value="${esc(rst?.username || $('#lg-user')?.value || '')}"></label>
+        <label class="fld" for="fg-mob"><span>شماره موبایل ثبت‌شده</span><input id="fg-mob" name="mobile" class="ltr" required inputmode="tel" autocomplete="tel" placeholder="09xxxxxxxxx" value="${esc(rst?.mobile || '')}"></label>
+        <div class="btns"><button class="btn" type="submit">${icon('sms')} ارسال کد تأیید</button><button class="btn ghost" type="button" data-act="closeSheet">انصراف</button></div>
+        <small class="muted">موبایل خود را عوض کرده‌اید یا کارمند هستید و موبایل ثبت نکرده‌اید؟ از شرکت گاز یا مدیر سامانه رمز موقت جدید بگیرید.</small>
+      </form>`);
+    return;
+  }
+  if (step === 'code') {
+    const last = rst.userId ? db.sms.find(x => x.mobile === rst.mobile) : null;
+    openSheet(`<h2>کد تأیید</h2><p class="lead">اگر نام کاربری و موبایل درست باشد، کد ۶ رقمی به <span class="num" dir="ltr">${fa(rst.mobile.replace(/^(\d{4})\d{4}/, '$1****'))}</span> پیامک شده است.</p>${e}
+      ${last ? `<div class="sms-demo">${icon('sms')}<div><b>پیامک نمایشی</b>${esc(last.text)}</div></div>` : ''}
+      <form class="form flat" data-form="forgotCode">
+        <label class="fld" for="fg-code"><span>کد تأیید</span><input id="fg-code" name="code" class="ltr otp" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="------"></label>
+        <div class="otp-left" id="otp-left"></div>
+        <div class="btns"><button class="btn green" type="submit">تأیید کد</button><button class="btn ghost" type="button" data-act="otpResend" id="otp-resend" disabled>ارسال دوباره</button></div>
+        <button class="link" type="button" data-act="forgot">${icon('edit')} اصلاح نام کاربری یا موبایل</button>
+      </form>`);
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((rst.exp - Date.now()) / 1000));
+      const el = $('#otp-left'); if (!el) { clearInterval(otpTick); return; }
+      el.textContent = left ? `اعتبار کد: ${fa(Math.floor(left / 60))}:${fa(String(left % 60).padStart(2, '0'))}` : 'کد منقضی شد؛ دوباره ارسال کنید.';
+      el.classList.toggle('over', !left);
+      const r = $('#otp-resend'); if (r) r.disabled = left > OTP_TTL / 2000;
+    };
+    tick(); otpTick = setInterval(tick, 1000);
+    return;
+  }
+  openSheet(`<h2>رمز عبور جدید</h2><p class="lead">کد تأیید شد. رمز تازه‌ای انتخاب کنید.</p>${e}
+    <form class="form flat" data-form="forgotNew">
+      <label class="fld" for="fg-p1"><span>رمز جدید</span><input id="fg-p1" name="p1" type="password" class="ltr" minlength="6" required autocomplete="new-password"><small>دست‌کم ۶ نویسه</small></label>
+      <label class="fld" for="fg-p2"><span>تکرار رمز جدید</span><input id="fg-p2" name="p2" type="password" class="ltr" minlength="6" required autocomplete="new-password"></label>
+      <button class="btn green" type="submit">ذخیره رمز و بازگشت به ورود</button>
+    </form>`);
+}
+async function sendOtp(username, mobile) {
+  const u = db.users.find(x => x.active && x.mobile && x.username.toLowerCase() === username.toLowerCase() && x.mobile === mobile);
+  const code = String(100000 + Math.floor(Math.random() * 900000));
+  rst = { username, mobile, userId: u?.id || null, exp: Date.now() + OTP_TTL, tries: 0, ok: false, hash: u ? await S.hashPw(u.username, 'otp:' + code) : '' };
+  if (u) { S.sendSms(mobile, `کد بازیابی رمز سامانه بیمه حوادث گاز: ${code} — این کد را به هیچ‌کس ندهید.`); persist(); }
+}
+
 async function resetPassword(u) {
   const pw = S.tempPassword();
   u.pwHash = await S.hashPw(u.username, pw); u.mustChangePassword = true; u.active = true;
@@ -2580,6 +3053,33 @@ async function resetPassword(u) {
 
 const FORMS = {
   login: f => doLogin(f.username.value, f.password.value),
+  forgotId: async f => {
+    const username = W.normalizeDigits(f.username.value).trim(), mobile = W.normalizeDigits(f.mobile.value).trim();
+    if (!W.isValidMobile(mobile)) return forgotSheet('id', 'شماره موبایل را ۱۱ رقمی و با ۰۹ وارد کنید.');
+    await sendOtp(username, mobile);
+    forgotSheet('code');
+  },
+  forgotCode: async f => {
+    if (!rst) return forgotSheet('id');
+    if (Date.now() > rst.exp) return forgotSheet('code', 'کد منقضی شده است؛ «ارسال دوباره» را بزنید.');
+    if (++rst.tries > OTP_TRIES) { rst = null; return forgotSheet('id', 'تعداد تلاش‌ها زیاد بود. دوباره از اول شروع کنید.'); }
+    const u = rst.userId && userById(rst.userId);
+    const code = W.normalizeDigits(f.code.value).trim();
+    if (!u || await S.hashPw(u.username, 'otp:' + code) !== rst.hash) return forgotSheet('code', `کد نادرست است. ${fa(OTP_TRIES - rst.tries)} بار دیگر می‌توانید امتحان کنید.`);
+    rst.ok = true; forgotSheet('new');
+  },
+  forgotNew: async f => {
+    const u = rst?.ok && userById(rst.userId);
+    if (!u) return forgotSheet('id');
+    if (f.p1.value.length < 6) return forgotSheet('new', 'رمز باید دست‌کم ۶ نویسه باشد.');
+    if (f.p1.value !== f.p2.value) return forgotSheet('new', 'تکرار رمز با رمز جدید یکسان نیست.');
+    u.pwHash = await S.hashPw(u.username, f.p1.value); u.mustChangePassword = false;
+    S.sendSms(u.mobile, 'رمز عبور حساب شما در سامانه بیمه حوادث گاز تغییر کرد. اگر شما این کار را نکرده‌اید، با شرکت گاز تماس بگیرید.');
+    S.notify({ toUser: u.id, text: 'رمز عبور حساب شما با کد پیامکی بازیابی شد.' });
+    persist(); rst = null; closeSheet();
+    const lu = $('#lg-user'); if (lu) { lu.value = u.username; $('#lg-pass').value = ''; $('#lg-pass').focus(); }
+    toast('رمز جدید ذخیره شد. با آن وارد شوید.');
+  },
   newpw: async f => {
     if (f.p1.value !== f.p2.value) return toast('تکرار رمز با رمز جدید یکسان نیست.', true);
     if (f.p1.value.length < 6) return toast('رمز باید دست‌کم ۶ نویسه باشد.', true);
@@ -2602,6 +3102,23 @@ const FORMS = {
     const t = $('#msg-text'); if (t) t.focus();
   },
   action: f => runAction(f.dataset.action, f.note.value.trim()),
+  fin: f => {
+    const c = currentClaim(); const step = f.dataset.step;
+    const v = k => (f[k] ? W.normalizeDigits(f[k].value).trim() : '');
+    const data = step === 'fin_review' ? { reviewer: f.reviewer.value.trim(), shebaMatch: f.shebaMatch.checked, note: f.note.value.trim() }
+      : step === 'fin_voucher' ? { voucherNo: v('voucherNo'), date: v('date'), amount: +v('amount') }
+      : { method: f.method.value, ref: v('ref'), date: v('date') };
+    try {
+      Object.assign(c, W.applyFinance(c, step, data, st.user));
+    } catch (e) { return toast(e.message, true); }
+    const sub = userById(c.subscriberId);
+    const msg = step === 'fin_review' ? `بررسی مالی پرونده ${c.code} انجام و شبای شما تأیید شد.`
+      : step === 'fin_voucher' ? `حواله پرداخت خسارت پرونده ${c.code} به شماره ${data.voucherNo} و مبلغ ${nf.format(data.amount)} ریال صادر شد.`
+      : `دستور پرداخت خسارت پرونده ${c.code} از طریق ${W.TRANSFER_METHODS[data.method].label} به بانک ارسال شد. پیگیری: ${data.ref}`;
+    S.notify({ toUser: sub.id, text: msg, claimId: c.id });
+    if (step !== 'fin_review') S.sendSms(sub.mobile, msg);
+    persist(); toast(W.FIN_STAGES.find(x => x.id === c.finance.stage).label + ' — ثبت شد.'); render();
+  },
   defect: f => {
     const c = currentClaim(); const note = f.note.value.trim(); if (!note) return;
     c.deficiencies.push({ id: S.uid('d'), target: f.dataset.target || 'general', title: f.dataset.title || (st.user.role === 'insurer' ? 'درخواست بیمه‌گر' : 'نقص عمومی'), note, by: st.user.role, byName: st.user.name, at: new Date().toISOString(), status: 'open', reply: '' });
@@ -2735,7 +3252,8 @@ function wire() {
 // ================= راه‌اندازی =================
 async function boot() {
   const t = lget('gii.theme'); if (t) document.documentElement.dataset.theme = t;
-  db = S.load() || await S.seed();
+  db = S.load();
+  if (!db || db.version !== S.DB_VERSION) db = await S.seed();
   wire();
   const uid = sget('gii.user');
   st.user = uid ? db.users.find(u => u.id === uid && u.active) || null : null;

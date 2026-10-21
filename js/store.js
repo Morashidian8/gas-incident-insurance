@@ -3,6 +3,8 @@
 import { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId } from './workflow.js';
 
 const KEY = 'gii.db.v1';
+// با تغییر ساختار داده نمایشی بالا می‌رود تا مرورگرهای قبلی داده نمونه تازه بگیرند
+export const DB_VERSION = 2;
 let db = null;
 
 export function uid(p = 'id') { return p + '-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
@@ -124,7 +126,7 @@ export async function seed() {
   await clearFiles();
   const now = new Date();
   db = {
-    version: 1, seq: 0, settings: { ...DEFAULT_SETTINGS },
+    version: DB_VERSION, seq: 0, settings: { ...DEFAULT_SETTINGS },
     users: [], claims: [], notifications: [], sms: [], reads: {},
   };
   const mk = async (u, pw) => { const user = { id: uid('u'), active: true, mustChangePassword: false, createdAt: daysAgo(40).toISOString(), ...u, pwHash: await hashPw(u.username, pw) }; db.users.push(user); return user; };
@@ -140,6 +142,7 @@ export async function seed() {
     ['زهرا موسوی', '038765432', '1089123456', '09127778899', 'تهران، شهرری، خیابان فداییان اسلام، پلاک ۳'],
     ['محسن نوری', '047654321', '1091234567', '09129990011', 'شهریار، خیابان ولیعصر، کوچه یاس، پلاک ۱۱'],
     ['فاطمه جعفری', '056543219', '1013579246', '09124443322', 'تهران، تهرانپارس، فلکه دوم، پلاک ۷۰'],
+    ['علیرضا تهرانی', '065432198', '1024681357', '09121234567', 'تهران، ونک، خیابان ملاصدرا، پلاک ۱۸'],
   ];
   const users = [];
   for (const [name, b9, subNo, mobile, address] of subs) {
@@ -251,6 +254,35 @@ export async function seed() {
   c6.assessment = { adjuster: 'مهندس نادر شریفی', visitDate: jalaliString(daysAgo(55)), note: '', at: daysAgo(50).toISOString(),
     items: [{ category: 'property', title: 'آبگرمکن و لوله‌کشی', claimed: 140000000, approved: 128000000 }, { category: 'property', title: 'بازسازی دیوار پارکینگ', claimed: 90000000, approved: 90000000 }] };
   c6.payment = { ref: '140506118842', date: jalaliString(daysAgo(41)), amount: 196200000 };
+  c6.acceptedAt = daysAgo(49).toISOString();
+  c6.finance = {
+    stage: 'bank',
+    review: { reviewer: 'واحد مالی بیمه‌گر', shebaMatch: true, note: '', at: daysAgo(47).toISOString(), by: ins.name },
+    voucher: { voucherNo: 'H-1405-000006', date: jalaliString(daysAgo(45)), amount: 196200000, at: daysAgo(45).toISOString(), by: ins.name },
+    bank: { method: 'paya', ref: 'P-77810452', date: jalaliString(daysAgo(42)), at: daysAgo(42).toISOString(), by: ins.name },
+  };
+  c6.timeline.splice(c6.timeline.length - 1, 0,
+    { at: daysAgo(47, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_review', label: 'بررسی مالی و استعلام شبا انجام شد', note: '' },
+    { at: daysAgo(45, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_voucher', label: 'حواله پرداخت صادر شد', note: 'حواله H-1405-000006' },
+    { at: daysAgo(42, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_bank', label: 'دستور پرداخت به بانک ارسال شد', note: 'پایا — پیگیری P-77810452' });
+
+  // ۷) قبول مبلغ و حواله صادر شده — نمایش مراحل مالی برای مشترک
+  const c7 = await claim(users[6], {
+    age: 40, status: 'payment', fill: true, gasReport: true,
+    incident: { description: 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', fireReportNo: '۴۷۲۲۵' },
+    damage: { items: [{ title: 'پکیج و لوله‌کشی', qty: 1, amount: 210000000 }, { title: 'کابینت و سقف کاذب', qty: 1, amount: 260000000 }] },
+    steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36], ['gas_start', 'شروع بررسی', 'gas', 35], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 9], ['fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6], ['fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007']],
+    extra: { submitCount: 1, acceptedAt: daysAgo(9).toISOString() },
+  });
+  c7.assessment = { adjuster: 'مهندس نادر شریفی', visitDate: jalaliString(daysAgo(25)), note: 'سقف کاذب با استهلاک ۱۵٪ محاسبه شد.', at: daysAgo(12).toISOString(),
+    items: [{ category: 'property', title: 'پکیج و لوله‌کشی', claimed: 210000000, approved: 195000000 }, { category: 'property', title: 'کابینت و سقف کاذب', claimed: 260000000, approved: 221000000 }] };
+  c7.finance = {
+    stage: 'voucher',
+    review: { reviewer: 'واحد مالی بیمه‌گر', shebaMatch: true, note: 'شبا با کد ملی ذی‌نفع تطبیق داده شد.', at: daysAgo(6).toISOString(), by: ins.name },
+    voucher: { voucherNo: 'H-1405-000007', date: jalaliString(daysAgo(2)), amount: 374400000, at: daysAgo(2).toISOString(), by: ins.name },
+  };
+  c7.payment = { amount: 374400000 };
+  notify({ toUser: users[6].id, text: `حواله پرداخت خسارت پرونده ${c7.code} به شماره H-1405-000007 صادر شد.`, claimId: c7.id });
 
   notify({ toRole: 'gas', text: `پرونده ${db.claims[3].code} از سوی مشترک ارسال شد.`, claimId: db.claims[3].id });
   notify({ toUser: users[0].id, text: `برای پرونده ${c1.code} نقص اعلام شد. لطفاً اصلاح و دوباره ارسال کنید.`, claimId: c1.id });

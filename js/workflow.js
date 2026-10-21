@@ -285,8 +285,11 @@ export const ACTIONS = {
   ins_reject:   { role: 'insurer', from: ['insurer_review', 'objection'], to: 'rejected', label: 'رد پرونده', needsNote: true },
   accept:       { role: 'subscriber', from: ['assessed'], to: 'payment', label: 'قبول مبلغ و درخواست پرداخت' },
   object:       { role: 'subscriber', from: ['assessed'], to: 'objection', label: 'اعتراض به مبلغ', needsNote: true },
-  ins_pay:      { role: 'insurer', from: ['payment'], to: 'paid', label: 'ثبت پرداخت',
-                  guard: c => (c.payment && c.payment.ref && c.payment.date) ? null : 'شماره پیگیری و تاریخ واریز را وارد کنید.' },
+  ins_pay:      { role: 'insurer', from: ['payment'], to: 'paid', label: 'ثبت واریز',
+                  guard: c => {
+                    if (finStage(c) !== 'bank') return 'پیش از ثبت واریز، بررسی مالی، صدور حواله و ارسال به بانک باید انجام شود.';
+                    return (c.payment && c.payment.ref && c.payment.date) ? null : 'شماره پیگیری بانکی و تاریخ واریز را وارد کنید.';
+                  } },
 };
 
 export function availableActions(c, role) {
@@ -350,4 +353,53 @@ export function slaInfo(c, settings = DEFAULT_SETTINGS, now = new Date()) {
 
 export function claimCode(seq, date = new Date()) {
   return `GZ-${toJalali(date).jy}-${String(seq).padStart(6, '0')}`;
+}
+
+// ---------- فرایند مالی پس از قبول مبلغ ----------
+// در وضعیت «payment» پرونده این زیرمرحله‌ها را به ترتیب طی می‌کند و هر کدام جزئیاتش را نگه می‌دارد.
+export const FIN_STAGES = [
+  { id: 'accepted', label: 'تأیید مبلغ توسط مشترک', short: 'تأیید مبلغ' },
+  { id: 'review', label: 'بررسی مالی و استعلام شبا', short: 'بررسی مالی' },
+  { id: 'voucher', label: 'صدور حواله پرداخت', short: 'حواله صادر شد' },
+  { id: 'bank', label: 'ارسال دستور پرداخت به بانک', short: 'ارسال به بانک' },
+  { id: 'paid', label: 'واریز به حساب ذی‌نفع', short: 'واریز شد' },
+];
+export const TRANSFER_METHODS = {
+  paya: { label: 'پایا', eta: 'معمولاً در چرخه‌های پایای همان روز یا روز کاری بعد به حساب می‌نشیند' },
+  satna: { label: 'ساتنا', eta: 'معمولاً در همان روز کاری به حساب می‌نشیند' },
+};
+
+export function finStage(c) {
+  if (c.status === 'paid') return 'paid';
+  if (c.status !== 'payment') return null;
+  return (c.finance && c.finance.stage) || 'accepted';
+}
+
+const FIN_STEPS = {
+  fin_review: { from: 'accepted', to: 'review', label: 'بررسی مالی و استعلام شبا انجام شد',
+    check: d => (!d.reviewer ? 'نام بررسی‌کننده مالی را وارد کنید.' : !d.shebaMatch ? 'تطبیق شبا با نام ذی‌نفع باید تأیید شود.' : null) },
+  fin_voucher: { from: 'review', to: 'voucher', label: 'حواله پرداخت صادر شد',
+    check: d => (!d.voucherNo ? 'شماره حواله را وارد کنید.' : !parseJalali(d.date) ? 'تاریخ صدور حواله معتبر نیست.' : !(d.amount > 0) ? 'مبلغ حواله باید بیشتر از صفر باشد.' : null) },
+  fin_bank: { from: 'voucher', to: 'bank', label: 'دستور پرداخت به بانک ارسال شد',
+    check: d => (!TRANSFER_METHODS[d.method] ? 'روش انتقال (پایا یا ساتنا) را انتخاب کنید.' : !d.ref ? 'شماره پیگیری دستور پرداخت را وارد کنید.' : !parseJalali(d.date) ? 'تاریخ ارسال معتبر نیست.' : null) },
+};
+export const FIN_ACTIONS = FIN_STEPS;
+
+// یک گام مالی را اعمال می‌کند و پرونده جدید برمی‌گرداند.
+export function applyFinance(claim, step, data, actor, now = new Date()) {
+  const f = FIN_STEPS[step];
+  if (!f) throw new Error('گام مالی نامعتبر');
+  if (actor.role !== 'insurer') throw new Error('فقط کارشناس بیمه‌گر گام‌های مالی را ثبت می‌کند.');
+  if (finStage(claim) !== f.from) throw new Error('این گام مالی به ترتیب نیست.');
+  const err = f.check(data);
+  if (err) throw new Error(err);
+  const c = structuredClone(claim);
+  const at = now.toISOString();
+  c.finance = { ...(c.finance || {}), stage: f.to, [f.to]: { ...data, at, by: actor.name } };
+  if (f.to === 'voucher') c.payment = { ...(c.payment || {}), amount: data.amount };
+  const note = f.to === 'review' ? (data.note || '')
+    : f.to === 'voucher' ? `حواله ${data.voucherNo} به مبلغ ${data.amount} ریال`
+    : `${TRANSFER_METHODS[data.method].label} — پیگیری ${data.ref}`;
+  c.timeline.push({ at, by: actor.name, role: actor.role, action: step, label: f.label, note });
+  return c;
 }

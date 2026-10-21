@@ -39,7 +39,11 @@ function currentClaim() {
   const mine = visibleClaims();
   return mine.find(c => c.id === st.claimId) || mine.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || null;
 }
-function badge(c) { const s = W.STATUS[c.status]; return `<span class="badge ${s.tone}">${esc(s.short)}</span>`; }
+function badge(c) {
+  const s = W.STATUS[c.status];
+  const label = c.status === 'payment' ? W.FIN_STAGES.find(x => x.id === W.finStage(c)).short : s.short;
+  return `<span class="badge ${s.tone}">${esc(label)}</span>`;
+}
 function slaBadge(c) {
   const s = W.slaInfo(c, db.settings);
   if (!s) return '';
@@ -71,7 +75,7 @@ function go(view, p = {}) {
 function render() {
   const app = $('#app');
   const site = MODE === 'site';
-  if (!st.user) { app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); return; }
+  if (!st.user) { app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); if (site) startJourney(); return; }
   if (st.user.mustChangePassword) { app.innerHTML = (site ? siteHeader() : topbar()) + `<main class="page narrow">${viewForcePassword()}</main>`; return; }
   const v = VIEWS[st.user.role][st.view] || VIEWS[st.user.role].home;
   const main = `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>`;
@@ -92,22 +96,22 @@ function siteHeader() {
   const u = st.user;
   const n = u ? unreadNotifs().length : 0;
   const nav = u ? navItems().map(i => `<button class="site-link ${i.on ? 'on' : ''}" data-nav="${i.id}" ${i.on ? 'aria-current="page"' : ''}>${icon(i.ic)}<span>${i.id === 'profile' ? esc(u.name) : i.label}</span>${i.dot ? `<span class="dot">${fa(i.dot)}</span>` : ''}</button>`).join('')
-    : `<a class="site-link" href="#steps">مراحل دریافت خسارت</a><a class="site-link" href="#docs">مدارک لازم</a><a class="site-link" href="#faq">پرسش‌های متداول</a>`;
-  return `<header class="site-head"><div class="site-head-in">
-    <div class="brand">${logoHtml(46)}<div><b>بیمه حوادث مشترکین گاز</b><small>${esc(u ? W.ROLES[u.role] : brandSetting('orgName') || 'سامانه پرونده خسارت')}</small></div></div>
+    : `<a class="site-link" href="#journey">مسیر پرونده</a><a class="site-link" href="#docs">مدارک لازم</a><a class="site-link" href="#faq">پرسش‌ها</a>`;
+  return `<header class="site-head ${u ? '' : 'on-hero'}"><div class="site-head-in">
+    <div class="brand">${logoHtml(44)}<div><b>بیمه حوادث مشترکین گاز</b><small>${esc(u ? W.ROLES[u.role] : brandSetting('orgName') || 'سامانه پرونده خسارت')}</small></div></div>
     <nav class="site-nav" aria-label="ناوبری اصلی">${nav}</nav>
     <div class="site-tools">
       <button class="sq-btn" data-act="help" aria-label="پرسش‌های متداول">${icon('help')}</button>
-      ${u ? `<button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>` : `<a class="btn sm ghost-light" href="#login">${icon('lock')} ورود</a>`}
+      ${u ? `<button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>` : `<a class="btn sm ember" href="#login">${icon('lock')} ورود</a>`}
     </div>
   </div></header>`;
 }
 function siteFooter() {
   return `<footer class="site-foot"><div class="site-foot-in">
-    <div><b>اورژانس گاز: <span class="num">۱۹۴</span></b><span>در صورت بوی گاز، شیر اصلی را ببندید و از محل خارج شوید.</span></div>
-    ${OTHER_URL ? `<div><a href="${esc(OTHER_URL)}">${icon('sms')} نسخه اپ موبایل (قابل نصب روی گوشی)</a></div>` : ''}
-    <small>داده‌های نسخه نمایشی فقط در همین مرورگر ذخیره می‌شود و با اپ موبایل روی همین دستگاه مشترک است.</small>
-  </div></footer>`;
+    <div class="foot-brand">${logoHtml(52)}<div><b>بیمه حوادث مشترکین گاز</b><span>تشکیل، تکمیل و پیگیری آنلاین پرونده خسارت حوادث گاز طبیعی</span></div></div>
+    <div class="foot-col"><b>اورژانس گاز</b><span class="foot-big num">۱۹۴</span><span>بوی گاز؟ شیر اصلی را ببندید، کلید برق نزنید و از محل خارج شوید.</span></div>
+    <div class="foot-col"><b>دسترسی</b>${OTHER_URL ? `<a href="${esc(OTHER_URL)}">${icon('sms')} اپ موبایل قابل نصب</a>` : ''}<a href="#journey">${icon('history')} مسیر پرونده</a><a href="#faq">${icon('help')} پرسش‌های متداول</a></div>
+  </div><div class="foot-note">داده‌های نسخه نمایشی فقط در همین مرورگر ذخیره می‌شود و با اپ موبایل روی همین دستگاه مشترک است.</div></footer>`;
 }
 
 function topbar() {
@@ -188,7 +192,7 @@ function openSheet(html) {
   const f = root.querySelector('textarea, input:not([type=hidden])');
   if (f) setTimeout(() => f.focus(), 50);
 }
-function closeSheet() { const s = $('#sheet'); if (s) s.remove(); }
+function closeSheet() { const s = $('#sheet'); if (s) s.remove(); clearInterval(otpTick); }
 
 // ================= فایل‌ها =================
 const urlCache = new Map();
@@ -262,6 +266,7 @@ const DEMO = [
   { u: '1023456789', p: '123456', t: 'مشترک — پرونده دارای نقص', s: 'حمید رضایی', ic: 'alert' },
   { u: '1045678912', p: '123456', t: 'مشترک — منتظر تأیید مبلغ', s: 'مریم احمدی', ic: 'money' },
   { u: '1067891234', p: '123456', t: 'مشترک — ورود اول با رمز موقت', s: 'رضا کریمی', ic: 'key' },
+  { u: '1024681357', p: '123456', t: 'مشترک — حواله صادر شده', s: 'علیرضا تهرانی', ic: 'receipt' },
   { u: 'gas', p: 'gas123', t: 'کارشناس شرکت گاز', s: 'سارا کاظمی', ic: 'flame' },
   { u: 'bime', p: 'bime123', t: 'کارشناس بیمه‌گر', s: 'علی محمدی', ic: 'shield' },
   { u: 'admin', p: 'admin123', t: 'مدیر سامانه', s: 'کاربران، تنظیمات و گزارش', ic: 'settings' },
@@ -285,6 +290,7 @@ function loginForm() {
   return `<form class="form" data-form="login" autocomplete="on" id="login">
       <label class="fld" for="lg-user"><span>نام کاربری</span><input id="lg-user" name="username" type="text" class="ltr" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="برای مشترکین: شماره اشتراک گاز"></label>
       <label class="fld" for="lg-pass"><span>رمز عبور</span><input id="lg-pass" name="password" type="password" class="ltr" autocomplete="current-password" required placeholder="رمز عبور یا رمز موقت پیامک‌شده"></label>
+      <button class="link forgot" type="button" data-act="forgot">${icon('key')} رمز عبور را فراموش کرده‌ام</button>
       <button class="btn" type="submit">${icon('lock')} ورود به سامانه</button>
       <div class="note info">${icon('help')}<div>حساب مشترک را شرکت گاز پس از مراجعه حضوری شما می‌سازد و نام کاربری و رمز موقت را پیامک می‌کند.</div></div>
     </form>`;
@@ -295,42 +301,108 @@ function demoRows() {
       <p class="demo-tag">همه اشخاص، پرونده‌ها و مبالغ نسخه نمایشی ساختگی‌اند و فقط در همین مرورگر ذخیره می‌شوند.</p>`;
 }
 
-// صفحه نخست سایت: معرفی، ورود، مراحل، مدارک و پرسش‌ها
-function viewLanding() {
-  const steps = [
-    ['userPlus', 'var(--green)', 'مراجعه به شرکت گاز', 'با کارت ملی و گزارش آتش‌نشانی به امور حوادث شرکت گاز منطقه بروید. حساب شما ساخته و رمز موقت پیامک می‌شود.'],
-    ['folderUp', 'var(--blue)', 'تکمیل پرونده', 'وارد سامانه شوید؛ اطلاعات حادثه، خسارت‌ها، عکس‌ها، مدارک و شماره شبا را بارگذاری و ارسال کنید.'],
-    ['meter', 'var(--orange)', 'بررسی شرکت گاز', 'کارشناس گاز بازدید می‌کند و مدارک را بررسی می‌کند. اگر نقصی باشد، پیامک می‌گیرید و اصلاح می‌کنید.'],
-    ['trackRial', 'var(--violet)', 'ارزیابی بیمه‌گر', 'بیمه‌گر خسارت را ارزیابی و مبلغ را اعلام می‌کند. می‌توانید بپذیرید یا اعتراض کنید.'],
-    ['payment', 'var(--green)', 'پرداخت', 'مبلغ به حساب شبای شما واریز و شماره پیگیری پیامک می‌شود.'],
+// ---------- مسیر پرونده (موشن‌گرافی مراحل) ----------
+// شش ایستگاه از حادثه تا واریز؛ نشانگر پرونده روی مسیر حرکت می‌کند و کارت هر مرحله جایگزین قبلی می‌شود.
+// مهلت‌ها از تنظیمات مدیر خوانده می‌شود تا با قرارداد جاری یکی باشد.
+function journeySteps() {
+  const s = db.settings;
+  return [
+    { art: 'houseFire', a: '#f26b21', b: '#3a8cc3', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، با کارت ملی و گزارش آتش‌نشانی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
+    { art: 'sms', a: '#3a8cc3', b: '#1f9d57', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
+    { art: 'folderUp', a: '#1f9d57', b: '#3a8cc3', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
+    { art: 'meter', a: '#f2a024', b: '#3a8cc3', who: 'شرکت گاز', t: 'بازدید و بررسی شرکت گاز', d: 'کارشناس از محل بازدید و مدارک را بررسی می‌کند، سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
+    { art: 'trackRial', a: '#6d5bd0', b: '#3a8cc3', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
+    { art: 'payment', a: '#1f9d57', b: '#f26b21', who: 'مشترک و بیمه‌گر', t: 'تأیید مبلغ و واریز', d: 'مبلغ را می‌پذیرید یا با دلیل اعتراض می‌کنید. پس از تأیید، خسارت به شبای شما واریز و شماره پیگیری پیامک می‌شود.', when: 'پس از تأیید شما' },
   ];
-  const docs = [
-    ['همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه']],
-    ['آتش‌سوزی و انفجار', ['گزارش آتش‌نشانی', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
-    ['مصدومیت', ['پرونده پزشکی و صورت‌حساب بیمارستان', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
-    ['فوت', ['گواهی فوت', 'گواهی انحصار وراثت و مدارک وراث', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
-  ];
-  return `<section class="land-hero"><div class="land-in land-grid">
-      <div class="land-copy">
-        ${brandSetting('orgName') ? `<div class="org-name">${esc(brandSetting('orgName'))}</div>` : ''}
-        <h1>پرونده خسارت حادثه گاز را آنلاین تشکیل و پیگیری کنید</h1>
-        <p>پس از آتش‌سوزی، انفجار یا گازگرفتگی، مدارک را بدون رفت‌وآمد بارگذاری کنید و مراحل بررسی شرکت گاز و پرداخت بیمه‌گر را لحظه‌به‌لحظه ببینید.</p>
-        <div class="land-chips"><span>${icon('upload')} بارگذاری مدارک</span><span>${icon('flame')} بررسی شرکت گاز</span><span>${icon('money')} پرداخت بیمه‌گر</span></div>
-        ${OTHER_URL ? `<a class="btn ghost-light land-app" href="${esc(OTHER_URL)}">${icon('sms')} نصب اپ موبایل</a>` : ''}
-      </div>
-      <div class="land-login">${loginForm()}</div>
-    </div></section>
-    <main class="page land-body">
-      <section id="steps" class="land-sec"><h2>مراحل دریافت خسارت</h2>
-        <ol class="land-steps">${steps.map(([art, c, t, d], i) => `<li><div class="step-art">${illo(art, c, 'var(--blue)')}</div><span class="step-no">${fa(i + 1)}</span><b>${t}</b><p>${d}</p></li>`).join('')}</ol></section>
-      <section id="docs" class="land-sec"><h2>مدارک لازم</h2>
-        <div class="land-docs">${docs.map(([t, list]) => `<div class="ocard"><b>${t}</b><ul>${list.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join('')}</div>
-        <p class="land-note">${icon('alert')} تا ثبت عکس‌ها و بازدید کارشناس، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p></section>
-      <section id="faq" class="land-sec"><h2>پرسش‌های متداول</h2>
-        <div class="faq ocard">${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div></section>
-      <section class="land-sec">${demoRows()}</section>
-    </main>`;
 }
+function journeyHtml(compact = false) {
+  const steps = journeySteps();
+  return `<section class="journey ${compact ? 'compact' : ''}" id="journey" data-i="0" style="--n:${steps.length};--p:0" aria-roledescription="نمایش مرحله‌به‌مرحله">
+    ${compact ? '' : `<div class="j-head"><div><span class="eyebrow">مسیر پرونده شما</span><h2>از تشکیل پرونده تا دریافت خسارت</h2><p>شش ایستگاه، با مهلت هر مرحله و اینکه کار دست کیست.</p></div></div>`}
+    <div class="j-track" role="tablist" aria-label="مراحل پرونده">
+      <div class="j-rail"><div class="j-fill"></div></div>
+      <div class="j-token" aria-hidden="true">${icon('doc')}</div>
+      ${steps.map((st_, i) => `<button class="j-st" role="tab" data-act="jGo" data-i="${i}" aria-label="مرحله ${fa(i + 1)}: ${st_.t}"><span class="j-dot">${fa(i + 1)}</span><span class="j-lbl">${st_.t}</span></button>`).join('')}
+    </div>
+    <div class="j-stage" aria-live="polite">${steps.map((st_, i) => `<article class="j-card" data-k="${i}">
+        <div class="j-art">${illo(st_.art, st_.a, st_.b)}</div>
+        <div class="j-txt"><span class="j-who">${icon(st_.who === 'بیمه‌گر' ? 'shield' : st_.who === 'شرکت گاز' ? 'flame' : 'user')} ${st_.who}</span>
+          <h3><span class="num">${fa(i + 1)}</span> ${st_.t}</h3><p>${st_.d}</p>
+          <span class="j-when">${icon('clock')} ${st_.when}</span>
+          ${st_.loop ? `<div class="j-loop"><svg viewBox="0 0 64 28" aria-hidden="true"><path d="M58 22C58 6 6 6 6 22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="5 5"/><path d="M2 16l4 7 5-6" fill="none" stroke="currentColor" stroke-width="2.5"/></svg><span>${st_.loop}</span></div>` : ''}
+        </div></article>`).join('')}</div>
+    <div class="j-ctrl">
+      <button class="j-btn" data-act="jStep" data-d="-1" aria-label="مرحله قبل">${icon('chevR')}</button>
+      <button class="j-btn play" data-act="jPlay" aria-label="توقف یا پخش">${icon('pause')}${icon('play')}</button>
+      <button class="j-btn" data-act="jStep" data-d="1" aria-label="مرحله بعد">${icon('chevL')}</button>
+      <div class="j-timer"><span></span></div>
+    </div>
+  </section>`;
+}
+const J_MS = 4200;
+let jTimer = null;
+function jSet(i) {
+  const j = $('.journey'); if (!j) return;
+  const n = journeySteps().length;
+  i = (i + n) % n;
+  j.dataset.i = i;
+  j.style.setProperty('--p', i / (n - 1));
+  j.querySelectorAll('.j-st').forEach((b, k) => { b.classList.toggle('done', k < i); b.classList.toggle('on', k === i); b.setAttribute('aria-selected', k === i); });
+  j.querySelectorAll('.j-card').forEach((c, k) => { c.classList.toggle('on', k === i); c.setAttribute('aria-hidden', k !== i); });
+  const bar = j.querySelector('.j-timer span');
+  bar.classList.remove('run'); void bar.offsetWidth;
+  if (j.dataset.play === '1') bar.classList.add('run');
+}
+function startJourney() {
+  clearInterval(jTimer); jTimer = null;
+  const j = $('.journey'); if (!j) return;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  j.dataset.play = reduced ? '0' : '1';
+  j.style.setProperty('--j-ms', J_MS + 'ms');
+  jSet(0);
+  jTimer = setInterval(() => {
+    const jj = $('.journey');
+    if (!jj) { clearInterval(jTimer); jTimer = null; return; }
+    if (jj.dataset.play === '1' && !document.hidden) jSet(+jj.dataset.i + 1);
+  }, J_MS);
+}
+
+// صفحه نخست سایت: معرفی و ورود، مسیر پرونده، مدارک، پرسش‌ها
+function viewLanding() {
+  const docs = [
+    ['doc', 'blue', 'همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه']],
+    ['flame', 'ember', 'آتش‌سوزی و انفجار', ['گزارش آتش‌نشانی', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
+    ['people', 'violet', 'مصدومیت', ['پرونده پزشکی و صورت‌حساب بیمارستان', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+    ['alert', 'green', 'فوت', ['گواهی فوت', 'گواهی انحصار وراثت و مدارک وراث', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
+  ];
+  return `<section class="hero"><div class="hero-glow" aria-hidden="true"></div><div class="wrap hero-grid">
+      <div class="hero-copy">
+        ${brandSetting('orgName') ? `<span class="eyebrow light">${esc(brandSetting('orgName'))}</span>` : ''}
+        <h1>خسارت حادثه گاز را <em>بی‌رفت‌وآمد</em> پیگیری کنید</h1>
+        <p>پس از آتش‌سوزی، انفجار یا گازگرفتگی، مدارک را آنلاین بفرستید و ببینید پرونده‌تان در شرکت گاز و نزد بیمه‌گر به کجا رسیده است.</p>
+        <ul class="hero-facts">
+          <li><b class="num">۶</b><span>ایستگاه شفاف تا واریز</span></li>
+          <li><b>${icon('sms')}</b><span>پیامک در هر مرحله</span></li>
+          <li><b>${icon('alert')}</b><span>اعلام دقیق هر نقص</span></li>
+        </ul>
+        <div class="hero-cta"><a class="btn ember" href="#journey">${icon('history')} مسیر پرونده را ببینید</a>${OTHER_URL ? `<a class="btn ghost-light" href="${esc(OTHER_URL)}">${icon('sms')} اپ موبایل</a>` : ''}</div>
+      </div>
+      <div class="hero-login"><div class="glass"><h2>ورود به سامانه</h2>${loginForm()}</div></div>
+    </div></section>
+    <div class="band">${journeyHtml()}</div>
+    <section id="docs" class="wrap sec">
+      <div class="sec-head"><span class="eyebrow">پیش از شروع</span><h2>مدارک لازم</h2><p>سامانه فهرست دقیق را بر اساس نوع حادثه و خسارت شما می‌سازد؛ این خلاصه برای آمادگی است.</p></div>
+      <div class="doc-grid">${docs.map(([ic, tone, t, list]) => `<article class="doc-tile ${tone}"><span class="doc-ic">${icon(ic)}</span><h3>${t}</h3><ul>${list.map(x => `<li>${icon('check')}${x}</li>`).join('')}</ul></article>`).join('')}</div>
+      <p class="warn-line">${icon('alert')} تا ثبت عکس‌ها و بازدید کارشناس، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p>
+    </section>
+    <section id="faq" class="wrap sec faq-split">
+      <div class="faq-aside"><span class="eyebrow light">پاسخ سریع</span><h2>پرسش‌های متداول</h2><p>پاسخ رایج‌ترین پرسش‌ها درباره پوشش، مدارک، نقص پرونده و اعتراض.</p>
+        <div class="sos"><span>${icon('flame')}</span><div><b>اورژانس گاز</b><span class="num">۱۹۴</span></div></div></div>
+      <div class="faq faq-list">${FAQ.map(([q, a]) => `<details><summary>${q}${icon('chevD')}</summary><p>${a}</p></details>`).join('')}</div>
+    </section>
+    <section class="wrap sec land-demo">${demoRows()}</section>`;
+}
+
 async function doLogin(username, password) {
   const uname = W.normalizeDigits(username).trim();
   const u = db.users.find(x => x.username.toLowerCase() === uname.toLowerCase());
@@ -373,7 +445,8 @@ function subHome() {
   const multi = visibleClaims().length > 1;
   let bar;
   if (c.status === 'paid') bar = `<div class="pill-bar green"><span>مبلغ پرداخت‌شده:</span><span class="amt num">${money(c.payment?.amount || pay)}</span></div>`;
-  else if (['assessed', 'payment', 'objection'].includes(c.status)) bar = `<div class="pill-bar"><span>مبلغ تعیین‌شده خسارت:</span><span class="amt num">${money(pay)}</span></div>`;
+  else if (c.status === 'payment') bar = `<div class="pill-bar"><span>${esc(W.FIN_STAGES.find(x => x.id === W.finStage(c)).label)}:</span><span class="amt num">${money(c.payment?.amount || pay)}</span></div>`;
+  else if (['assessed', 'objection'].includes(c.status)) bar = `<div class="pill-bar"><span>مبلغ تعیین‌شده خسارت:</span><span class="amt num">${money(pay)}</span></div>`;
   else if (c.status === 'returned') bar = `<div class="pill-bar orange"><span>نقص پرونده:</span><span class="amt">${fa(W.openDeficiencies(c).length)} مورد</span></div>`;
   else if (c.status === 'rejected') bar = `<div class="pill-bar red"><span>وضعیت پرونده:</span><span class="amt">رد شده</span></div>`;
   else bar = `<div class="pill-bar"><span>وضعیت پرونده:</span><span class="amt">${esc(status.short)}</span></div>`;
@@ -393,6 +466,7 @@ function subHome() {
   ${bar}
   ${c.status === 'returned' ? `<div class="note warn">${icon('alert')}<div><b>شرکت گاز پرونده را برای اصلاح برگردانده است</b>
       <ul>${W.openDeficiencies(c).map(d => `<li>${esc(d.title)}: ${esc(d.note)}${d.reply ? ' — <i>پاسخ داده شد</i>' : ''}</li>`).join('')}</ul></div></div>` : ''}
+  ${['payment', 'paid'].includes(c.status) ? `<button class="note info as-link" data-go="track">${icon('receipt')}<div><b>${c.status === 'paid' ? 'رسید واریز خسارت' : 'پرداخت در جریان است'}</b>مراحل مالی، شماره حواله و پیگیری بانکی را در «پیگیری پرونده» ببینید.</div>${icon('chevL', 'chev')}</button>` : ''}
   ${c.status === 'assessed' ? `<div class="note info">${icon('money')}<div><b>مبلغ خسارت شما تعیین شد</b>برای دیدن جزئیات و قبول یا اعتراض، «پیگیری پرونده» را باز کنید.</div></div>` : ''}
   <div class="well">
     <div class="tiles">
@@ -573,9 +647,78 @@ function offerBlock(c) {
     ${c.assessment.note ? `<div class="note info">${icon('chat')}<div><b>توضیح ارزیاب (${esc(c.assessment.adjuster)})</b>${esc(c.assessment.note)}</div></div>` : ''}
     ${c.objection ? `<div class="note warn">${icon('alert')}<div><b>اعتراض مشترک — ${fdate(c.objection.at)}</b>${esc(c.objection.note)}</div></div>` : ''}
     ${c.status === 'assessed' && st.user.role === 'subscriber' ? `<div class="btns"><button class="btn green" data-act="doAction" data-action="accept">${icon('check')} قبول مبلغ</button><button class="btn ghost" data-act="doAction" data-action="object">اعتراض به مبلغ</button></div>` : ''}
-    ${c.status === 'paid' ? `<div class="note ok">${icon('checkC')}<div><b>واریز شد</b>شماره پیگیری <span class="num">${fa(c.payment.ref)}</span> — تاریخ ${fa(c.payment.date)}</div></div>` : ''}
-    ${c.status === 'payment' ? `<div class="note info">${icon('clock')}<div>درخواست پرداخت ثبت شد. پس از واریز، شماره پیگیری اینجا و با پیامک اعلام می‌شود.</div></div>` : ''}
+  </div>${financeBlock(c)}`;
+}
+
+// ---------- پنل مالی: از قبول مبلغ تا واریز ----------
+const maskSheba = v => v ? `${v.slice(0, 4)} •••• •••• ${v.slice(-4)}` : '—';
+const FIN_WAIT = {
+  review: 'واحد مالی بیمه‌گر مدارک پرداخت را کنترل و شبای شما را با نام ذی‌نفع تطبیق می‌دهد.',
+  voucher: 'پس از بررسی مالی، حواله پرداخت به نام شما صادر می‌شود.',
+  bank: 'حواله برای انتقال پایا یا ساتنا به بانک فرستاده می‌شود.',
+  paid: 'مبلغ به حساب شبای شما واریز و شماره پیگیری بانکی پیامک می‌شود.',
+};
+function finDetails(c, id) {
+  const f = c.finance || {};
+  const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
+  const num_ = v => `<span class="num" dir="ltr">${esc(fa(v))}</span>`;
+  if (id === 'accepted') return [['تاریخ تأیید شما', fdt(c.acceptedAt)], ['مبلغ پذیرفته‌شده', money(r.payable)]];
+  if (id === 'review' && f.review) return [['بررسی‌کننده', esc(f.review.reviewer)], ['تطبیق شبا با نام ذی‌نفع', `<span class="ok-txt">${icon('check')} تأیید شد</span>`], ['زمان بررسی', fdt(f.review.at)], ...(f.review.note ? [['توضیح', esc(f.review.note)]] : [])];
+  if (id === 'voucher' && f.voucher) return [['شماره حواله', num_(f.voucher.voucherNo)], ['تاریخ صدور', fa(f.voucher.date)], ['مبلغ حواله', money(f.voucher.amount)], ['صادرکننده', esc(f.voucher.by)]];
+  if (id === 'bank' && f.bank) return [['روش انتقال', W.TRANSFER_METHODS[f.bank.method].label], ['پیگیری دستور پرداخت', num_(f.bank.ref)], ['تاریخ ارسال به بانک', fa(f.bank.date)], ['زمان تقریبی واریز', W.TRANSFER_METHODS[f.bank.method].eta]];
+  if (id === 'paid' && c.status === 'paid') return [['شماره پیگیری بانکی', num_(c.payment.ref)], ['تاریخ واریز', fa(c.payment.date)], ['مبلغ واریزی', money(c.payment.amount)], ['حساب مقصد', `<span class="num" dir="ltr">${maskSheba(c.bank.sheba)}</span>`], ['صاحب حساب', esc(c.bank.holder)]];
+  return null;
+}
+function financeBlock(c) {
+  const stage = W.finStage(c);
+  if (!stage || !c.assessment) return '';
+  const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
+  const due = c.payment?.amount || r.payable;
+  const paid = c.status === 'paid' ? due : 0;
+  const cur = W.FIN_STAGES.findIndex(x => x.id === stage);
+  const receipt = c.status === 'paid' ? `رسید واریز خسارت — پرونده ${c.code}\nمبلغ: ${nf.format(c.payment.amount)} ریال\nتاریخ واریز: ${c.payment.date}\nپیگیری بانکی: ${c.payment.ref}\nحواله: ${c.finance?.voucher?.voucherNo || '—'}\nحساب مقصد: ${maskSheba(c.bank.sheba)} — ${c.bank.holder}` : '';
+  return `<div class="form fin">
+    <div class="fin-head"><h2>${icon('receipt')} وضعیت مالی و پرداخت</h2><span class="badge ${c.status === 'paid' ? 'ok' : 'accent'}">${W.FIN_STAGES[cur].short}</span></div>
+    <div class="fin-sum">
+      <div><span>خسارت نهایی تأییدشده</span><b class="num">${money(due)}</b></div>
+      <div><span>پرداخت‌شده</span><b class="num ok-txt">${money(paid)}</b></div>
+      <div><span>مانده</span><b class="num">${money(due - paid)}</b></div>
+    </div>
+    <ol class="fin-steps">${W.FIN_STAGES.map((fs, i) => {
+      const cls = c.status === 'paid' || i < cur ? 'done' : i === cur ? 'on' : 'todo';
+      const det = cls !== 'todo' ? finDetails(c, fs.id) : null;
+      return `<li class="${cls}"><span class="fin-dot">${cls === 'done' ? icon('check') : fa(i + 1)}</span><div class="fin-body"><b>${fs.label}</b>
+        ${det ? `<dl class="fin-kv">${det.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : `<span class="muted">${cls === 'on' ? 'در حال انجام — ' : ''}${FIN_WAIT[fs.id] || ''}</span>`}</div></li>`;
+    }).join('')}</ol>
+    ${receipt ? `<div class="receipt"><div>${icon('checkC')}<b>خسارت به حساب شما واریز شد</b></div><button class="btn sm ghost" data-act="copyCred" data-text="${esc(receipt)}">${icon('copy')} رونوشت رسید</button></div>` : ''}
   </div>`;
+}
+function finForm(c) {
+  if (st.user.role !== 'insurer' || c.status !== 'payment') return '';
+  const stage = W.finStage(c);
+  const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
+  const today = fa(W.jalaliString(new Date()));
+  const sub = userById(c.subscriberId);
+  if (stage === 'accepted') return `<form class="form" data-form="fin" data-step="fin_review"><b>گام بعد: بررسی مالی و استعلام شبا</b>
+    <label class="fld" for="fn-rev"><span>بررسی‌کننده مالی</span><input id="fn-rev" name="reviewer" value="${esc(st.user.name)}" required></label>
+    <label class="check"><input type="checkbox" id="fn-sheba" name="shebaMatch"><span>استعلام شد: شبای <span class="num" dir="ltr">${esc(c.bank.sheba)}</span> به نام «${esc(c.bank.holder)}» است و با ذی‌نفع پرونده (${esc(sub?.name || '')}) مطابقت دارد.</span></label>
+    <label class="fld" for="fn-note"><span>توضیح (اختیاری)</span><textarea id="fn-note" name="note" style="min-height:60px"></textarea></label>
+    <button class="btn green" type="submit">${icon('check')} ثبت بررسی مالی</button></form>`;
+  if (stage === 'review') return `<form class="form" data-form="fin" data-step="fin_voucher"><b>گام بعد: صدور حواله پرداخت</b>
+    <div class="grid2"><label class="fld" for="fn-vno"><span>شماره حواله</span><input id="fn-vno" name="voucherNo" class="ltr" required value="H-${W.toJalali(new Date()).jy}-${esc(c.code.slice(-6))}"></label>
+    <label class="fld" for="fn-vdate"><span>تاریخ صدور</span><input id="fn-vdate" name="date" class="ltr" required value="${today}"></label></div>
+    <div class="sumline total"><span>مبلغ حواله (طبق ارزیابی)</span><b>${money(r.payable)}</b></div><input type="hidden" name="amount" value="${r.payable}">
+    <button class="btn green" type="submit">${icon('receipt')} صدور حواله</button></form>`;
+  if (stage === 'voucher') return `<form class="form" data-form="fin" data-step="fin_bank"><b>گام بعد: ارسال دستور پرداخت به بانک</b>
+    <div class="grid2"><label class="fld" for="fn-m"><span>روش انتقال</span><select id="fn-m" name="method">${Object.entries(W.TRANSFER_METHODS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></label>
+    <label class="fld" for="fn-ref"><span>شماره پیگیری دستور پرداخت</span><input id="fn-ref" name="ref" class="ltr" required></label>
+    <label class="fld" for="fn-bdate"><span>تاریخ ارسال</span><input id="fn-bdate" name="date" class="ltr" required value="${today}"></label></div>
+    <small class="muted">مقصد: <span class="num" dir="ltr">${esc(c.bank.sheba)}</span> — ${esc(c.bank.holder)}</small>
+    <button class="btn green" type="submit">${icon('send')} ثبت ارسال به بانک</button></form>`;
+  return `<div class="form"><b>گام آخر: ثبت واریز</b>
+    <div class="grid2">${field('شماره پیگیری بانکی واریز', 'payment.ref', fa(c.payment?.ref), { req: true, ltr: true })}${field('تاریخ واریز', 'payment.date', fa(c.payment?.date), { req: true, ltr: true, ph: today })}</div>
+    <div class="sumline total"><span>مبلغ واریزی</span><b>${money(c.payment?.amount || r.payable)}</b></div>
+    <button class="btn green" data-act="doAction" data-action="ins_pay">${icon('checkC')} ثبت واریز و اطلاع به مشترک</button></div>`;
 }
 
 function timelineBlock(c) {
@@ -866,11 +1009,7 @@ function reviewAssess(c) {
   const a = c.assessment || { adjuster: '', visitDate: '', note: '', items: [] };
   const r = W.computePayable(a.items, db.settings, c.damage.deceased?.length || 0);
   const cat = { property: 'مالی', medical: 'درمان', death: 'فوت' };
-  const payForm = role === 'insurer' && c.status === 'payment' ? `<div class="form"><b>ثبت پرداخت</b>
-      <div class="grid2">${field('شماره پیگیری واریز', 'payment.ref', fa(c.payment?.ref), { req: true, ltr: true })}${field('تاریخ واریز', 'payment.date', fa(c.payment?.date), { req: true, ltr: true, ph: '۱۴۰۵/۰۸/۱۰' })}</div>
-      <div class="sumline total"><span>مبلغ واریزی</span><b>${money(r.payable)}</b></div>
-      <small>شماره شبا: <span dir="ltr" class="num">${esc(c.bank.sheba)}</span> — ${esc(c.bank.holder)}</small></div>` : '';
-  if (dis) return offerBlock(c) + payForm;
+  if (dis) return offerBlock(c) + finForm(c);
   return `<div class="form">
     ${c.objection && c.status === 'objection' ? `<div class="note warn">${icon('alert')}<div><b>اعتراض مشترک</b>${esc(c.objection.note)}</div></div>` : ''}
     <div class="grid2">${field('ارزیاب خسارت', 'assessment.adjuster', a.adjuster, { req: true })}${field('تاریخ بازدید ارزیاب', 'assessment.visitDate', fa(a.visitDate), { ltr: true, ph: '۱۴۰۵/۰۷/۲۸' })}</div>
@@ -1005,16 +1144,8 @@ function helpSheet() {
     <div class="support"><span class="av">${icon('support')}</span>اورژانس گاز: <span class="num">۱۹۴</span></div>`);
 }
 function guideSheet() {
-  openSheet(`<h2>مراحل پرونده</h2><ul class="tl">
-    <li><div class="t">۱. مراجعه به شرکت گاز</div><div class="s">ثبت مشترک، تشکیل پرونده و پیامک نام کاربری و رمز موقت</div></li>
-    <li><div class="t">۲. تکمیل پرونده توسط مشترک</div><div class="s">اطلاعات حادثه، خسارت‌ها، عکس‌ها، مدارک و شبا؛ سپس ارسال</div></li>
-    <li><div class="t">۳. بررسی شرکت گاز</div><div class="s">بازدید کارشناس، بررسی مدارک؛ در صورت نقص، بازگشت به مشترک</div></li>
-    <li><div class="t">۴. بررسی بیمه‌گر</div><div class="s">ارزیابی خسارت؛ در صورت نیاز درخواست مدارک تکمیلی از طریق شرکت گاز</div></li>
-    <li><div class="t">۵. تأیید مبلغ و پرداخت</div><div class="s">قبول یا اعتراض مشترک، سپس واریز به شبا و اعلام شماره پیگیری</div></li></ul>`);
-}
-function isDark() {
-  const t = document.documentElement.dataset.theme;
-  return t ? t === 'dark' : !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+  openSheet(`<h2>مسیر پرونده</h2><p class="lead">از تشکیل پرونده تا دریافت خسارت</p>${journeyHtml(true)}`);
+  startJourney();
 }
 function profileSheet() {
   const dark = isDark();
@@ -1094,6 +1225,11 @@ function setPath(obj, path, val) {
 
 // ================= رویدادها =================
 const ACTS = {
+  forgot: () => forgotSheet('id'),
+  otpResend: async () => { if (!rst) return forgotSheet('id'); await sendOtp(rst.username, rst.mobile); forgotSheet('code'); toast('کد تازه ارسال شد.'); },
+  jGo: el => { const j = $('.journey'); j.dataset.play = '0'; jSet(+el.dataset.i); },
+  jStep: el => { const j = $('.journey'); j.dataset.play = '0'; jSet(+j.dataset.i + +el.dataset.d); },
+  jPlay: () => { const j = $('.journey'); j.dataset.play = j.dataset.play === '1' ? '0' : '1'; jSet(+j.dataset.i); },
   toggle: el => { const k = el.dataset.key; st.open.has(k) ? st.open.delete(k) : st.open.add(k); render(); },
   help: helpSheet, guide: guideSheet, notifs: notifSheet, closeSheet,
   demoLogin: el => { const d = DEMO[+el.dataset.i]; doLogin(d.u, d.p); },
@@ -1188,6 +1324,59 @@ const ACTS = {
   resetDemoYes: async () => { closeSheet(); db = await S.seed(); urlCache.clear(); st.user = db.users.find(u => u.role === 'admin'); sset('gii.user', st.user.id); toast('داده‌های نمونه بازنشانی شد.'); go('home'); },
 };
 
+// ---------- بازیابی رمز عبور (فراموشی رمز) ----------
+// کاربر نام کاربری و موبایل ثبت‌شده را وارد می‌کند، کد ۶ رقمی پیامکی می‌گیرد و رمز تازه می‌گذارد.
+// کد فقط به‌صورت هش نگه داشته می‌شود، ۲ دقیقه اعتبار دارد و حداکثر ۵ بار می‌شود امتحانش کرد.
+// پیام مرحله اول برای حساب موجود و ناموجود یکسان است تا وجود حساب لو نرود.
+const OTP_TTL = 120000, OTP_TRIES = 5;
+let rst = null, otpTick = null;
+function forgotSheet(step = 'id', err = '') {
+  clearInterval(otpTick);
+  const e = err ? `<div class="note bad">${icon('alert')}<div>${esc(err)}</div></div>` : '';
+  if (step === 'id') {
+    openSheet(`<h2>بازیابی رمز عبور</h2><p class="lead">کد تأیید به موبایلی که در شرکت گاز ثبت کرده‌اید پیامک می‌شود.</p>${e}
+      <form class="form flat" data-form="forgotId">
+        <label class="fld" for="fg-user"><span>نام کاربری</span><input id="fg-user" name="username" class="ltr" required autocomplete="username" placeholder="برای مشترکین: شماره اشتراک گاز" value="${esc(rst?.username || $('#lg-user')?.value || '')}"></label>
+        <label class="fld" for="fg-mob"><span>شماره موبایل ثبت‌شده</span><input id="fg-mob" name="mobile" class="ltr" required inputmode="tel" autocomplete="tel" placeholder="09xxxxxxxxx" value="${esc(rst?.mobile || '')}"></label>
+        <div class="btns"><button class="btn" type="submit">${icon('sms')} ارسال کد تأیید</button><button class="btn ghost" type="button" data-act="closeSheet">انصراف</button></div>
+        <small class="muted">موبایل خود را عوض کرده‌اید یا کارمند هستید و موبایل ثبت نکرده‌اید؟ از شرکت گاز یا مدیر سامانه رمز موقت جدید بگیرید.</small>
+      </form>`);
+    return;
+  }
+  if (step === 'code') {
+    const last = rst.userId ? db.sms.find(x => x.mobile === rst.mobile) : null;
+    openSheet(`<h2>کد تأیید</h2><p class="lead">اگر نام کاربری و موبایل درست باشد، کد ۶ رقمی به <span class="num" dir="ltr">${fa(rst.mobile.replace(/^(\d{4})\d{4}/, '$1****'))}</span> پیامک شده است.</p>${e}
+      ${last ? `<div class="sms-demo">${icon('sms')}<div><b>پیامک نمایشی</b>${esc(last.text)}</div></div>` : ''}
+      <form class="form flat" data-form="forgotCode">
+        <label class="fld" for="fg-code"><span>کد تأیید</span><input id="fg-code" name="code" class="ltr otp" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="------"></label>
+        <div class="otp-left" id="otp-left"></div>
+        <div class="btns"><button class="btn green" type="submit">تأیید کد</button><button class="btn ghost" type="button" data-act="otpResend" id="otp-resend" disabled>ارسال دوباره</button></div>
+        <button class="link" type="button" data-act="forgot">${icon('edit')} اصلاح نام کاربری یا موبایل</button>
+      </form>`);
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((rst.exp - Date.now()) / 1000));
+      const el = $('#otp-left'); if (!el) { clearInterval(otpTick); return; }
+      el.textContent = left ? `اعتبار کد: ${fa(Math.floor(left / 60))}:${fa(String(left % 60).padStart(2, '0'))}` : 'کد منقضی شد؛ دوباره ارسال کنید.';
+      el.classList.toggle('over', !left);
+      const r = $('#otp-resend'); if (r) r.disabled = left > OTP_TTL / 2000;
+    };
+    tick(); otpTick = setInterval(tick, 1000);
+    return;
+  }
+  openSheet(`<h2>رمز عبور جدید</h2><p class="lead">کد تأیید شد. رمز تازه‌ای انتخاب کنید.</p>${e}
+    <form class="form flat" data-form="forgotNew">
+      <label class="fld" for="fg-p1"><span>رمز جدید</span><input id="fg-p1" name="p1" type="password" class="ltr" minlength="6" required autocomplete="new-password"><small>دست‌کم ۶ نویسه</small></label>
+      <label class="fld" for="fg-p2"><span>تکرار رمز جدید</span><input id="fg-p2" name="p2" type="password" class="ltr" minlength="6" required autocomplete="new-password"></label>
+      <button class="btn green" type="submit">ذخیره رمز و بازگشت به ورود</button>
+    </form>`);
+}
+async function sendOtp(username, mobile) {
+  const u = db.users.find(x => x.active && x.mobile && x.username.toLowerCase() === username.toLowerCase() && x.mobile === mobile);
+  const code = String(100000 + Math.floor(Math.random() * 900000));
+  rst = { username, mobile, userId: u?.id || null, exp: Date.now() + OTP_TTL, tries: 0, ok: false, hash: u ? await S.hashPw(u.username, 'otp:' + code) : '' };
+  if (u) { S.sendSms(mobile, `کد بازیابی رمز سامانه بیمه حوادث گاز: ${code} — این کد را به هیچ‌کس ندهید.`); persist(); }
+}
+
 async function resetPassword(u) {
   const pw = S.tempPassword();
   u.pwHash = await S.hashPw(u.username, pw); u.mustChangePassword = true; u.active = true;
@@ -1199,6 +1388,33 @@ async function resetPassword(u) {
 
 const FORMS = {
   login: f => doLogin(f.username.value, f.password.value),
+  forgotId: async f => {
+    const username = W.normalizeDigits(f.username.value).trim(), mobile = W.normalizeDigits(f.mobile.value).trim();
+    if (!W.isValidMobile(mobile)) return forgotSheet('id', 'شماره موبایل را ۱۱ رقمی و با ۰۹ وارد کنید.');
+    await sendOtp(username, mobile);
+    forgotSheet('code');
+  },
+  forgotCode: async f => {
+    if (!rst) return forgotSheet('id');
+    if (Date.now() > rst.exp) return forgotSheet('code', 'کد منقضی شده است؛ «ارسال دوباره» را بزنید.');
+    if (++rst.tries > OTP_TRIES) { rst = null; return forgotSheet('id', 'تعداد تلاش‌ها زیاد بود. دوباره از اول شروع کنید.'); }
+    const u = rst.userId && userById(rst.userId);
+    const code = W.normalizeDigits(f.code.value).trim();
+    if (!u || await S.hashPw(u.username, 'otp:' + code) !== rst.hash) return forgotSheet('code', `کد نادرست است. ${fa(OTP_TRIES - rst.tries)} بار دیگر می‌توانید امتحان کنید.`);
+    rst.ok = true; forgotSheet('new');
+  },
+  forgotNew: async f => {
+    const u = rst?.ok && userById(rst.userId);
+    if (!u) return forgotSheet('id');
+    if (f.p1.value.length < 6) return forgotSheet('new', 'رمز باید دست‌کم ۶ نویسه باشد.');
+    if (f.p1.value !== f.p2.value) return forgotSheet('new', 'تکرار رمز با رمز جدید یکسان نیست.');
+    u.pwHash = await S.hashPw(u.username, f.p1.value); u.mustChangePassword = false;
+    S.sendSms(u.mobile, 'رمز عبور حساب شما در سامانه بیمه حوادث گاز تغییر کرد. اگر شما این کار را نکرده‌اید، با شرکت گاز تماس بگیرید.');
+    S.notify({ toUser: u.id, text: 'رمز عبور حساب شما با کد پیامکی بازیابی شد.' });
+    persist(); rst = null; closeSheet();
+    const lu = $('#lg-user'); if (lu) { lu.value = u.username; $('#lg-pass').value = ''; $('#lg-pass').focus(); }
+    toast('رمز جدید ذخیره شد. با آن وارد شوید.');
+  },
   newpw: async f => {
     if (f.p1.value !== f.p2.value) return toast('تکرار رمز با رمز جدید یکسان نیست.', true);
     if (f.p1.value.length < 6) return toast('رمز باید دست‌کم ۶ نویسه باشد.', true);
@@ -1221,6 +1437,23 @@ const FORMS = {
     const t = $('#msg-text'); if (t) t.focus();
   },
   action: f => runAction(f.dataset.action, f.note.value.trim()),
+  fin: f => {
+    const c = currentClaim(); const step = f.dataset.step;
+    const v = k => (f[k] ? W.normalizeDigits(f[k].value).trim() : '');
+    const data = step === 'fin_review' ? { reviewer: f.reviewer.value.trim(), shebaMatch: f.shebaMatch.checked, note: f.note.value.trim() }
+      : step === 'fin_voucher' ? { voucherNo: v('voucherNo'), date: v('date'), amount: +v('amount') }
+      : { method: f.method.value, ref: v('ref'), date: v('date') };
+    try {
+      Object.assign(c, W.applyFinance(c, step, data, st.user));
+    } catch (e) { return toast(e.message, true); }
+    const sub = userById(c.subscriberId);
+    const msg = step === 'fin_review' ? `بررسی مالی پرونده ${c.code} انجام و شبای شما تأیید شد.`
+      : step === 'fin_voucher' ? `حواله پرداخت خسارت پرونده ${c.code} به شماره ${data.voucherNo} و مبلغ ${nf.format(data.amount)} ریال صادر شد.`
+      : `دستور پرداخت خسارت پرونده ${c.code} از طریق ${W.TRANSFER_METHODS[data.method].label} به بانک ارسال شد. پیگیری: ${data.ref}`;
+    S.notify({ toUser: sub.id, text: msg, claimId: c.id });
+    if (step !== 'fin_review') S.sendSms(sub.mobile, msg);
+    persist(); toast(W.FIN_STAGES.find(x => x.id === c.finance.stage).label + ' — ثبت شد.'); render();
+  },
   defect: f => {
     const c = currentClaim(); const note = f.note.value.trim(); if (!note) return;
     c.deficiencies.push({ id: S.uid('d'), target: f.dataset.target || 'general', title: f.dataset.title || (st.user.role === 'insurer' ? 'درخواست بیمه‌گر' : 'نقص عمومی'), note, by: st.user.role, byName: st.user.name, at: new Date().toISOString(), status: 'open', reply: '' });
@@ -1354,7 +1587,8 @@ function wire() {
 // ================= راه‌اندازی =================
 async function boot() {
   const t = lget('gii.theme'); if (t) document.documentElement.dataset.theme = t;
-  db = S.load() || await S.seed();
+  db = S.load();
+  if (!db || db.version !== S.DB_VERSION) db = await S.seed();
   wire();
   const uid = sget('gii.user');
   st.user = uid ? db.users.find(u => u.id === uid && u.active) || null : null;

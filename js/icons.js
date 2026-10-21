@@ -44,6 +44,9 @@ const P = {
   support: '<path d="M5 13.5V12a7 7 0 0 1 14 0v1.5"/><rect x="3.5" y="13" width="3.5" height="5.5" rx="1.4"/><rect x="17" y="13" width="3.5" height="5.5" rx="1.4"/><path d="M19 18.5c0 1.5-1.5 2.3-4 2.3"/>',
   swap: '<path d="M7 4.5 4 7.5l3 3M4 7.5h12M17 13.5l3 3-3 3M20 16.5H8"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
+  pause: '<rect x="7" y="5.5" width="3.4" height="13" rx="1"/><rect x="13.6" y="5.5" width="3.4" height="13" rx="1"/>',
+  play: '<path d="M16.5 6v12L7.5 12z" fill="currentColor"/>',
+  receipt: '<path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/>',
   refresh: '<path d="M19.5 11A7.5 7.5 0 0 0 6.2 7.2L4.5 9M4.5 13a7.5 7.5 0 0 0 13.3 3.8l1.7-1.8"/><path d="M4.5 4.8V9h4.2M19.5 19.2V15h-4.2"/>',
 };
 

@@ -84,11 +84,20 @@ test('چرخه کامل: نقص، اصلاح، ارسال به بیمه‌گر،
   c = W.applyAction(c, 'ins_assess', ins);
   assert.throws(() => W.applyAction(c, 'object', sub, ''), /توضیح/);
   c = W.applyAction(c, 'accept', sub);
-  assert.match(W.canDo(c, 'insurer', 'ins_pay'), /پیگیری/);
   c.payment = { ref: '998877', date: '1405/08/10' };
+  assert.match(W.canDo(c, 'insurer', 'ins_pay'), /حواله/);
+  assert.equal(W.finStage(c), 'accepted');
+  assert.throws(() => W.applyFinance(c, 'fin_voucher', { voucherNo: '1', date: '1405/08/01', amount: 1 }, ins), /ترتیب/);
+  assert.throws(() => W.applyFinance(c, 'fin_review', { reviewer: 'مالی' }, ins), /شبا/);
+  c = W.applyFinance(c, 'fin_review', { reviewer: 'واحد مالی', shebaMatch: true }, ins);
+  c = W.applyFinance(c, 'fin_voucher', { voucherNo: 'H-1405-77', date: '1405/08/05', amount: 205000000 }, ins);
+  assert.equal(c.payment.amount, 205000000);
+  c = W.applyFinance(c, 'fin_bank', { method: 'paya', ref: 'P-5566', date: '1405/08/06' }, ins);
+  assert.equal(W.finStage(c), 'bank');
   c = W.applyAction(c, 'ins_pay', ins);
   assert.equal(c.status, 'paid');
-  assert.equal(c.timeline.length, 12);
+  assert.equal(c.timeline.length, 15);
+  assert.equal(W.finStage(c), 'paid');
 });
 
 test('محاسبه خسارت با فرانشیز و سقف', () => {
