@@ -74,9 +74,9 @@ class GII_Seed {
 			. '<path d="M200 460c-60 0-90-40-90-90 0-60 50-80 60-150 40 30 60 60 55 90 20-10 30-30 35-50 40 30 70 70 70 110 0 50-40 90-130 90z" fill="hsl(28,40%,30%)" opacity=".7"/>'
 			. '<text x="400" y="560" font-family="Tahoma" font-size="34" fill="#fff" text-anchor="middle" opacity=".85">عکس نمونه — ' . esc_html( $label ) . '</text></svg>';
 	}
-	private static function doc_svg( $title ) {
-		$lines = '';
-		for ( $i = 0; $i < 14; $i++ ) $lines .= '<rect x="80" y="' . ( 220 + $i * 34 ) . '" width="' . ( $i % 3 ? 440 : 300 ) . '" height="10" rx="5" fill="#dfe6ec"/>';
+	private static function doc_svg( $title, $cause = '' ) {
+		$lines = $cause ? '<rect x="70" y="190" width="460" height="56" rx="10" fill="#fdecdf"/><text x="300" y="227" font-family="Tahoma" font-size="22" fill="#c2410c" text-anchor="middle">' . esc_html( $cause ) . '</text>' : '';
+		for ( $i = 0; $i < ( $cause ? 12 : 14 ); $i++ ) $lines .= '<rect x="80" y="' . ( ( $cause ? 270 : 220 ) + $i * 34 ) . '" width="' . ( $i % 3 ? 440 : 300 ) . '" height="10" rx="5" fill="#dfe6ec"/>';
 		return '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800"><rect width="600" height="800" fill="#fbfbf8"/><rect x="40" y="40" width="520" height="720" fill="none" stroke="#c9d3dc" stroke-width="3"/>'
 			. '<text x="300" y="120" font-family="Tahoma" font-size="30" fill="#1c2733" text-anchor="middle">' . esc_html( $title ) . '</text>'
 			. '<text x="300" y="165" font-family="Tahoma" font-size="20" fill="#8a97a3" text-anchor="middle">مدرک نمونه برای نسخه نمایشی</text>' . $lines
@@ -110,12 +110,12 @@ class GII_Seed {
 		$c       = array(
 			'code' => GII_WF::claim_code( GII_Store::next_seq(), $created ), 'subscriberId' => (string) $u->ID, 'createdBy' => (string) self::$gas->ID,
 			'createdAt' => GII_WF::iso( $created ), 'status' => 'draft', 'statusAt' => GII_WF::iso( $created ), 'submitCount' => 0,
-			'incident' => array_merge( array( 'date' => self::jal( $o['age'] + 2 ), 'time' => '21:30', 'type' => 'fire', 'placeType' => 'residential', 'address' => $addr, 'postalCode' => '', 'description' => '', 'fireReportNo' => '', 'policeReportNo' => '' ), $o['incident'] ?? array() ),
+			'incident' => array_merge( array( 'date' => self::jal( $o['age'] + 2 ), 'time' => '21:30', 'type' => 'fire', 'placeType' => 'residential', 'address' => $addr, 'postalCode' => '', 'description' => '', 'causeIssuer' => '', 'causeReportNo' => '', 'causeReportDate' => '', 'causeStatesGas' => false, 'policeReportNo' => '' ), $o['incident'] ?? array() ),
 			'damage' => array_merge( array( 'kinds' => array( 'property' ), 'items' => array(), 'injured' => array(), 'deceased' => array() ), $o['damage'] ?? array() ),
 			'photos' => array(), 'docs' => array(), 'files' => array(), 'bank' => array( 'sheba' => '', 'holder' => '' ), 'declaration' => false,
 			'deficiencies' => array(), 'messages' => array(),
 			'timeline' => array( array( 'at' => GII_WF::iso( $created ), 'by' => self::$gas->display_name, 'role' => 'gas', 'action' => 'create', 'label' => 'تشکیل پرونده و ایجاد حساب مشترک', 'note' => '' ) ),
-			'gasReport' => array(), 'assessment' => null, 'payment' => null,
+			'assessment' => null, 'payment' => null,
 		);
 		$c = GII_Store::save_claim( $c );
 		if ( ! empty( $o['fill'] ) ) {
@@ -124,14 +124,17 @@ class GII_Seed {
 			}
 			foreach ( GII_WF::required_docs( $c, 'subscriber' ) as $d ) {
 				if ( in_array( $d['id'], $o['skipDocs'] ?? array(), true ) ) continue;
-				self::add_svg( $c, $d['id'], self::doc_svg( $d['title'] ), $d['id'] . '.svg', 'subscriber' );
+				$cause = 'cause_report' === $d['id'] ? 'علت حادثه: ' . ( 'co' === $c['incident']['type'] ? 'گازگرفتگی ناشی از نشت گاز طبیعی' : 'آتش‌سوزی ناشی از نشت گاز طبیعی' ) : '';
+				self::add_svg( $c, $d['id'], self::doc_svg( $d['title'], $cause ), $d['id'] . '.svg', 'subscriber' );
 			}
+			// گزارش علت حادثه با قید «گاز»؛ گازگرفتگی معمولاً با گزارش کارشناس رسمی دادگستری
+			$c['incident'] = array_merge( $c['incident'], array(
+				'causeIssuer' => 'co' === $c['incident']['type'] ? 'expert' : 'fire',
+				'causeReportNo' => '' !== $c['incident']['causeReportNo'] ? $c['incident']['causeReportNo'] : '۵۱۰' . $c['id'],
+				'causeReportDate' => self::jal( $o['age'] + 1 ), 'causeStatesGas' => true,
+			) );
 			$c['bank']        = array( 'sheba' => self::sheba( '0170000000123456789001' ), 'holder' => $u->display_name );
 			$c['declaration'] = true;
-		}
-		if ( ! empty( $o['gasReport'] ) ) {
-			$c['gasReport'] = array( 'inspector' => 'مهندس امیر سعیدی', 'visitDate' => self::jal( $o['age'] - 2 ), 'cause' => 'hose', 'afterMeter' => 'after', 'appliance' => 'standard', 'opinion' => 'covered', 'notes' => 'نشت از شیلنگ غیراستاندارد اجاق گاز؛ خسارت پس از کنتور است.' );
-			self::add_svg( $c, 'gas_report', self::doc_svg( 'صورت‌جلسه بازدید کارشناس گاز' ), 'gas_report.svg', 'gas' );
 		}
 		foreach ( $o['steps'] ?? array() as $s ) {
 			$by              = 'gas' === $s[2] ? self::$gas->display_name : ( 'insurer' === $s[2] ? self::$ins->display_name : $u->display_name );
@@ -139,7 +142,7 @@ class GII_Seed {
 		}
 		if ( ! empty( $o['steps'] ) ) $c['statusAt'] = end( $c['timeline'] )['at'];
 		foreach ( $c['timeline'] as $t ) {
-			if ( 'gas_forward' === $t['action'] ) { $c['forwardedAt'] = $t['at']; break; }
+			if ( 'gas_forward' === $t['action'] ) { $c['forwardedAt'] = $t['at']; $c['causeCheck'] = array( 'by' => self::$gas->display_name, 'at' => $t['at'] ); break; }
 		}
 		$c['status'] = $o['status'] ?? 'draft';
 		return array_merge( $c, $o['extra'] ?? array() );
@@ -172,7 +175,7 @@ class GII_Seed {
 		// ۱) پرونده دارای نقص
 		$c1 = self::claim( $users[0], array(
 			'age' => 9, 'status' => 'returned', 'fill' => true, 'skipDocs' => array( 'ownership' ),
-			'incident' => array( 'description' => 'هنگام روشن کردن اجاق گاز، شعله به شیلنگ رسید و آتش به کابینت و پرده آشپزخانه سرایت کرد. آتش‌نشانی ظرف ۱۵ دقیقه آتش را مهار کرد.', 'fireReportNo' => '۵۴۸۷۲' ),
+			'incident' => array( 'description' => 'هنگام روشن کردن اجاق گاز، شعله به شیلنگ رسید و آتش به کابینت و پرده آشپزخانه سرایت کرد. آتش‌نشانی ظرف ۱۵ دقیقه آتش را مهار کرد.', 'causeReportNo' => '۵۴۸۷۲' ),
 			'damage' => array( 'items' => array( array( 'title' => 'کابینت آشپزخانه', 'qty' => 1, 'amount' => 420000000 ), array( 'title' => 'یخچال فریزر', 'qty' => 1, 'amount' => 310000000 ), array( 'title' => 'رنگ و گچ‌کاری سقف', 'qty' => 1, 'amount' => 95000000 ) ) ),
 			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 6 ), array( 'gas_start', 'شروع بررسی', 'gas', 5 ), array( 'gas_return', 'اعلام نقص و بازگشت به مشترک', 'gas', 4, 'دو مورد نقص ثبت شد.' ) ),
 			'extra' => array( 'submitCount' => 1 ),
@@ -186,8 +189,8 @@ class GII_Seed {
 
 		// ۲) منتظر تأیید مشترک
 		$c2 = self::claim( $users[1], array(
-			'age' => 34, 'status' => 'assessed', 'fill' => true, 'gasReport' => true,
-			'incident' => array( 'type' => 'explosion', 'description' => 'انفجار ناشی از تجمع گاز در آشپزخانه پس از خاموش شدن شعله اجاق؛ شیشه‌ها و در ورودی آسیب دید.', 'fireReportNo' => '۴۹۱۲۰' ),
+			'age' => 34, 'status' => 'assessed', 'fill' => true,
+			'incident' => array( 'type' => 'explosion', 'description' => 'انفجار ناشی از تجمع گاز در آشپزخانه پس از خاموش شدن شعله اجاق؛ شیشه‌ها و در ورودی آسیب دید.', 'causeReportNo' => '۴۹۱۲۰' ),
 			'damage' => array( 'items' => array( array( 'title' => 'شیشه و پنجره‌ها', 'qty' => 4, 'amount' => 180000000 ), array( 'title' => 'در ورودی', 'qty' => 1, 'amount' => 120000000 ), array( 'title' => 'لوازم آشپزخانه', 'qty' => 1, 'amount' => 260000000 ) ) ),
 			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 30 ), array( 'gas_start', 'شروع بررسی', 'gas', 29 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 26 ), array( 'ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 24 ), array( 'ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 3, 'بر اساس بازدید ارزیاب و فاکتورها.' ) ),
 		) );
@@ -209,8 +212,8 @@ class GII_Seed {
 
 		// ۵) نزد بیمه‌گر
 		$c5 = GII_Store::save_claim( self::claim( $users[4], array(
-			'age' => 18, 'status' => 'sent_insurer', 'fill' => true, 'gasReport' => true,
-			'incident' => array( 'description' => 'آتش‌سوزی بخاری گازی در اتاق نشیمن به علت نزدیکی پرده؛ فرش و مبلمان سوخت.', 'fireReportNo' => '۵۰۳۳۱' ),
+			'age' => 18, 'status' => 'sent_insurer', 'fill' => true,
+			'incident' => array( 'description' => 'آتش‌سوزی بخاری گازی در اتاق نشیمن به علت نزدیکی پرده؛ فرش و مبلمان سوخت.', 'causeReportNo' => '۵۰۳۳۱' ),
 			'damage' => array( 'items' => array( array( 'title' => 'فرش دستباف ۹ متری', 'qty' => 1, 'amount' => 350000000 ), array( 'title' => 'مبلمان', 'qty' => 1, 'amount' => 280000000 ) ) ),
 			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 14 ), array( 'gas_start', 'شروع بررسی', 'gas', 13 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 11 ) ),
 			'extra' => array( 'submitCount' => 1 ),
@@ -218,8 +221,8 @@ class GII_Seed {
 
 		// ۶) پرداخت‌شده
 		$c6 = self::claim( $users[5], array(
-			'age' => 70, 'status' => 'paid', 'fill' => true, 'gasReport' => true,
-			'incident' => array( 'description' => 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', 'fireReportNo' => '۴۴۰۹۸' ),
+			'age' => 70, 'status' => 'paid', 'fill' => true,
+			'incident' => array( 'description' => 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', 'causeReportNo' => '۴۴۰۹۸' ),
 			'damage' => array( 'items' => array( array( 'title' => 'آبگرمکن و لوله‌کشی', 'qty' => 1, 'amount' => 140000000 ), array( 'title' => 'بازسازی دیوار پارکینگ', 'qty' => 1, 'amount' => 90000000 ) ) ),
 			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 66 ), array( 'gas_start', 'شروع بررسی', 'gas', 65 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 62 ), array( 'ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 60 ), array( 'ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 50 ), array( 'accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 49 ), array( 'ins_pay', 'ثبت پرداخت', 'insurer', 41, 'واریز به حساب شبای مشترک' ) ),
 			'extra' => array( 'submitCount' => 1 ),
@@ -243,8 +246,8 @@ class GII_Seed {
 
 		// ۷) حواله صادر شده
 		$c7 = self::claim( $users[6], array(
-			'age' => 40, 'status' => 'payment', 'fill' => true, 'gasReport' => true,
-			'incident' => array( 'description' => 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', 'fireReportNo' => '۴۷۲۲۵' ),
+			'age' => 40, 'status' => 'payment', 'fill' => true,
+			'incident' => array( 'description' => 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', 'causeReportNo' => '۴۷۲۲۵' ),
 			'damage' => array( 'items' => array( array( 'title' => 'پکیج و لوله‌کشی', 'qty' => 1, 'amount' => 210000000 ), array( 'title' => 'کابینت و سقف کاذب', 'qty' => 1, 'amount' => 260000000 ) ) ),
 			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36 ), array( 'gas_start', 'شروع بررسی', 'gas', 35 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31 ), array( 'ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29 ), array( 'ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12 ), array( 'accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 9 ), array( 'fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6 ), array( 'fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007' ) ),
 			'extra' => array( 'submitCount' => 1, 'acceptedAt' => self::iso( 9 ) ),

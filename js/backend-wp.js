@@ -61,7 +61,7 @@ export async function forgotReset(password) { return (await req('POST', 'auth/re
 const edits = new WeakMap();
 const timers = new Map();
 const inflight = new Map();
-const EDITABLE = ['incident', 'damage', 'bank', 'declaration', 'gasReport', 'assessment', 'payment'];
+const EDITABLE = ['incident', 'damage', 'bank', 'declaration', 'assessment', 'payment'];
 function sendClaim(c) {
   timers.delete(c.id);
   const v = edits.get(c);
@@ -87,7 +87,7 @@ export async function flush() {
   await Promise.all([...inflight.values()]);
 }
 
-export async function action(c, id, note) { await flush(); await req('POST', `claims/${c.id}/action`, { action: id, note }); }
+export async function action(c, id, note, opts = {}) { await flush(); await req('POST', `claims/${c.id}/action`, { action: id, note, ...opts }); }
 export async function finance(c, step, data) { await flush(); await req('POST', `claims/${c.id}/finance`, { step, data }); }
 export async function addDefect(c, d) { await req('POST', `claims/${c.id}/defects`, d); }
 export async function defect(c, id, op, reply = '') { await req('POST', `claims/${c.id}/defects/${id}`, { op, reply }); }

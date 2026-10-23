@@ -30,10 +30,9 @@ function complete_claim() {
 	foreach ( GII_WF::doc_types() as $d ) $docs[ $d['id'] ] = array( 'f-' . $d['id'] );
 	return array(
 		'id' => 'c1', 'status' => 'draft', 'timeline' => array(), 'deficiencies' => array(),
-		'incident' => array( 'date' => '1405/07/20', 'type' => 'fire', 'placeType' => 'residential', 'address' => 'تهران، خیابان آزادی، پلاک ۱۲', 'description' => 'آتش‌سوزی آشپزخانه به علت نشت شیلنگ اجاق گاز', 'fireReportNo' => '۱۲۳۴' ),
+		'incident' => array( 'date' => '1405/07/20', 'type' => 'fire', 'placeType' => 'residential', 'address' => 'تهران، خیابان آزادی، پلاک ۱۲', 'description' => 'آتش‌سوزی آشپزخانه به علت نشت شیلنگ اجاق گاز', 'causeIssuer' => 'fire', 'causeReportNo' => '۱۲۳۴', 'causeReportDate' => '1405/07/21', 'causeStatesGas' => true ),
 		'damage' => array( 'kinds' => array( 'property' ), 'items' => array( array( 'title' => 'کابینت', 'qty' => 1, 'amount' => 300000000 ) ), 'injured' => array(), 'deceased' => array() ),
 		'photos' => array( 'p1', 'p2', 'p3', 'p4' ), 'docs' => $docs, 'bank' => array( 'sheba' => make_sheba( '0570028180010653892101' ), 'holder' => 'مشترک' ), 'declaration' => true,
-		'gasReport' => array( 'inspector' => 'مهندس رضایی', 'visitDate' => '1405/07/21', 'cause' => 'hose', 'afterMeter' => 'after', 'opinion' => 'covered' ),
 	);
 }
 date_default_timezone_set( 'Asia/Tehran' );
@@ -59,6 +58,14 @@ check( 'parse jalali', $ts && '2026-10-20' === date( 'Y-m-d', $ts ) );
 check( 'parse invalid day', null === GII_WF::parse_jalali( '1405/07/31' ) );
 check( 'parse garbage', null === GII_WF::parse_jalali( 'abc' ) );
 
+// قید علت گاز
+$c = complete_claim();
+$c['incident']['causeStatesGas'] = false;
+check( 'submit needs gas cause statement', (bool) preg_match( '/علت گاز/u', (string) GII_WF::can_do( $c, 'subscriber', 'submit' ) ) );
+$c['incident']['causeStatesGas'] = true;
+$c['incident']['causeIssuer']    = '';
+check( 'submit needs issuer', (bool) preg_match( '/صادرکننده/u', (string) GII_WF::can_do( $c, 'subscriber', 'submit' ) ) );
+
 // ارسال ناقص
 $c = complete_claim();
 $c['photos'] = array( 'p1' );
@@ -71,14 +78,16 @@ $c = GII_WF::apply_action( $c, 'submit', $sub );
 check( 'submitted', 'submitted' === $c['status'] );
 $c = GII_WF::apply_action( $c, 'gas_start', $gas );
 check( 'return needs defect', (bool) preg_match( '/نقص/u', (string) GII_WF::can_do( $c, 'gas', 'gas_return' ) ) );
-$c['deficiencies'][] = array( 'id' => 'd1', 'target' => 'doc:fire_report', 'note' => 'ناخوانا', 'by' => 'gas', 'status' => 'open' );
+$c['deficiencies'][] = array( 'id' => 'd1', 'target' => 'doc:cause_report', 'note' => 'ناخوانا', 'by' => 'gas', 'status' => 'open' );
 $c = GII_WF::apply_action( $c, 'gas_return', $gas );
 check( 'returned', 'returned' === $c['status'] );
 check( 'resubmit needs reply', (bool) preg_match( '/پاسخ/u', (string) GII_WF::can_do( $c, 'subscriber', 'submit' ) ) );
 $c['deficiencies'][0]['reply'] = 'اصلاح شد';
 $c = GII_WF::apply_action( $c, 'submit', $sub );
 $c = GII_WF::apply_action( $c, 'gas_start', $gas );
-$c = GII_WF::apply_action( $c, 'gas_forward', $gas );
+check( 'forward needs cause confirmation', throws( function () use ( $c, $gas ) { GII_WF::apply_action( $c, 'gas_forward', $gas ); }, '/گاز/u' ) );
+$c = GII_WF::apply_action( $c, 'gas_forward', $gas, '', null, array( 'causeConfirmed' => true ) );
+check( 'cause check recorded', 'کارشناس گاز' === $c['causeCheck']['by'] );
 check( 'sent to insurer', 'sent_insurer' === $c['status'] && 0 === count( GII_WF::open_deficiencies( $c ) ) );
 $c = GII_WF::apply_action( $c, 'ins_start', $ins );
 $c['deficiencies'][] = array( 'id' => 'd2', 'target' => 'general', 'note' => 'عکس کنتور', 'by' => 'insurer', 'status' => 'open' );
@@ -117,13 +126,15 @@ check( 'payable capped 150', 150.0 === (float) $r['payable'] );
 $c         = complete_claim();
 $c['docs'] = array();
 $ids       = function () use ( &$c ) { return array_column( GII_WF::required_docs( $c, 'subscriber' ), 'id' ); };
-check( 'fire report required', in_array( 'fire_report', $ids(), true ) );
+check( 'cause report required', in_array( 'cause_report', $ids(), true ) );
 check( 'no death cert', ! in_array( 'death_cert', $ids(), true ) );
 check( 'police optional', ! in_array( 'police', $ids(), true ) );
 $c['damage']['kinds'][] = 'death';
 check( 'death cert required', in_array( 'death_cert', $ids(), true ) );
 check( 'police required on death', in_array( 'police', $ids(), true ) );
-check( 'gas report not subscriber', ! in_array( 'gas_report', $ids(), true ) );
+$c['incident']['type'] = 'co';
+check( 'cause report required for every type', in_array( 'cause_report', $ids(), true ) );
+check( 'no gas-uploaded documents', ! in_array( 'gas', array_column( GII_WF::doc_types(), 'uploader' ), true ) );
 
 echo $fails ? "\n$fails of $count checks failed\n" : "all $count checks passed\n";
 exit( $fails ? 1 : 0 );

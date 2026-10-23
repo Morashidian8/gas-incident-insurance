@@ -103,9 +103,9 @@ function afterAction(c, id, note) {
     case 'gas_reject': case 'ins_reject': t(`پرونده ${c.code} رد شد.`); sms(`پرونده ${c.code} مشمول پوشش تشخیص داده نشد. دلیل: ${note}`); S.notify({ toRole: id === 'gas_reject' ? 'insurer' : 'gas', text: `پرونده ${c.code} رد شد.`, claimId: c.id }); break;
   }
 }
-export async function action(c, id, note) {
+export async function action(c, id, note, opts = {}) {
   if (id === 'ins_pay' && c.payment && c.assessment) c.payment.amount = c.payment.amount || W.computePayable(c.assessment.items, db().settings, c.damage.deceased?.length || 0).payable;
-  Object.assign(c, W.applyAction(c, id, user(), note));
+  Object.assign(c, W.applyAction(c, id, user(), note, new Date(), opts));
   afterAction(c, id, note);
   save();
 }
@@ -182,9 +182,9 @@ export async function register(f) {
   const staff = user();
   const c = {
     id: S.uid('c'), code: W.claimCode(db().seq), subscriberId: u.id, createdBy: staff.id, createdAt: now, status: 'draft', statusAt: now, submitCount: 0,
-    incident: { date: W.jalaliString(d), time: '', type: f.type, placeType: 'residential', address: f.address, postalCode: '', description: '', fireReportNo: '', policeReportNo: '' },
+    incident: { date: W.jalaliString(d), time: '', type: f.type, placeType: 'residential', address: f.address, postalCode: '', description: '', causeIssuer: '', causeReportNo: '', causeReportDate: '', causeStatesGas: false, policeReportNo: '' },
     damage: { kinds: [], items: [], injured: [], deceased: [] }, photos: [], docs: {}, files: {}, bank: { sheba: '', holder: u.name }, declaration: false,
-    deficiencies: [], messages: [], gasReport: {}, assessment: null, payment: null,
+    deficiencies: [], messages: [], assessment: null, payment: null,
     timeline: [{ at: now, by: staff.name, role: 'gas', action: 'create', label: existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک', note: [f.note, late ? `اعلام با تأخیر: بیش از ${db().settings.reportWindowDays} روز پس از حادثه` : ''].filter(Boolean).join(' — ') }],
   };
   db().claims.push(c);

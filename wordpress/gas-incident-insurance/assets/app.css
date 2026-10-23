@@ -448,6 +448,19 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .btn.ghost-light { background: transparent; border-color: rgba(255, 255, 255, .75); color: #fff; text-decoration: none; }
 .btn.ghost-light:hover { background: rgba(255, 255, 255, .14); }
 
+/* کادر گزارش علت حادثه (آتش‌نشانی یا کارشناس رسمی دادگستری) */
+.cause-box { border: 2px solid var(--orange); background: var(--orange-tint); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.cause-box.review { border-width: 1.5px; }
+.cause-head { display: flex; align-items: center; gap: 8px; color: var(--orange); font-size: 16px; }
+.cause-head b { color: var(--ink); }
+.cause-head i { color: var(--red); font-style: normal; }
+.cause-box p { margin: 0; font-size: 14px; }
+.cause-box ul { margin: 0; padding-inline-start: 18px; font-size: 13.5px; color: var(--ink); display: flex; flex-direction: column; gap: 3px; }
+.cause-box .check { background: var(--card); border-radius: 12px; padding: 10px 12px; }
+.cause-box small { color: var(--muted); }
+.doc-hint { margin: 0; display: flex; gap: 8px; align-items: flex-start; background: var(--orange-tint); border-radius: 12px; padding: 8px 10px; font-size: 13px; }
+.doc-hint .ic { width: 18px; height: 18px; color: var(--orange); flex: none; margin-top: 2px; }
+
 /* ================= پنل مالی (از قبول مبلغ تا واریز) ================= */
 .ok-txt { color: var(--green); display: inline-flex; gap: 4px; align-items: center; }
 .ok-txt .ic { width: 16px; height: 16px; }

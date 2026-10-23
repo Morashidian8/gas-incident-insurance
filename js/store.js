@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId
 
 const KEY = 'gii.db.v1';
 // با تغییر ساختار داده نمایشی بالا می‌رود تا مرورگرهای قبلی داده نمونه تازه بگیرند
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 let db = null;
 
 export function uid(p = 'id') { return p + '-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
@@ -111,12 +111,13 @@ function samplePhoto(label, hue) {
 <rect x="430" y="220" width="260" height="240" fill="hsl(${hue},10%,26%)"/><path d="M200 460c-60 0-90-40-90-90 0-60 50-80 60-150 40 30 60 60 55 90 20-10 30-30 35-50 40 30 70 70 70 110 0 50-40 90-130 90z" fill="hsl(28,40%,30%)" opacity=".7"/>
 <text x="400" y="560" font-family="Tahoma" font-size="34" fill="#fff" text-anchor="middle" opacity=".85">عکس نمونه — ${label}</text></svg>`);
 }
-function sampleDoc(title) {
+function sampleDoc(title, cause = '') {
   return svgBlob(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
 <rect width="600" height="800" fill="#fbfbf8"/><rect x="40" y="40" width="520" height="720" fill="none" stroke="#c9d3dc" stroke-width="3"/>
 <text x="300" y="120" font-family="Tahoma" font-size="30" fill="#1c2733" text-anchor="middle">${title}</text>
 <text x="300" y="165" font-family="Tahoma" font-size="20" fill="#8a97a3" text-anchor="middle">مدرک نمونه برای نسخه نمایشی</text>
-${Array.from({ length: 14 }, (_, i) => `<rect x="80" y="${220 + i * 34}" width="${i % 3 ? 440 : 300}" height="10" rx="5" fill="#dfe6ec"/>`).join('')}
+${cause ? `<rect x="70" y="190" width="460" height="56" rx="10" fill="#fdecdf"/><text x="300" y="227" font-family="Tahoma" font-size="22" fill="#c2410c" text-anchor="middle">${cause}</text>` : ''}
+${Array.from({ length: cause ? 12 : 14 }, (_, i) => `<rect x="80" y="${(cause ? 270 : 220) + i * 34}" width="${i % 3 ? 440 : 300}" height="10" rx="5" fill="#dfe6ec"/>`).join('')}
 <circle cx="460" cy="690" r="46" fill="none" stroke="#3a8cc3" stroke-width="4"/></svg>`);
 }
 
@@ -164,25 +165,23 @@ export async function seed() {
     const c = {
       id: uid('c'), code: claimCode(db.seq, created), subscriberId: u.id, createdBy: gas.id, createdAt: created.toISOString(),
       status: 'draft', statusAt: created.toISOString(), submitCount: 0,
-      incident: { date: jalaliString(daysAgo(opt.age + 2)), time: '21:30', type: 'fire', placeType: 'residential', address: u.address, postalCode: '', description: '', fireReportNo: '', policeReportNo: '', ...opt.incident },
+      incident: { date: jalaliString(daysAgo(opt.age + 2)), time: '21:30', type: 'fire', placeType: 'residential', address: u.address, postalCode: '', description: '', causeIssuer: '', causeReportNo: '', causeReportDate: '', causeStatesGas: false, policeReportNo: '', ...opt.incident },
       damage: { kinds: ['property'], items: [], injured: [], deceased: [], ...opt.damage },
       photos: [], docs: {}, files: {}, bank: { sheba: '', holder: '' }, declaration: false,
       deficiencies: [], messages: [], timeline: [{ at: created.toISOString(), by: gas.name, role: 'gas', action: 'create', label: 'تشکیل پرونده و ایجاد حساب مشترک', note: '' }],
-      gasReport: {}, assessment: null, payment: null,
+      assessment: null, payment: null,
     };
     if (opt.fill) {
       for (let i = 0; i < 5; i++) c.photos.push(await fileMeta(c, samplePhoto(['آشپزخانه', 'سقف', 'کابینت', 'پنجره', 'کنتور'][i], 200 + i * 20), `photo-${i + 1}.svg`, 'subscriber'));
       for (const d of DOC_TYPES) {
         if (d.uploader !== 'subscriber' || !d.need(c) || (d.optional && d.optional(c))) continue;
         if (opt.skipDocs && opt.skipDocs.includes(d.id)) continue;
-        c.docs[d.id] = [await fileMeta(c, sampleDoc(d.title), d.id + '.svg', 'subscriber')];
+        c.docs[d.id] = [await fileMeta(c, sampleDoc(d.title, d.id === 'cause_report' ? 'علت حادثه: ' + (c.incident.type === 'co' ? 'گازگرفتگی ناشی از نشت گاز طبیعی' : 'آتش‌سوزی ناشی از نشت گاز طبیعی') : ''), d.id + '.svg', 'subscriber')];
       }
+      // گزارش علت حادثه با قید «گاز»؛ گازگرفتگی معمولاً با گزارش کارشناس رسمی دادگستری
+      c.incident = { ...c.incident, causeIssuer: c.incident.type === 'co' ? 'expert' : 'fire', causeReportNo: c.incident.causeReportNo || '۵۱' + String(db.seq).padStart(3, '۰'), causeReportDate: jalaliString(daysAgo(opt.age + 1)), causeStatesGas: true };
       c.bank = { sheba: sheba(opt.bban || '0170000000123456789001'), holder: u.name };
       c.declaration = true;
-    }
-    if (opt.gasReport) {
-      c.gasReport = { inspector: 'مهندس امیر سعیدی', visitDate: jalaliString(daysAgo(opt.age - 2)), cause: 'hose', afterMeter: 'after', appliance: 'standard', opinion: 'covered', notes: 'نشت از شیلنگ غیراستاندارد اجاق گاز؛ خسارت پس از کنتور است.' };
-      c.docs.gas_report = [await fileMeta(c, sampleDoc('صورت‌جلسه بازدید کارشناس گاز'), 'gas_report.svg', 'gas')];
     }
     const steps = opt.steps || [];
     for (const [action, label, role, ago, note] of steps) {
@@ -191,7 +190,7 @@ export async function seed() {
     }
     if (steps.length) c.statusAt = c.timeline[c.timeline.length - 1].at;
     const fw = c.timeline.find(t => t.action === 'gas_forward');
-    if (fw) c.forwardedAt = fw.at;
+    if (fw) { c.forwardedAt = fw.at; c.causeCheck = { by: gas.name, at: fw.at }; }
     c.status = opt.status || 'draft';
     Object.assign(c, opt.extra || {});
     db.claims.push(c);
@@ -201,7 +200,7 @@ export async function seed() {
   // ۱) پرونده دارای نقص — مشترک باید اصلاح کند
   const c1 = await claim(users[0], {
     age: 9, status: 'returned', fill: true, skipDocs: ['ownership'],
-    incident: { description: 'هنگام روشن کردن اجاق گاز، شعله به شیلنگ رسید و آتش به کابینت و پرده آشپزخانه سرایت کرد. آتش‌نشانی ظرف ۱۵ دقیقه آتش را مهار کرد.', fireReportNo: '۵۴۸۷۲' },
+    incident: { description: 'هنگام روشن کردن اجاق گاز، شعله به شیلنگ رسید و آتش به کابینت و پرده آشپزخانه سرایت کرد. آتش‌نشانی ظرف ۱۵ دقیقه آتش را مهار کرد.', causeReportNo: '۵۴۸۷۲' },
     damage: { items: [{ title: 'کابینت آشپزخانه', qty: 1, amount: 420000000 }, { title: 'یخچال فریزر', qty: 1, amount: 310000000 }, { title: 'رنگ و گچ‌کاری سقف', qty: 1, amount: 95000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 6], ['gas_start', 'شروع بررسی', 'gas', 5], ['gas_return', 'اعلام نقص و بازگشت به مشترک', 'gas', 4, 'دو مورد نقص ثبت شد.']],
     extra: { submitCount: 1 },
@@ -214,8 +213,8 @@ export async function seed() {
 
   // ۲) خسارت تعیین شده — منتظر تأیید مشترک
   const c2 = await claim(users[1], {
-    age: 34, status: 'assessed', fill: true, gasReport: true,
-    incident: { type: 'explosion', description: 'انفجار ناشی از تجمع گاز در آشپزخانه پس از خاموش شدن شعله اجاق؛ شیشه‌ها و در ورودی آسیب دید.', fireReportNo: '۴۹۱۲۰' },
+    age: 34, status: 'assessed', fill: true,
+    incident: { type: 'explosion', description: 'انفجار ناشی از تجمع گاز در آشپزخانه پس از خاموش شدن شعله اجاق؛ شیشه‌ها و در ورودی آسیب دید.', causeReportNo: '۴۹۱۲۰' },
     damage: { items: [{ title: 'شیشه و پنجره‌ها', qty: 4, amount: 180000000 }, { title: 'در ورودی', qty: 1, amount: 120000000 }, { title: 'لوازم آشپزخانه', qty: 1, amount: 260000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 30], ['gas_start', 'شروع بررسی', 'gas', 29], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 26], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 24], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 3, 'بر اساس بازدید ارزیاب و فاکتورها.']],
   });
@@ -236,8 +235,8 @@ export async function seed() {
 
   // ۵) نزد بیمه‌گر
   await claim(users[4], {
-    age: 18, status: 'sent_insurer', fill: true, gasReport: true,
-    incident: { description: 'آتش‌سوزی بخاری گازی در اتاق نشیمن به علت نزدیکی پرده؛ فرش و مبلمان سوخت.', fireReportNo: '۵۰۳۳۱' },
+    age: 18, status: 'sent_insurer', fill: true,
+    incident: { description: 'آتش‌سوزی بخاری گازی در اتاق نشیمن به علت نزدیکی پرده؛ فرش و مبلمان سوخت.', causeReportNo: '۵۰۳۳۱' },
     damage: { items: [{ title: 'فرش دستباف ۹ متری', qty: 1, amount: 350000000 }, { title: 'مبلمان', qty: 1, amount: 280000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 14], ['gas_start', 'شروع بررسی', 'gas', 13], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 11]],
     extra: { submitCount: 1 },
@@ -245,8 +244,8 @@ export async function seed() {
 
   // ۶) پرداخت‌شده
   const c6 = await claim(users[5], {
-    age: 70, status: 'paid', fill: true, gasReport: true,
-    incident: { description: 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', fireReportNo: '۴۴۰۹۸' },
+    age: 70, status: 'paid', fill: true,
+    incident: { description: 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', causeReportNo: '۴۴۰۹۸' },
     damage: { items: [{ title: 'آبگرمکن و لوله‌کشی', qty: 1, amount: 140000000 }, { title: 'بازسازی دیوار پارکینگ', qty: 1, amount: 90000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 66], ['gas_start', 'شروع بررسی', 'gas', 65], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 62], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 60], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 50], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 49], ['ins_pay', 'ثبت پرداخت', 'insurer', 41, 'واریز به حساب شبای مشترک']],
     extra: { submitCount: 1 },
@@ -268,8 +267,8 @@ export async function seed() {
 
   // ۷) قبول مبلغ و حواله صادر شده — نمایش مراحل مالی برای مشترک
   const c7 = await claim(users[6], {
-    age: 40, status: 'payment', fill: true, gasReport: true,
-    incident: { description: 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', fireReportNo: '۴۷۲۲۵' },
+    age: 40, status: 'payment', fill: true,
+    incident: { description: 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', causeReportNo: '۴۷۲۲۵' },
     damage: { items: [{ title: 'پکیج و لوله‌کشی', qty: 1, amount: 210000000 }, { title: 'کابینت و سقف کاذب', qty: 1, amount: 260000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36], ['gas_start', 'شروع بررسی', 'gas', 35], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 9], ['fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6], ['fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007']],
     extra: { submitCount: 1, acceptedAt: daysAgo(9).toISOString() },

@@ -41,6 +41,7 @@ class GII_WF {
 	const PLACE_TYPES  = array( 'residential', 'commercial', 'office', 'other' );
 	const DAMAGE_KINDS = array( 'property', 'medical', 'death' );
 	const MIN_PHOTOS   = 4;
+	const CAUSE_ISSUERS = array( 'fire' => 'سازمان آتش‌نشانی', 'expert' => 'کارشناس رسمی دادگستری' );
 
 	const DEFAULT_SETTINGS = array(
 		'propertyCapRial'   => 2000000000,
@@ -75,7 +76,8 @@ class GII_WF {
 			array( 'id' => 'national_id', 'title' => 'کارت ملی مشترک (پشت و رو)', 'uploader' => 'subscriber', 'need' => $always ),
 			array( 'id' => 'ownership', 'title' => 'سند مالکیت یا اجاره‌نامه محل حادثه', 'uploader' => 'subscriber', 'need' => $always ),
 			array( 'id' => 'gas_bill', 'title' => 'آخرین قبض گاز', 'uploader' => 'subscriber', 'need' => $always ),
-			array( 'id' => 'fire_report', 'title' => 'گزارش آتش‌نشانی', 'uploader' => 'subscriber', 'need' => function ( $c ) { return in_array( $c['incident']['type'] ?? '', array( 'fire', 'explosion' ), true ); } ),
+			// سند اصلی اثبات علت حادثه؛ شرکت گاز بازدید ندارد
+			array( 'id' => 'cause_report', 'title' => 'گزارش آتش‌نشانی یا کارشناس رسمی دادگستری (با قید علت گاز)', 'uploader' => 'subscriber', 'need' => $always ),
 			array( 'id' => 'police', 'title' => 'گزارش نیروی انتظامی / کلانتری', 'uploader' => 'subscriber', 'need' => array( __CLASS__, 'injury_or_death_pub' ), 'optional' => function ( $c ) { return ! GII_WF::injury_or_death_pub( $c ); } ),
 			array( 'id' => 'invoices', 'title' => 'فاکتور یا برآورد هزینه اقلام خسارت‌دیده', 'uploader' => 'subscriber', 'need' => function ( $c ) { return GII_WF::has_kind( $c, 'property' ); } ),
 			array( 'id' => 'medical', 'title' => 'پرونده پزشکی و صورت‌حساب بیمارستان', 'uploader' => 'subscriber', 'need' => function ( $c ) { return GII_WF::has_kind( $c, 'medical' ); } ),
@@ -83,7 +85,6 @@ class GII_WF {
 			array( 'id' => 'death_cert', 'title' => 'گواهی فوت', 'uploader' => 'subscriber', 'need' => function ( $c ) { return GII_WF::has_kind( $c, 'death' ); } ),
 			array( 'id' => 'inheritance', 'title' => 'گواهی انحصار وراثت و مدارک وراث', 'uploader' => 'subscriber', 'need' => function ( $c ) { return GII_WF::has_kind( $c, 'death' ); } ),
 			array( 'id' => 'sheba_cert', 'title' => 'گواهی شماره شبا به نام ذی‌نفع', 'uploader' => 'subscriber', 'need' => $always ),
-			array( 'id' => 'gas_report', 'title' => 'صورت‌جلسه بازدید کارشناس شرکت گاز', 'uploader' => 'gas', 'need' => $always ),
 		);
 	}
 	public static function injury_or_death_pub( $c ) { return self::injury_or_death( $c ); }
@@ -266,7 +267,10 @@ class GII_WF {
 		if ( empty( $inc['placeType'] ) ) $out['incident'][] = 'نوع کاربری محل';
 		if ( self::len( $inc['address'] ?? '' ) < 10 ) $out['incident'][] = 'نشانی کامل محل حادثه';
 		if ( self::len( $inc['description'] ?? '' ) < 20 ) $out['incident'][] = 'شرح حادثه (دست‌کم ۲۰ حرف)';
-		if ( in_array( $inc['type'] ?? '', array( 'fire', 'explosion' ), true ) && empty( $inc['fireReportNo'] ) ) $out['incident'][] = 'شماره گزارش آتش‌نشانی';
+		if ( ! isset( self::CAUSE_ISSUERS[ $inc['causeIssuer'] ?? '' ] ) ) $out['incident'][] = 'صادرکننده گزارش علت حادثه';
+		if ( empty( $inc['causeReportNo'] ) ) $out['incident'][] = 'شماره گزارش علت حادثه';
+		if ( ! self::parse_jalali( $inc['causeReportDate'] ?? '' ) ) $out['incident'][] = 'تاریخ گزارش علت حادثه';
+		if ( empty( $inc['causeStatesGas'] ) ) $out['incident'][] = 'تأیید قید علت گاز در گزارش';
 
 		$dmg = $c['damage'] ?? array();
 		if ( empty( $dmg['kinds'] ) ) $out['damage'][] = 'نوع خسارت';
@@ -298,18 +302,6 @@ class GII_WF {
 		}
 		return $list;
 	}
-	public static function gas_report_issues( $c ) {
-		$r   = $c['gasReport'] ?? array();
-		$out = array();
-		if ( empty( $r['inspector'] ) ) $out[] = 'نام کارشناس بازدید';
-		if ( ! self::parse_jalali( $r['visitDate'] ?? '' ) ) $out[] = 'تاریخ بازدید';
-		if ( empty( $r['cause'] ) ) $out[] = 'علت فنی حادثه';
-		if ( empty( $r['afterMeter'] ) ) $out[] = 'محل وقوع نسبت به کنتور';
-		if ( empty( $r['opinion'] ) ) $out[] = 'نظر کارشناس درباره پوشش بیمه';
-		if ( empty( $c['docs']['gas_report'] ) ) $out[] = 'بارگذاری صورت‌جلسه بازدید';
-		return $out;
-	}
-
 	// ---------- محاسبه خسارت قابل پرداخت ----------
 	public static function compute_payable( $items, $s, $death_count = 0 ) {
 		$sum = function ( $cat ) use ( $items ) {
@@ -344,8 +336,6 @@ class GII_WF {
 				'guard' => function ( $c ) { foreach ( GII_WF::open_deficiencies( $c ) as $d ) { if ( empty( $d['reply'] ) ) return null; } return 'دست‌کم یک مورد نقص جدید ثبت کنید.'; } ),
 			'gas_forward' => array( 'role' => 'gas', 'from' => array( 'gas_review' ), 'to' => 'sent_insurer', 'label' => 'تأیید و ارسال به بیمه‌گر',
 				'guard' => function ( $c ) {
-					$g = GII_WF::gas_report_issues( $c );
-					if ( $g ) return 'گزارش بازدید ناقص است: ' . implode( '، ', $g );
 					$s = GII_WF::missing_for_submit( array_merge( $c, array( 'status' => 'draft' ) ) );
 					if ( $s ) return 'مدارک مشترک ناقص است: ' . implode( '، ', $s );
 					foreach ( GII_WF::open_deficiencies( $c ) as $d ) { if ( empty( $d['reply'] ) ) return 'موارد نقص باز وجود دارد.'; }
@@ -382,12 +372,16 @@ class GII_WF {
 		return isset( $a['guard'] ) ? call_user_func( $a['guard'], $c ) : null;
 	}
 
-	/** @param array $actor array( 'name' => ..., 'role' => ... ) */
-	public static function apply_action( $c, $id, $actor, $note = '', $now = null ) {
+	/**
+	 * @param array $actor array( 'name' => ..., 'role' => ... )
+	 * @param array $opts  causeConfirmed: کارشناس گاز تأیید می‌کند که در گزارش، علت گاز قید شده است
+	 */
+	public static function apply_action( $c, $id, $actor, $note = '', $now = null, $opts = array() ) {
 		$err = self::can_do( $c, $actor['role'], $id );
 		if ( $err ) throw new GII_WF_Error( $err );
 		$a = self::actions()[ $id ];
 		if ( ! empty( $a['needsNote'] ) && '' === trim( $note ) ) throw new GII_WF_Error( 'نوشتن توضیح برای این عمل الزامی است.' );
+		if ( 'gas_forward' === $id && empty( $opts['causeConfirmed'] ) ) throw new GII_WF_Error( 'تأیید کنید که گزارش علت حادثه را دیده‌اید و در آن «گاز» به‌عنوان علت قید شده است.' );
 		$at            = self::iso( $now );
 		$c['status']   = $a['to'];
 		$c['statusAt'] = $at;
@@ -401,7 +395,10 @@ class GII_WF {
 			}
 			unset( $d );
 		}
-		if ( 'gas_forward' === $id ) $c['forwardedAt'] = $at;
+		if ( 'gas_forward' === $id ) {
+			$c['forwardedAt'] = $at;
+			$c['causeCheck']  = array( 'by' => $actor['name'], 'at' => $at );
+		}
 		if ( 'gas_return' === $id ) $c['returnedAt'] = $at;
 		if ( 'ins_assess' === $id ) $c['assessment']['at'] = $at;
 		if ( 'accept' === $id ) $c['acceptedAt'] = $at;

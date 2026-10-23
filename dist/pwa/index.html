@@ -468,6 +468,19 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .btn.ghost-light { background: transparent; border-color: rgba(255, 255, 255, .75); color: #fff; text-decoration: none; }
 .btn.ghost-light:hover { background: rgba(255, 255, 255, .14); }
 
+/* کادر گزارش علت حادثه (آتش‌نشانی یا کارشناس رسمی دادگستری) */
+.cause-box { border: 2px solid var(--orange); background: var(--orange-tint); border-radius: 18px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.cause-box.review { border-width: 1.5px; }
+.cause-head { display: flex; align-items: center; gap: 8px; color: var(--orange); font-size: 16px; }
+.cause-head b { color: var(--ink); }
+.cause-head i { color: var(--red); font-style: normal; }
+.cause-box p { margin: 0; font-size: 14px; }
+.cause-box ul { margin: 0; padding-inline-start: 18px; font-size: 13.5px; color: var(--ink); display: flex; flex-direction: column; gap: 3px; }
+.cause-box .check { background: var(--card); border-radius: 12px; padding: 10px 12px; }
+.cause-box small { color: var(--muted); }
+.doc-hint { margin: 0; display: flex; gap: 8px; align-items: flex-start; background: var(--orange-tint); border-radius: 12px; padding: 8px 10px; font-size: 13px; }
+.doc-hint .ic { width: 18px; height: 18px; color: var(--orange); flex: none; margin-top: 2px; }
+
 /* ================= پنل مالی (از قبول مبلغ تا واریز) ================= */
 .ok-txt { color: var(--green); display: inline-flex; gap: 4px; align-items: center; }
 .ok-txt .ic { width: 16px; height: 16px; }
@@ -792,11 +805,15 @@ const DAMAGE_KINDS = {
 
 // انواع مدارک. need(claim) مشخص می‌کند آیا برای این پرونده لازم است.
 // uploader: چه نقشی آن را بارگذاری می‌کند.
+const CAUSE_ISSUERS = { fire: 'سازمان آتش‌نشانی', expert: 'کارشناس رسمی دادگستری' };
+const CAUSE_HINT = 'در این گزارش باید علت حادثه به‌صراحت «گاز طبیعی» نوشته شده باشد (مثلاً نشت گاز، انفجار یا آتش‌سوزی ناشی از گاز). گزارشی که علت را «نامعلوم» یا چیزی غیر از گاز (مثلاً اتصالی برق) نوشته باشد پذیرفته نمی‌شود. گزارش باید مهر و امضا، تاریخ و نشانی محل حادثه را داشته باشد.';
+
 const DOC_TYPES = [
   { id: 'national_id',  title: 'کارت ملی مشترک (پشت و رو)',            uploader: 'subscriber', need: () => true },
   { id: 'ownership',    title: 'سند مالکیت یا اجاره‌نامه محل حادثه',      uploader: 'subscriber', need: () => true },
   { id: 'gas_bill',     title: 'آخرین قبض گاز',                           uploader: 'subscriber', need: () => true },
-  { id: 'fire_report',  title: 'گزارش آتش‌نشانی',                          uploader: 'subscriber', need: c => c.incident.type === 'fire' || c.incident.type === 'explosion' },
+  // سند اصلی اثبات علت حادثه؛ شرکت گاز بازدید ندارد و فقط همین گزارش علت «گاز» را ثابت می‌کند
+  { id: 'cause_report', title: 'گزارش آتش‌نشانی یا کارشناس رسمی دادگستری (با قید علت گاز)', uploader: 'subscriber', need: () => true, hint: CAUSE_HINT },
   { id: 'police',       title: 'گزارش نیروی انتظامی / کلانتری',            uploader: 'subscriber', need: c => hasKind(c, 'medical') || hasKind(c, 'death'), optional: c => !(hasKind(c, 'medical') || hasKind(c, 'death')) },
   { id: 'invoices',     title: 'فاکتور یا برآورد هزینه اقلام خسارت‌دیده',  uploader: 'subscriber', need: c => hasKind(c, 'property') },
   { id: 'medical',      title: 'پرونده پزشکی و صورت‌حساب بیمارستان',        uploader: 'subscriber', need: c => hasKind(c, 'medical') },
@@ -804,7 +821,6 @@ const DOC_TYPES = [
   { id: 'death_cert',   title: 'گواهی فوت',                                uploader: 'subscriber', need: c => hasKind(c, 'death') },
   { id: 'inheritance',  title: 'گواهی انحصار وراثت و مدارک وراث',          uploader: 'subscriber', need: c => hasKind(c, 'death') },
   { id: 'sheba_cert',   title: 'گواهی شماره شبا به نام ذی‌نفع',             uploader: 'subscriber', need: () => true },
-  { id: 'gas_report',   title: 'صورت‌جلسه بازدید کارشناس شرکت گاز',        uploader: 'gas',        need: () => true },
 ];
 
 const MIN_PHOTOS = 4;
@@ -942,7 +958,10 @@ function sectionIssues(c) {
   if (!inc.placeType) out.incident.push('نوع کاربری محل');
   if (!inc.address || inc.address.trim().length < 10) out.incident.push('نشانی کامل محل حادثه');
   if (!inc.description || inc.description.trim().length < 20) out.incident.push('شرح حادثه (دست‌کم ۲۰ حرف)');
-  if ((inc.type === 'fire' || inc.type === 'explosion') && !inc.fireReportNo) out.incident.push('شماره گزارش آتش‌نشانی');
+  if (!CAUSE_ISSUERS[inc.causeIssuer]) out.incident.push('صادرکننده گزارش علت حادثه');
+  if (!inc.causeReportNo) out.incident.push('شماره گزارش علت حادثه');
+  if (!parseJalali(inc.causeReportDate)) out.incident.push('تاریخ گزارش علت حادثه');
+  if (!inc.causeStatesGas) out.incident.push('تأیید قید علت گاز در گزارش');
 
   const dmg = c.damage || { kinds: [] };
   if (!dmg.kinds || !dmg.kinds.length) out.damage.push('نوع خسارت');
@@ -973,18 +992,6 @@ function missingForSubmit(c) {
 
 function openDeficiencies(c) { return (c.deficiencies || []).filter(d => d.status === 'open'); }
 
-function gasReportIssues(c) {
-  const r = c.gasReport || {};
-  const out = [];
-  if (!r.inspector) out.push('نام کارشناس بازدید');
-  if (!parseJalali(r.visitDate)) out.push('تاریخ بازدید');
-  if (!r.cause) out.push('علت فنی حادثه');
-  if (!r.afterMeter) out.push('محل وقوع نسبت به کنتور');
-  if (!r.opinion) out.push('نظر کارشناس درباره پوشش بیمه');
-  if (!(c.docs.gas_report || []).length) out.push('بارگذاری صورت‌جلسه بازدید');
-  return out;
-}
-
 // ---------- محاسبه خسارت قابل پرداخت ----------
 function computePayable(items, settings = DEFAULT_SETTINGS, deathCount = 0) {
   const sum = cat => items.filter(i => i.category === cat).reduce((a, i) => a + Math.max(0, +i.approved || 0), 0);
@@ -1011,8 +1018,6 @@ const ACTIONS = {
                   guard: c => openDeficiencies(c).some(d => !d.reply) ? null : 'دست‌کم یک مورد نقص جدید ثبت کنید.' },
   gas_forward:  { role: 'gas', from: ['gas_review'], to: 'sent_insurer', label: 'تأیید و ارسال به بیمه‌گر',
                   guard: c => {
-                    const g = gasReportIssues(c);
-                    if (g.length) return 'گزارش بازدید ناقص است: ' + g.join('، ');
                     const s = missingForSubmit({ ...c, status: 'draft' });
                     if (s.length) return 'مدارک مشترک ناقص است: ' + s.join('، ');
                     if (openDeficiencies(c).some(d => !d.reply)) return 'موارد نقص باز وجود دارد.';
@@ -1054,11 +1059,13 @@ function canDo(c, role, actionId) {
 }
 
 // اعمال یک عمل روی پرونده؛ پرونده جدید برمی‌گرداند (ورودی را تغییر نمی‌دهد).
-function applyAction(claim, actionId, actor, note = '', now = new Date()) {
+// opts.causeConfirmed: کارشناس گاز هنگام ارسال به بیمه‌گر تأیید می‌کند که در گزارش، علت گاز قید شده است
+function applyAction(claim, actionId, actor, note = '', now = new Date(), opts = {}) {
   const err = canDo(claim, actor.role, actionId);
   if (err) throw new Error(err);
   const a = ACTIONS[actionId];
   if (a.needsNote && !note.trim()) throw new Error('نوشتن توضیح برای این عمل الزامی است.');
+  if (actionId === 'gas_forward' && !opts.causeConfirmed) throw new Error('تأیید کنید که گزارش علت حادثه را دیده‌اید و در آن «گاز» به‌عنوان علت قید شده است.');
   const c = structuredClone(claim);
   const at = now.toISOString();
   c.status = a.to;
@@ -1070,7 +1077,7 @@ function applyAction(claim, actionId, actor, note = '', now = new Date()) {
   if (actionId === 'gas_forward' || actionId === 'gas_answer') {
     for (const d of c.deficiencies) if (d.status === 'open') { d.status = 'closed'; d.closedAt = at; }
   }
-  if (actionId === 'gas_forward') c.forwardedAt = at;
+  if (actionId === 'gas_forward') { c.forwardedAt = at; c.causeCheck = { by: actor.name, at }; }
   if (actionId === 'gas_return') {
     // استعلام‌های بیمه‌گر که به مشترک ارجاع شده باز می‌مانند تا مشترک پاسخ دهد
     c.returnedAt = at;
@@ -1153,7 +1160,7 @@ function applyFinance(claim, step, data, actor, now = new Date()) {
   return c;
 }
 
-return { ROLES, STATUS, STEPS, INCIDENT_TYPES, PLACE_TYPES, DAMAGE_KINDS, DOC_TYPES, MIN_PHOTOS, DEFAULT_SETTINGS, hasKind, requiredDocs, visibleDocs, normalizeDigits, isValidNationalId, isValidMobile, isValidSheba, toJalali, jalaliString, parseJalali, daysBetween, sectionIssues, missingForSubmit, openDeficiencies, gasReportIssues, computePayable, ACTIONS, availableActions, canDo, applyAction, waitingOn, slaInfo, claimCode, FIN_STAGES, TRANSFER_METHODS, finStage, FIN_ACTIONS, applyFinance };
+return { ROLES, STATUS, STEPS, INCIDENT_TYPES, PLACE_TYPES, DAMAGE_KINDS, CAUSE_ISSUERS, CAUSE_HINT, DOC_TYPES, MIN_PHOTOS, DEFAULT_SETTINGS, hasKind, requiredDocs, visibleDocs, normalizeDigits, isValidNationalId, isValidMobile, isValidSheba, toJalali, jalaliString, parseJalali, daysBetween, sectionIssues, missingForSubmit, openDeficiencies, computePayable, ACTIONS, availableActions, canDo, applyAction, waitingOn, slaInfo, claimCode, FIN_STAGES, TRANSFER_METHODS, finStage, FIN_ACTIONS, applyFinance };
 })();
 const S = (() => {
 const { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId } = W;
@@ -1162,7 +1169,7 @@ const { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId 
 
 const KEY = 'gii.db.v1';
 // با تغییر ساختار داده نمایشی بالا می‌رود تا مرورگرهای قبلی داده نمونه تازه بگیرند
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 let db = null;
 
 function uid(p = 'id') { return p + '-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
@@ -1269,12 +1276,13 @@ function samplePhoto(label, hue) {
 <rect x="430" y="220" width="260" height="240" fill="hsl(${hue},10%,26%)"/><path d="M200 460c-60 0-90-40-90-90 0-60 50-80 60-150 40 30 60 60 55 90 20-10 30-30 35-50 40 30 70 70 70 110 0 50-40 90-130 90z" fill="hsl(28,40%,30%)" opacity=".7"/>
 <text x="400" y="560" font-family="Tahoma" font-size="34" fill="#fff" text-anchor="middle" opacity=".85">عکس نمونه — ${label}</text></svg>`);
 }
-function sampleDoc(title) {
+function sampleDoc(title, cause = '') {
   return svgBlob(`<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
 <rect width="600" height="800" fill="#fbfbf8"/><rect x="40" y="40" width="520" height="720" fill="none" stroke="#c9d3dc" stroke-width="3"/>
 <text x="300" y="120" font-family="Tahoma" font-size="30" fill="#1c2733" text-anchor="middle">${title}</text>
 <text x="300" y="165" font-family="Tahoma" font-size="20" fill="#8a97a3" text-anchor="middle">مدرک نمونه برای نسخه نمایشی</text>
-${Array.from({ length: 14 }, (_, i) => `<rect x="80" y="${220 + i * 34}" width="${i % 3 ? 440 : 300}" height="10" rx="5" fill="#dfe6ec"/>`).join('')}
+${cause ? `<rect x="70" y="190" width="460" height="56" rx="10" fill="#fdecdf"/><text x="300" y="227" font-family="Tahoma" font-size="22" fill="#c2410c" text-anchor="middle">${cause}</text>` : ''}
+${Array.from({ length: cause ? 12 : 14 }, (_, i) => `<rect x="80" y="${(cause ? 270 : 220) + i * 34}" width="${i % 3 ? 440 : 300}" height="10" rx="5" fill="#dfe6ec"/>`).join('')}
 <circle cx="460" cy="690" r="46" fill="none" stroke="#3a8cc3" stroke-width="4"/></svg>`);
 }
 
@@ -1322,25 +1330,23 @@ async function seed() {
     const c = {
       id: uid('c'), code: claimCode(db.seq, created), subscriberId: u.id, createdBy: gas.id, createdAt: created.toISOString(),
       status: 'draft', statusAt: created.toISOString(), submitCount: 0,
-      incident: { date: jalaliString(daysAgo(opt.age + 2)), time: '21:30', type: 'fire', placeType: 'residential', address: u.address, postalCode: '', description: '', fireReportNo: '', policeReportNo: '', ...opt.incident },
+      incident: { date: jalaliString(daysAgo(opt.age + 2)), time: '21:30', type: 'fire', placeType: 'residential', address: u.address, postalCode: '', description: '', causeIssuer: '', causeReportNo: '', causeReportDate: '', causeStatesGas: false, policeReportNo: '', ...opt.incident },
       damage: { kinds: ['property'], items: [], injured: [], deceased: [], ...opt.damage },
       photos: [], docs: {}, files: {}, bank: { sheba: '', holder: '' }, declaration: false,
       deficiencies: [], messages: [], timeline: [{ at: created.toISOString(), by: gas.name, role: 'gas', action: 'create', label: 'تشکیل پرونده و ایجاد حساب مشترک', note: '' }],
-      gasReport: {}, assessment: null, payment: null,
+      assessment: null, payment: null,
     };
     if (opt.fill) {
       for (let i = 0; i < 5; i++) c.photos.push(await fileMeta(c, samplePhoto(['آشپزخانه', 'سقف', 'کابینت', 'پنجره', 'کنتور'][i], 200 + i * 20), `photo-${i + 1}.svg`, 'subscriber'));
       for (const d of DOC_TYPES) {
         if (d.uploader !== 'subscriber' || !d.need(c) || (d.optional && d.optional(c))) continue;
         if (opt.skipDocs && opt.skipDocs.includes(d.id)) continue;
-        c.docs[d.id] = [await fileMeta(c, sampleDoc(d.title), d.id + '.svg', 'subscriber')];
+        c.docs[d.id] = [await fileMeta(c, sampleDoc(d.title, d.id === 'cause_report' ? 'علت حادثه: ' + (c.incident.type === 'co' ? 'گازگرفتگی ناشی از نشت گاز طبیعی' : 'آتش‌سوزی ناشی از نشت گاز طبیعی') : ''), d.id + '.svg', 'subscriber')];
       }
+      // گزارش علت حادثه با قید «گاز»؛ گازگرفتگی معمولاً با گزارش کارشناس رسمی دادگستری
+      c.incident = { ...c.incident, causeIssuer: c.incident.type === 'co' ? 'expert' : 'fire', causeReportNo: c.incident.causeReportNo || '۵۱' + String(db.seq).padStart(3, '۰'), causeReportDate: jalaliString(daysAgo(opt.age + 1)), causeStatesGas: true };
       c.bank = { sheba: sheba(opt.bban || '0170000000123456789001'), holder: u.name };
       c.declaration = true;
-    }
-    if (opt.gasReport) {
-      c.gasReport = { inspector: 'مهندس امیر سعیدی', visitDate: jalaliString(daysAgo(opt.age - 2)), cause: 'hose', afterMeter: 'after', appliance: 'standard', opinion: 'covered', notes: 'نشت از شیلنگ غیراستاندارد اجاق گاز؛ خسارت پس از کنتور است.' };
-      c.docs.gas_report = [await fileMeta(c, sampleDoc('صورت‌جلسه بازدید کارشناس گاز'), 'gas_report.svg', 'gas')];
     }
     const steps = opt.steps || [];
     for (const [action, label, role, ago, note] of steps) {
@@ -1349,7 +1355,7 @@ async function seed() {
     }
     if (steps.length) c.statusAt = c.timeline[c.timeline.length - 1].at;
     const fw = c.timeline.find(t => t.action === 'gas_forward');
-    if (fw) c.forwardedAt = fw.at;
+    if (fw) { c.forwardedAt = fw.at; c.causeCheck = { by: gas.name, at: fw.at }; }
     c.status = opt.status || 'draft';
     Object.assign(c, opt.extra || {});
     db.claims.push(c);
@@ -1359,7 +1365,7 @@ async function seed() {
   // ۱) پرونده دارای نقص — مشترک باید اصلاح کند
   const c1 = await claim(users[0], {
     age: 9, status: 'returned', fill: true, skipDocs: ['ownership'],
-    incident: { description: 'هنگام روشن کردن اجاق گاز، شعله به شیلنگ رسید و آتش به کابینت و پرده آشپزخانه سرایت کرد. آتش‌نشانی ظرف ۱۵ دقیقه آتش را مهار کرد.', fireReportNo: '۵۴۸۷۲' },
+    incident: { description: 'هنگام روشن کردن اجاق گاز، شعله به شیلنگ رسید و آتش به کابینت و پرده آشپزخانه سرایت کرد. آتش‌نشانی ظرف ۱۵ دقیقه آتش را مهار کرد.', causeReportNo: '۵۴۸۷۲' },
     damage: { items: [{ title: 'کابینت آشپزخانه', qty: 1, amount: 420000000 }, { title: 'یخچال فریزر', qty: 1, amount: 310000000 }, { title: 'رنگ و گچ‌کاری سقف', qty: 1, amount: 95000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 6], ['gas_start', 'شروع بررسی', 'gas', 5], ['gas_return', 'اعلام نقص و بازگشت به مشترک', 'gas', 4, 'دو مورد نقص ثبت شد.']],
     extra: { submitCount: 1 },
@@ -1372,8 +1378,8 @@ async function seed() {
 
   // ۲) خسارت تعیین شده — منتظر تأیید مشترک
   const c2 = await claim(users[1], {
-    age: 34, status: 'assessed', fill: true, gasReport: true,
-    incident: { type: 'explosion', description: 'انفجار ناشی از تجمع گاز در آشپزخانه پس از خاموش شدن شعله اجاق؛ شیشه‌ها و در ورودی آسیب دید.', fireReportNo: '۴۹۱۲۰' },
+    age: 34, status: 'assessed', fill: true,
+    incident: { type: 'explosion', description: 'انفجار ناشی از تجمع گاز در آشپزخانه پس از خاموش شدن شعله اجاق؛ شیشه‌ها و در ورودی آسیب دید.', causeReportNo: '۴۹۱۲۰' },
     damage: { items: [{ title: 'شیشه و پنجره‌ها', qty: 4, amount: 180000000 }, { title: 'در ورودی', qty: 1, amount: 120000000 }, { title: 'لوازم آشپزخانه', qty: 1, amount: 260000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 30], ['gas_start', 'شروع بررسی', 'gas', 29], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 26], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 24], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 3, 'بر اساس بازدید ارزیاب و فاکتورها.']],
   });
@@ -1394,8 +1400,8 @@ async function seed() {
 
   // ۵) نزد بیمه‌گر
   await claim(users[4], {
-    age: 18, status: 'sent_insurer', fill: true, gasReport: true,
-    incident: { description: 'آتش‌سوزی بخاری گازی در اتاق نشیمن به علت نزدیکی پرده؛ فرش و مبلمان سوخت.', fireReportNo: '۵۰۳۳۱' },
+    age: 18, status: 'sent_insurer', fill: true,
+    incident: { description: 'آتش‌سوزی بخاری گازی در اتاق نشیمن به علت نزدیکی پرده؛ فرش و مبلمان سوخت.', causeReportNo: '۵۰۳۳۱' },
     damage: { items: [{ title: 'فرش دستباف ۹ متری', qty: 1, amount: 350000000 }, { title: 'مبلمان', qty: 1, amount: 280000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 14], ['gas_start', 'شروع بررسی', 'gas', 13], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 11]],
     extra: { submitCount: 1 },
@@ -1403,8 +1409,8 @@ async function seed() {
 
   // ۶) پرداخت‌شده
   const c6 = await claim(users[5], {
-    age: 70, status: 'paid', fill: true, gasReport: true,
-    incident: { description: 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', fireReportNo: '۴۴۰۹۸' },
+    age: 70, status: 'paid', fill: true,
+    incident: { description: 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', causeReportNo: '۴۴۰۹۸' },
     damage: { items: [{ title: 'آبگرمکن و لوله‌کشی', qty: 1, amount: 140000000 }, { title: 'بازسازی دیوار پارکینگ', qty: 1, amount: 90000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 66], ['gas_start', 'شروع بررسی', 'gas', 65], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 62], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 60], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 50], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 49], ['ins_pay', 'ثبت پرداخت', 'insurer', 41, 'واریز به حساب شبای مشترک']],
     extra: { submitCount: 1 },
@@ -1426,8 +1432,8 @@ async function seed() {
 
   // ۷) قبول مبلغ و حواله صادر شده — نمایش مراحل مالی برای مشترک
   const c7 = await claim(users[6], {
-    age: 40, status: 'payment', fill: true, gasReport: true,
-    incident: { description: 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', fireReportNo: '۴۷۲۲۵' },
+    age: 40, status: 'payment', fill: true,
+    incident: { description: 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', causeReportNo: '۴۷۲۲۵' },
     damage: { items: [{ title: 'پکیج و لوله‌کشی', qty: 1, amount: 210000000 }, { title: 'کابینت و سقف کاذب', qty: 1, amount: 260000000 }] },
     steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36], ['gas_start', 'شروع بررسی', 'gas', 35], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 9], ['fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6], ['fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007']],
     extra: { submitCount: 1, acceptedAt: daysAgo(9).toISOString() },
@@ -1773,9 +1779,9 @@ function afterAction(c, id, note) {
     case 'gas_reject': case 'ins_reject': t(`پرونده ${c.code} رد شد.`); sms(`پرونده ${c.code} مشمول پوشش تشخیص داده نشد. دلیل: ${note}`); S.notify({ toRole: id === 'gas_reject' ? 'insurer' : 'gas', text: `پرونده ${c.code} رد شد.`, claimId: c.id }); break;
   }
 }
-async function action(c, id, note) {
+async function action(c, id, note, opts = {}) {
   if (id === 'ins_pay' && c.payment && c.assessment) c.payment.amount = c.payment.amount || W.computePayable(c.assessment.items, db().settings, c.damage.deceased?.length || 0).payable;
-  Object.assign(c, W.applyAction(c, id, user(), note));
+  Object.assign(c, W.applyAction(c, id, user(), note, new Date(), opts));
   afterAction(c, id, note);
   save();
 }
@@ -1852,9 +1858,9 @@ async function register(f) {
   const staff = user();
   const c = {
     id: S.uid('c'), code: W.claimCode(db().seq), subscriberId: u.id, createdBy: staff.id, createdAt: now, status: 'draft', statusAt: now, submitCount: 0,
-    incident: { date: W.jalaliString(d), time: '', type: f.type, placeType: 'residential', address: f.address, postalCode: '', description: '', fireReportNo: '', policeReportNo: '' },
+    incident: { date: W.jalaliString(d), time: '', type: f.type, placeType: 'residential', address: f.address, postalCode: '', description: '', causeIssuer: '', causeReportNo: '', causeReportDate: '', causeStatesGas: false, policeReportNo: '' },
     damage: { kinds: [], items: [], injured: [], deceased: [] }, photos: [], docs: {}, files: {}, bank: { sheba: '', holder: u.name }, declaration: false,
-    deficiencies: [], messages: [], gasReport: {}, assessment: null, payment: null,
+    deficiencies: [], messages: [], assessment: null, payment: null,
     timeline: [{ at: now, by: staff.name, role: 'gas', action: 'create', label: existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک', note: [f.note, late ? `اعلام با تأخیر: بیش از ${db().settings.reportWindowDays} روز پس از حادثه` : ''].filter(Boolean).join(' — ') }],
   };
   db().claims.push(c);
@@ -1953,7 +1959,7 @@ async function forgotReset(password) { return (await req('POST', 'auth/reset', {
 const edits = new WeakMap();
 const timers = new Map();
 const inflight = new Map();
-const EDITABLE = ['incident', 'damage', 'bank', 'declaration', 'gasReport', 'assessment', 'payment'];
+const EDITABLE = ['incident', 'damage', 'bank', 'declaration', 'assessment', 'payment'];
 function sendClaim(c) {
   timers.delete(c.id);
   const v = edits.get(c);
@@ -1979,7 +1985,7 @@ async function flush() {
   await Promise.all([...inflight.values()]);
 }
 
-async function action(c, id, note) { await flush(); await req('POST', `claims/${c.id}/action`, { action: id, note }); }
+async function action(c, id, note, opts = {}) { await flush(); await req('POST', `claims/${c.id}/action`, { action: id, note, ...opts }); }
 async function finance(c, step, data) { await flush(); await req('POST', `claims/${c.id}/finance`, { step, data }); }
 async function addDefect(c, d) { await req('POST', `claims/${c.id}/defects`, d); }
 async function defect(c, id, op, reply = '') { await req('POST', `claims/${c.id}/defects/${id}`, { op, reply }); }
@@ -2345,10 +2351,10 @@ function demoRows() {
 function journeySteps() {
   const s = db.settings;
   return [
-    { art: 'houseFire', a: '#f26b21', b: '#3a8cc3', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، با کارت ملی و گزارش آتش‌نشانی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
+    { art: 'houseFire', a: '#f26b21', b: '#3a8cc3', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری را بگیرید که در آن علت حادثه «گاز» قید شده باشد؛ سپس با کارت ملی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
     { art: 'sms', a: '#3a8cc3', b: '#1f9d57', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
     { art: 'folderUp', a: '#1f9d57', b: '#3a8cc3', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
-    { art: 'meter', a: '#f2a024', b: '#3a8cc3', who: 'شرکت گاز', t: 'بازدید و بررسی شرکت گاز', d: 'کارشناس از محل بازدید و مدارک را بررسی می‌کند، سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
+    { art: 'docsCheck', a: '#f2a024', b: '#3a8cc3', who: 'شرکت گاز', t: 'بررسی مدارک در شرکت گاز', d: 'کارشناس گاز مدارک را بررسی می‌کند؛ به‌ویژه اینکه در گزارش آتش‌نشانی یا کارشناس رسمی دادگستری، علت حادثه «گاز» قید شده باشد. سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
     { art: 'trackRial', a: '#6d5bd0', b: '#3a8cc3', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
     { art: 'payment', a: '#1f9d57', b: '#f26b21', who: 'مشترک و بیمه‌گر', t: 'تأیید مبلغ و واریز', d: 'مبلغ را می‌پذیرید یا با دلیل اعتراض می‌کنید. پس از تأیید، خسارت به شبای شما واریز و شماره پیگیری پیامک می‌شود.', when: 'پس از تأیید شما' },
   ];
@@ -2408,8 +2414,8 @@ function startJourney() {
 // صفحه نخست سایت: معرفی و ورود، مسیر پرونده، مدارک، پرسش‌ها
 function viewLanding() {
   const docs = [
-    ['doc', 'blue', 'همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه']],
-    ['flame', 'ember', 'آتش‌سوزی و انفجار', ['گزارش آتش‌نشانی', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
+    ['flame', 'ember', 'مهم‌ترین مدرک', ['گزارش آتش‌نشانی یا کارشناس رسمی دادگستری', 'در گزارش باید صریحاً نوشته شده باشد که علت حادثه «گاز» بوده است', 'گزارش با علت نامعلوم یا غیر از گاز پذیرفته نمی‌شود']],
+    ['doc', 'blue', 'همه پرونده‌ها', ['کارت ملی مشترک', 'سند مالکیت یا اجاره‌نامه', 'آخرین قبض گاز', 'گواهی شماره شبا', 'دست‌کم ۴ عکس از محل حادثه', 'فاکتور یا برآورد اقلام خسارت‌دیده']],
     ['people', 'violet', 'مصدومیت', ['پرونده پزشکی و صورت‌حساب بیمارستان', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
     ['alert', 'green', 'فوت', ['گواهی فوت', 'گواهی انحصار وراثت و مدارک وراث', 'گواهی پزشکی قانونی', 'گزارش کلانتری']],
   ];
@@ -2431,7 +2437,7 @@ function viewLanding() {
     <section id="docs" class="wrap sec">
       <div class="sec-head"><span class="eyebrow">پیش از شروع</span><h2>مدارک لازم</h2><p>سامانه فهرست دقیق را بر اساس نوع حادثه و خسارت شما می‌سازد؛ این خلاصه برای آمادگی است.</p></div>
       <div class="doc-grid">${docs.map(([ic, tone, t, list]) => `<article class="doc-tile ${tone}"><span class="doc-ic">${icon(ic)}</span><h3>${t}</h3><ul>${list.map(x => `<li>${icon('check')}${x}</li>`).join('')}</ul></article>`).join('')}</div>
-      <p class="warn-line">${icon('alert')} تا ثبت عکس‌ها و بازدید کارشناس، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p>
+      <p class="warn-line">${icon('alert')} تا عکاسی از محل و صدور گزارش آتش‌نشانی یا کارشناس رسمی، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p>
     </section>
     <section id="faq" class="wrap sec faq-split">
       <div class="faq-aside"><span class="eyebrow light">پاسخ سریع</span><h2>پرسش‌های متداول</h2><p>پاسخ رایج‌ترین پرسش‌ها درباره پوشش، مدارک، نقص پرونده و اعتراض.</p>
@@ -2575,10 +2581,10 @@ function subSection() {
       ${field('نشانی کامل محل حادثه', 'incident.address', inc.address, { req: true, area: true, dis })}
       <div class="grid2">
         ${field('کد پستی', 'incident.postalCode', fa(inc.postalCode), { ltr: true, ph: '۱۰ رقم', dis })}
-        ${field('شماره گزارش آتش‌نشانی', 'incident.fireReportNo', fa(inc.fireReportNo), { req: inc.type === 'fire' || inc.type === 'explosion', dis, hint: 'در صورت حضور آتش‌نشانی' })}
         ${field('شماره گزارش کلانتری', 'incident.policeReportNo', fa(inc.policeReportNo), { dis, hint: 'در حوادث منجر به جرح یا فوت الزامی است' })}
       </div>
       ${field('شرح حادثه', 'incident.description', inc.description, { req: true, area: true, dis, ph: 'چه اتفاقی افتاد؟ از کدام وسیله گازسوز شروع شد؟ چه بخش‌هایی آسیب دید؟' })}
+      ${causeBox(c, dis)}
       ${nextBtn(idx)}
     </div>`;
 
@@ -2648,6 +2654,28 @@ function subSection() {
   </div>`;
 }
 
+// گزارش آتش‌نشانی یا کارشناس رسمی دادگستری: مهم‌ترین مدرک پرونده، چون شرکت گاز بازدید ندارد
+function causeBox(c, dis) {
+  const inc = c.incident;
+  return `<div class="cause-box">
+    <div class="cause-head">${icon('flame')}<b>گزارش علت حادثه <i>*</i></b></div>
+    <p>گزارش <b>آتش‌نشانی</b> یا <b>کارشناس رسمی دادگستری</b> که در آن علت حادثه به‌صراحت «گاز» نوشته شده باشد. این مهم‌ترین مدرک پرونده است و بدون آن خسارت پرداخت نمی‌شود.</p>
+    <ul>
+      <li>علت باید روشن نوشته شده باشد؛ مثلاً «نشت گاز»، «انفجار ناشی از تجمع گاز» یا «آتش‌سوزی ناشی از گاز».</li>
+      <li>گزارشی که علت را «نامعلوم» یا چیزی غیر از گاز (مثلاً اتصالی برق) نوشته باشد پذیرفته نمی‌شود.</li>
+      <li>گزارش باید مهر و امضا، تاریخ و نشانی محل حادثه را داشته باشد.</li>
+    </ul>
+    <div class="grid2">
+      ${field('صادرکننده گزارش', 'incident.causeIssuer', inc.causeIssuer, { req: true, opts: W.CAUSE_ISSUERS, dis })}
+      ${field('شماره گزارش', 'incident.causeReportNo', fa(inc.causeReportNo), { req: true, dis })}
+      ${field('تاریخ گزارش', 'incident.causeReportDate', fa(inc.causeReportDate), { req: true, ph: '۱۴۰۵/۰۷/۲۸', ltr: true, dis })}
+    </div>
+    <label class="check"><input type="checkbox" id="f-cause-gas" data-bind="incident.causeStatesGas" ${inc.causeStatesGas ? 'checked' : ''} ${dis ? 'disabled' : ''}>
+      <span>تأیید می‌کنم در این گزارش <b>صریحاً قید شده که علت حادثه گاز بوده است.</b></span></label>
+    <small>فایل یا عکس واضح همین گزارش را در بخش «مدارک» بارگذاری کنید.</small>
+  </div>`;
+}
+
 function docCards(c, { editableBy = null, flagRole = null } = {}) {
   return W.visibleDocs(c).map(d => {
     const files = c.docs[d.id] || [];
@@ -2657,10 +2685,11 @@ function docCards(c, { editableBy = null, flagRole = null } = {}) {
     const dot = flags.length ? `<span class="state-dot flag">${icon('alert')}</span>` : files.length ? `<span class="state-dot ok">${icon('check')}</span>` : `<span class="state-dot miss">${icon('upload')}</span>`;
     return `<div class="doc-card ${flags.length ? 'flag' : ''}">
       <div class="doc-head">${dot}<span class="t">${esc(d.title)}</span>
-        ${d.uploader === 'gas' ? '<span class="badge info">شرکت گاز</span>' : required ? '<span class="badge neutral">الزامی</span>' : '<span class="badge neutral">اختیاری</span>'}
+        ${required ? `<span class="badge ${d.hint ? 'warn' : 'neutral'}">${d.hint ? 'الزامی و مهم' : 'الزامی'}</span>` : '<span class="badge neutral">اختیاری</span>'}
         ${flagRole ? `<button class="btn sm ghost" data-act="flag" data-target="doc:${d.id}" data-title="${esc(d.title)}">${icon('alert')} نقص</button>` : ''}</div>
+      ${d.hint ? `<p class="doc-hint">${icon('alert')}<span>${esc(d.hint)}</span></p>` : ''}
       ${flags.map(f => defectBox(c, f, editable(c) && st.user.role === 'subscriber')).join('')}
-      ${files.length || canUp ? `<div class="thumbs">${files.map(id => thumb(c, id, canUp)).join('')}${canUp ? addFileBtn(d.id) : ''}</div>` : `<small class="s" style="color:var(--muted)">${d.uploader === 'gas' ? 'پس از بازدید کارشناس گاز بارگذاری می‌شود.' : 'بارگذاری نشده'}</small>`}
+      ${files.length || canUp ? `<div class="thumbs">${files.map(id => thumb(c, id, canUp)).join('')}${canUp ? addFileBtn(d.id) : ''}</div>` : '<small class="s" style="color:var(--muted)">بارگذاری نشده</small>'}
     </div>`;
   }).join('');
 }
@@ -2904,13 +2933,6 @@ function insurerHome() {
 }
 
 // ---------- صفحه بررسی پرونده (کارکنان) ----------
-const CAUSES = {
-  hose: 'شیلنگ فرسوده یا غیراستاندارد', appliance: 'نقص وسیله گازسوز', flue: 'نقص یا انسداد دودکش',
-  pipe: 'نشت لوله‌کشی داخلی (پس از کنتور)', ventilation: 'نبود تهویه مناسب', before_meter: 'حادثه در تأسیسات قبل از کنتور',
-  unrelated: 'علت غیرمرتبط با گاز', other: 'سایر',
-};
-const OPINIONS = { covered: 'مشمول پوشش بیمه', needs_review: 'نیازمند بررسی بیشتر بیمه‌گر', not_covered: 'غیرمشمول' };
-
 function canFlag(c) {
   return (st.user.role === 'gas' && c.status === 'gas_review') || (st.user.role === 'insurer' && ['insurer_review', 'objection'].includes(c.status));
 }
@@ -2923,7 +2945,7 @@ function viewReview() {
   const tab = st.p.tab || 'summary';
   const acts = W.availableActions(c, st.user.role);
   const openDef = W.openDeficiencies(c).length;
-  const tabs = [['summary', 'خلاصه', 'list'], ['files', 'مدارک و عکس', 'image'], ['defects', `نقص‌ها${openDef ? ' (' + fa(openDef) + ')' : ''}`, 'alert'], ['gas', 'بازدید گاز', 'meter'],
+  const tabs = [['summary', 'خلاصه', 'list'], ['files', 'مدارک و عکس', 'image'], ['defects', `نقص‌ها${openDef ? ' (' + fa(openDef) + ')' : ''}`, 'alert'],
     ...(st.user.role !== 'subscriber' && (c.forwardedAt || st.user.role === 'insurer') ? [['assess', 'ارزیابی خسارت', 'money']] : []), ['chat', `پیام‌ها${unreadMsgs(c) ? ' (' + fa(unreadMsgs(c)) + ')' : ''}`, 'chat'], ['history', 'تاریخچه', 'history']];
   const actBtns = acts.map(a => {
     const tone = /reject/.test(a.id) ? 'red ghost' : /return|query|object/.test(a.id) ? 'orange' : /forward|assess|pay|answer/.test(a.id) ? 'green' : '';
@@ -2933,7 +2955,6 @@ function viewReview() {
   if (tab === 'summary') body = reviewSummary(c, u);
   if (tab === 'files') body = reviewFiles(c);
   if (tab === 'defects') body = reviewDefects(c);
-  if (tab === 'gas') body = reviewGas(c);
   if (tab === 'assess') body = reviewAssess(c);
   if (tab === 'chat') { markRead(c); body = threadHtml(c); }
   if (tab === 'history') body = `<div class="ocard" style="padding:16px 18px">${timelineBlock(c)}</div>`;
@@ -2964,10 +2985,11 @@ function reviewSummary(c, u) {
   const late = W.parseJalali(i.date) && W.daysBetween(W.parseJalali(i.date), c.createdAt) > db.settings.reportWindowDays;
   return `
     ${late ? `<div class="note warn">${icon('clock')}<div>حادثه بیش از ${fa(db.settings.reportWindowDays)} روز پس از وقوع اعلام شده است.</div></div>` : ''}
+    ${causeReview(c)}
     ${secCard(c, 'subscriber', 'user', 'مشترک', `${kv('نام', esc(u.name))}<div class="kv-row">${kv('کد ملی', fa(u.nationalId))}${kv('موبایل', fa(u.mobile))}</div>${kv('نشانی', esc(u.address))}
       ${st.user.role === 'gas' ? `<div class="kv"><button class="btn sm ghost" data-act="resetSubPw" data-id="${u.id}">${icon('key')} صدور رمز موقت جدید برای مشترک</button></div>` : ''}`)}
     ${secCard(c, 'incident', 'flame', 'اطلاعات حادثه', `<div class="kv-row">${kv('نوع', esc(W.INCIDENT_TYPES[i.type] || '—'))}${kv('تاریخ', fa(i.date || '—') + (i.time ? ' ساعت ' + fa(i.time) : ''))}</div>
-      <div class="kv-row">${kv('کاربری', esc(W.PLACE_TYPES[i.placeType] || '—'))}${kv('گزارش آتش‌نشانی', fa(i.fireReportNo || '—'))}${kv('گزارش کلانتری', fa(i.policeReportNo || '—'))}</div>
+      <div class="kv-row">${kv('کاربری', esc(W.PLACE_TYPES[i.placeType] || '—'))}${kv('گزارش کلانتری', fa(i.policeReportNo || '—'))}</div>
       ${kv('نشانی', esc(i.address || '—'))}${kv('شرح', esc(i.description || '—'))}`)}
     ${secCard(c, 'damage', 'list', 'خسارت‌های ادعایی', `${kv('نوع', d.kinds.map(k => W.DAMAGE_KINDS[k]).join('، ') || '—')}
       ${(d.items || []).map(x => kv(esc(x.title), `${money(num(x.amount))} <span style="color:var(--muted)">(${fa(x.qty || 1)} عدد)</span>`)).join('')}
@@ -2979,9 +3001,24 @@ function reviewSummary(c, u) {
 }
 
 function reviewFiles(c) {
-  const gasCanUpload = st.user.role === 'gas' && ['submitted', 'gas_review', 'insurer_query'].includes(c.status);
   return `${secCard(c, 'photos', 'camera', `تصاویر حادثه (${fa(c.photos.length)})`, `<div class="thumbs">${c.photos.map(id => thumb(c, id, false)).join('')}</div>`)}
-    ${docCards(c, { editableBy: gasCanUpload ? 'gas' : null, flagRole: canFlag(c) })}`;
+    ${docCards(c, { flagRole: canFlag(c) })}`;
+}
+
+// کادر گزارش علت حادثه در صفحه بررسی کارکنان؛ نقص آن به مدرک cause_report بسته می‌شود تا مشترک کنار همان مدرک ببیند
+function causeReview(c) {
+  const i = c.incident;
+  const files = c.docs.cause_report || [];
+  const flags = c.deficiencies.filter(d => d.status === 'open' && d.target === 'doc:cause_report');
+  return `<div class="cause-box review">
+    <div class="cause-head">${icon('flame')}<b style="flex:1">گزارش علت حادثه</b>${canFlag(c) ? `<button class="btn sm ghost" data-act="flag" data-target="doc:cause_report" data-title="گزارش علت حادثه">${icon('alert')} اعلام نقص</button>` : ''}</div>
+    <div class="kv-row">${kv('صادرکننده', esc(W.CAUSE_ISSUERS[i.causeIssuer] || '—'))}${kv('شماره', fa(i.causeReportNo || '—'))}${kv('تاریخ', fa(i.causeReportDate || '—'))}</div>
+    ${kv('اظهار مشترک', i.causeStatesGas ? '<span class="badge ok">در گزارش علت گاز قید شده</span>' : '<span class="badge bad">تأیید نشده</span>')}
+    ${c.causeCheck ? kv('بررسی شرکت گاز', `<span class="badge ok">${icon('check')} علت گاز تأیید شد</span> ${esc(c.causeCheck.by)} · ${fdate(c.causeCheck.at)}`) : ''}
+    ${flags.map(d => defectBox(c, d, false)).join('')}
+    ${files.length ? `<div class="thumbs">${files.map(id => thumb(c, id, false)).join('')}</div>` : '<div class="note bad">' + icon('alert') + '<div>فایل گزارش بارگذاری نشده است.</div></div>'}
+    ${st.user.role === 'gas' && c.status === 'gas_review' ? `<small>پیش از ارسال به بیمه‌گر، فایل گزارش را باز کنید و مطمئن شوید علت حادثه صریحاً «گاز» نوشته شده است. اگر نیست یا مبهم است، «اعلام نقص» بزنید.</small>` : ''}
+  </div>`;
 }
 
 function reviewDefects(c) {
@@ -3004,25 +3041,6 @@ function reviewDefects(c) {
     <div class="section-label">موارد باز (${fa(open.length)})</div>
     ${open.length ? open.map(item).join('') : `<div class="empty">${icon('checkC')}<span>نقص بازی وجود ندارد.</span></div>`}
     ${closed.length ? `<div class="section-label">موارد بسته‌شده (${fa(closed.length)})</div>${closed.map(d => defectBox(c, d, false)).join('')}` : ''}`;
-}
-
-function reviewGas(c) {
-  const r = c.gasReport || {};
-  const dis = !(st.user.role === 'gas' && ['submitted', 'gas_review'].includes(c.status));
-  const issues = W.gasReportIssues(c);
-  const radio = (bind, val, opts) => `<div class="chips">${Object.entries(opts).map(([k, v]) => `<label class="chip ${val === k ? 'on' : ''}"><input type="radio" name="${bind}" data-bind="${bind}" value="${k}" ${val === k ? 'checked' : ''} ${dis ? 'disabled' : ''}>${v}</label>`).join('')}</div>`;
-  return `<div class="form">
-    ${!dis && issues.length ? `<div class="note warn">${icon('meter')}<div><b>برای ارسال به بیمه‌گر تکمیل کنید:</b> ${esc(issues.join('، '))}</div></div>` : ''}
-    ${r.afterMeter === 'before' || r.cause === 'before_meter' ? `<div class="note bad">${icon('alert')}<div>حادثه در تأسیسات قبل از کنتور معمولاً از محل بیمه‌نامه مسئولیت شرکت گاز پیگیری می‌شود، نه بیمه حوادث مشترکین. طبق قرارداد جاری تصمیم بگیرید.</div></div>` : ''}
-    ${r.opinion === 'not_covered' ? `<div class="note bad">${icon('x')}<div>کارشناس، حادثه را غیرمشمول دانسته است. در صورت قطعی بودن، «رد پرونده» را با ذکر دلیل بزنید.</div></div>` : ''}
-    <div class="grid2">${field('کارشناس بازدیدکننده', 'gasReport.inspector', r.inspector, { req: true, dis })}${field('تاریخ بازدید', 'gasReport.visitDate', fa(r.visitDate), { req: true, ph: '۱۴۰۵/۰۷/۲۸', ltr: true, dis })}</div>
-    ${field('علت فنی حادثه', 'gasReport.cause', r.cause, { req: true, opts: CAUSES, dis })}
-    <div class="fld"><span>محل وقوع نسبت به کنتور <i>*</i></span>${radio('gasReport.afterMeter', r.afterMeter, { after: 'پس از کنتور (لوله‌کشی و وسایل مشترک)', before: 'قبل از کنتور' })}</div>
-    <div class="fld"><span>وسیله گازسوز</span>${radio('gasReport.appliance', r.appliance, { standard: 'استاندارد', nonstandard: 'غیراستاندارد', unknown: 'نامشخص' })}</div>
-    <div class="fld"><span>نظر کارشناس درباره پوشش <i>*</i></span>${radio('gasReport.opinion', r.opinion, OPINIONS)}</div>
-    ${field('شرح بازدید و توضیحات', 'gasReport.notes', r.notes, { area: true, dis })}
-    <div class="fld"><span>صورت‌جلسه بازدید (امضاشده) <i>*</i></span><div class="thumbs">${(c.docs.gas_report || []).map(id => thumb(c, id, !dis)).join('')}${dis ? '' : addFileBtn('gas_report')}</div></div>
-  </div>`;
 }
 
 function assessSummary(c) {
@@ -3171,10 +3189,11 @@ const VIEWS = {
 const FAQ = [
   ['چه حوادثی تحت پوشش است؟', 'آتش‌سوزی، انفجار و گازگرفتگی ناشی از گاز طبیعی در محل مشترک (معمولاً پس از کنتور) که به خسارت مالی، جرح یا فوت منجر شده باشد. جزئیات و سقف‌ها را بیمه‌نامه سال جاری تعیین می‌کند.'],
   ['حساب کاربری را از کجا بگیرم؟', 'به امور حوادث شرکت گاز منطقه مراجعه کنید. پس از ثبت، نام کاربری (شماره اشتراک) و رمز موقت برایتان پیامک می‌شود.'],
-  ['چه مدارکی لازم است؟', 'کارت ملی، سند یا اجاره‌نامه، قبض گاز، گزارش آتش‌نشانی، عکس‌های محل، فاکتور اقلام و گواهی شبا. در جرح یا فوت، مدارک پزشکی، پزشکی قانونی، گواهی فوت و انحصار وراثت هم لازم است. سامانه فهرست دقیق پرونده شما را نشان می‌دهد.'],
+  ['چه مدارکی لازم است؟', 'مهم‌ترین مدرک، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری است که در آن علت حادثه «گاز» قید شده باشد. بقیه: کارت ملی، سند یا اجاره‌نامه، قبض گاز، عکس‌های محل، فاکتور اقلام و گواهی شبا. در جرح یا فوت، مدارک پزشکی، پزشکی قانونی، گواهی فوت و انحصار وراثت هم لازم است. سامانه فهرست دقیق پرونده شما را نشان می‌دهد.'],
   ['اگر شرکت گاز نقص اعلام کند؟', 'پیامک دریافت می‌کنید. وارد سامانه شوید، موارد را اصلاح کنید، به هر مورد پاسخ دهید و پرونده را دوباره ارسال کنید.'],
   ['اگر با مبلغ خسارت موافق نباشم؟', 'در «پیگیری پرونده» گزینه «اعتراض به مبلغ» را بزنید و دلیل را بنویسید. بیمه‌گر دوباره ارزیابی می‌کند.'],
-  ['پیش از عکاسی محل را تمیز کنم؟', 'خیر. تا ثبت عکس‌ها و بازدید کارشناس، محل را تعمیر یا پاک‌سازی نکنید.'],
+  ['پیش از عکاسی محل را تمیز کنم؟', 'خیر. تا عکاسی از محل و صدور گزارش آتش‌نشانی یا کارشناس رسمی دادگستری، محل را تعمیر یا پاک‌سازی نکنید.'],
+  ['گزارش آتش‌نشانی چه چیزی باید داشته باشد؟', 'در گزارش آتش‌نشانی یا کارشناس رسمی دادگستری باید صریحاً نوشته شده باشد که علت حادثه «گاز» بوده است (مثلاً نشت گاز یا انفجار ناشی از گاز)، با مهر و امضا، تاریخ و نشانی محل. گزارشی که علت را نامعلوم یا غیر از گاز بداند، برای پرونده پذیرفته نمی‌شود.'],
 ];
 function helpSheet() {
   openSheet(`<h2>پرسش‌های متداول</h2><div class="faq">${FAQ.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</div>
@@ -3218,13 +3237,17 @@ function actionSheet(id) {
   openSheet(`<h2>${esc(a.label)}</h2><p class="lead"><span dir="ltr" class="num">${esc(c.code)}</span></p>
     ${err ? `<div class="note warn">${icon('alert')}<div>${esc(err)}</div></div>` : ''}
     <form class="form" data-form="action" data-action="${id}" style="border:0;padding:0">
+      ${id === 'gas_forward' ? `<div class="cause-box review"><div class="cause-head">${icon('flame')}<b>گزارش علت حادثه</b></div>
+        <div class="thumbs">${(c.docs.cause_report || []).map(fid => thumb(c, fid, false)).join('')}</div>
+        <label class="check"><input type="checkbox" name="causeConfirmed" id="act-cause" required>
+          <span>گزارش ${esc(W.CAUSE_ISSUERS[c.incident.causeIssuer] || 'علت حادثه')} را باز کردم و در آن <b>صریحاً «گاز» به‌عنوان علت حادثه قید شده است.</b></span></label></div>` : ''}
       <label class="fld"><span>${a.needsNote ? 'توضیح <i>*</i>' : 'توضیح'}</span><textarea id="act-note" name="note" ${a.needsNote ? 'required' : ''} placeholder="${esc(placeholder)}"></textarea></label>
       <div class="btns"><button class="btn ${/reject/.test(id) ? 'red' : 'green'}" type="submit" ${err ? 'disabled' : ''}>تأیید</button><button class="btn ghost" type="button" data-act="closeSheet">انصراف</button></div>
     </form>`);
 }
-async function runAction(id, note) {
+async function runAction(id, note, opts = {}) {
   const c = currentClaim();
-  if (!await run(() => B.action(c, id, note))) return;
+  if (!await run(() => B.action(c, id, note, opts))) return;
   closeSheet();
   toast(W.STATUS[claimById(c.id).status].label);
   if (st.user.role === 'subscriber') go('track'); else render();
@@ -3435,7 +3458,7 @@ const FORMS = {
     markRead(claimById(c.id)); render();
     const t = $('#msg-text'); if (t) t.focus();
   },
-  action: f => runAction(f.dataset.action, f.note.value.trim()),
+  action: f => runAction(f.dataset.action, f.note.value.trim(), { causeConfirmed: !!(f.causeConfirmed && f.causeConfirmed.checked) }),
   fin: async f => {
     const c = currentClaim(); const step = f.dataset.step;
     const v = k => (f[k] ? W.normalizeDigits(f[k].value).trim() : '');
@@ -3485,7 +3508,7 @@ function onBind(el) {
   const path = el.dataset.bind;
   let val = el.type === 'checkbox' ? el.checked : el.value;
   if (el.dataset.num !== undefined) val = num(val);
-  else if (typeof val === 'string' && /(date|time|postalCode|ReportNo|qty|amount|nationalId|ref)$/.test(path)) val = W.normalizeDigits(val).trim();
+  else if (typeof val === 'string' && /(date|Date|time|postalCode|ReportNo|qty|amount|nationalId|ref)$/.test(path)) val = W.normalizeDigits(val).trim();
   if (path.endsWith('.amount')) val = String(num(val) || '');
   if (path === 'bank.sheba') val = W.normalizeDigits(val).replace(/\s|-/g, '').toUpperCase();
   if (path.startsWith('assessment')) c.assessment ||= { adjuster: '', visitDate: '', note: '', items: [] };

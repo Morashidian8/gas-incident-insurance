@@ -196,7 +196,7 @@ class GII_Store {
 		if ( 'subscriber' === $role ) {
 			$c['messages'] = array_values( array_filter( (array) $c['messages'], function ( $m ) { return empty( $m['internal'] ); } ) );
 		}
-		foreach ( array( 'docs', 'files', 'gasReport' ) as $k ) {
+		foreach ( array( 'docs', 'files' ) as $k ) {
 			if ( empty( $c[ $k ] ) ) {
 				$c[ $k ] = new stdClass();
 			}

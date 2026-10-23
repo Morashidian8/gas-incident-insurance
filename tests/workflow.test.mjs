@@ -19,10 +19,9 @@ function completeClaim() {
   for (const d of W.DOC_TYPES) docs[d.id] = ['f-' + d.id];
   return {
     id: 'c1', status: 'draft', createdAt: new Date().toISOString(), timeline: [], deficiencies: [],
-    incident: { date: '1405/07/20', type: 'fire', placeType: 'residential', address: 'تهران، خیابان آزادی، پلاک ۱۲', description: 'آتش‌سوزی آشپزخانه به علت نشت شیلنگ اجاق گاز', fireReportNo: '۱۲۳۴' },
+    incident: { date: '1405/07/20', type: 'fire', placeType: 'residential', address: 'تهران، خیابان آزادی، پلاک ۱۲', description: 'آتش‌سوزی آشپزخانه به علت نشت شیلنگ اجاق گاز', causeIssuer: 'fire', causeReportNo: '۱۲۳۴', causeReportDate: '1405/07/21', causeStatesGas: true },
     damage: { kinds: ['property'], items: [{ title: 'کابینت', qty: 1, amount: 300000000 }], injured: [], deceased: [] },
     photos, docs, bank: { sheba: makeSheba('0570028180010653892101'), holder: 'مشترک' }, declaration: true,
-    gasReport: { inspector: 'مهندس رضایی', visitDate: '1405/07/21', cause: 'hose', afterMeter: 'after', opinion: 'covered' },
   };
 }
 
@@ -49,6 +48,14 @@ test('تاریخ شمسی رفت و برگشت', () => {
   assert.equal(W.parseJalali('abc'), null);
 });
 
+test('بدون تأیید قید علت گاز، ارسال ممکن نیست', () => {
+  const c = completeClaim();
+  c.incident.causeStatesGas = false;
+  assert.match(W.canDo(c, 'subscriber', 'submit'), /علت گاز/);
+  c.incident.causeStatesGas = true; c.incident.causeIssuer = '';
+  assert.match(W.canDo(c, 'subscriber', 'submit'), /صادرکننده/);
+});
+
 test('ارسال پرونده ناقص رد می‌شود', () => {
   const c = completeClaim();
   c.photos = ['p1'];
@@ -62,14 +69,16 @@ test('چرخه کامل: نقص، اصلاح، ارسال به بیمه‌گر،
   assert.equal(c.status, 'submitted');
   c = W.applyAction(c, 'gas_start', gas);
   assert.match(W.canDo(c, 'gas', 'gas_return'), /نقص/);
-  c.deficiencies.push({ id: 'd1', target: 'doc:fire_report', note: 'گزارش ناخوانا است', by: 'gas', status: 'open' });
+  c.deficiencies.push({ id: 'd1', target: 'doc:cause_report', note: 'گزارش ناخوانا است', by: 'gas', status: 'open' });
   c = W.applyAction(c, 'gas_return', gas);
   assert.equal(c.status, 'returned');
   assert.match(W.canDo(c, 'subscriber', 'submit'), /پاسخ/);
   c.deficiencies[0].reply = 'نسخه خوانا بارگذاری شد';
   c = W.applyAction(c, 'submit', sub);
   c = W.applyAction(c, 'gas_start', gas);
-  c = W.applyAction(c, 'gas_forward', gas);
+  assert.throws(() => W.applyAction(c, 'gas_forward', gas), /گاز/);
+  c = W.applyAction(c, 'gas_forward', gas, '', new Date(), { causeConfirmed: true });
+  assert.equal(c.causeCheck.by, gas.name);
   assert.equal(c.status, 'sent_insurer');
   assert.equal(W.openDeficiencies(c).length, 0);
   c = W.applyAction(c, 'ins_start', ins);
@@ -117,11 +126,13 @@ test('مدارک لازم بر اساس نوع خسارت', () => {
   const c = completeClaim();
   c.docs = {};
   const ids = () => W.requiredDocs(c, 'subscriber').map(d => d.id);
-  assert.ok(ids().includes('fire_report'));
+  assert.ok(ids().includes('cause_report'));
   assert.ok(!ids().includes('death_cert'));
   assert.ok(!ids().includes('police'));
   c.damage.kinds.push('death');
   assert.ok(ids().includes('death_cert'));
   assert.ok(ids().includes('police'));
-  assert.ok(!W.requiredDocs(c, 'subscriber').some(d => d.id === 'gas_report'));
+  c.incident.type = 'co';
+  assert.ok(ids().includes('cause_report'), 'گزارش علت برای همه انواع حادثه لازم است');
+  assert.ok(!W.DOC_TYPES.some(d => d.uploader === 'gas'), 'مدرکی برای بارگذاری شرکت گاز نمانده');
 });

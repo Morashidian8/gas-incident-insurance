@@ -43,11 +43,15 @@ export const DAMAGE_KINDS = {
 
 // انواع مدارک. need(claim) مشخص می‌کند آیا برای این پرونده لازم است.
 // uploader: چه نقشی آن را بارگذاری می‌کند.
+export const CAUSE_ISSUERS = { fire: 'سازمان آتش‌نشانی', expert: 'کارشناس رسمی دادگستری' };
+export const CAUSE_HINT = 'در این گزارش باید علت حادثه به‌صراحت «گاز طبیعی» نوشته شده باشد (مثلاً نشت گاز، انفجار یا آتش‌سوزی ناشی از گاز). گزارشی که علت را «نامعلوم» یا چیزی غیر از گاز (مثلاً اتصالی برق) نوشته باشد پذیرفته نمی‌شود. گزارش باید مهر و امضا، تاریخ و نشانی محل حادثه را داشته باشد.';
+
 export const DOC_TYPES = [
   { id: 'national_id',  title: 'کارت ملی مشترک (پشت و رو)',            uploader: 'subscriber', need: () => true },
   { id: 'ownership',    title: 'سند مالکیت یا اجاره‌نامه محل حادثه',      uploader: 'subscriber', need: () => true },
   { id: 'gas_bill',     title: 'آخرین قبض گاز',                           uploader: 'subscriber', need: () => true },
-  { id: 'fire_report',  title: 'گزارش آتش‌نشانی',                          uploader: 'subscriber', need: c => c.incident.type === 'fire' || c.incident.type === 'explosion' },
+  // سند اصلی اثبات علت حادثه؛ شرکت گاز بازدید ندارد و فقط همین گزارش علت «گاز» را ثابت می‌کند
+  { id: 'cause_report', title: 'گزارش آتش‌نشانی یا کارشناس رسمی دادگستری (با قید علت گاز)', uploader: 'subscriber', need: () => true, hint: CAUSE_HINT },
   { id: 'police',       title: 'گزارش نیروی انتظامی / کلانتری',            uploader: 'subscriber', need: c => hasKind(c, 'medical') || hasKind(c, 'death'), optional: c => !(hasKind(c, 'medical') || hasKind(c, 'death')) },
   { id: 'invoices',     title: 'فاکتور یا برآورد هزینه اقلام خسارت‌دیده',  uploader: 'subscriber', need: c => hasKind(c, 'property') },
   { id: 'medical',      title: 'پرونده پزشکی و صورت‌حساب بیمارستان',        uploader: 'subscriber', need: c => hasKind(c, 'medical') },
@@ -55,7 +59,6 @@ export const DOC_TYPES = [
   { id: 'death_cert',   title: 'گواهی فوت',                                uploader: 'subscriber', need: c => hasKind(c, 'death') },
   { id: 'inheritance',  title: 'گواهی انحصار وراثت و مدارک وراث',          uploader: 'subscriber', need: c => hasKind(c, 'death') },
   { id: 'sheba_cert',   title: 'گواهی شماره شبا به نام ذی‌نفع',             uploader: 'subscriber', need: () => true },
-  { id: 'gas_report',   title: 'صورت‌جلسه بازدید کارشناس شرکت گاز',        uploader: 'gas',        need: () => true },
 ];
 
 export const MIN_PHOTOS = 4;
@@ -193,7 +196,10 @@ export function sectionIssues(c) {
   if (!inc.placeType) out.incident.push('نوع کاربری محل');
   if (!inc.address || inc.address.trim().length < 10) out.incident.push('نشانی کامل محل حادثه');
   if (!inc.description || inc.description.trim().length < 20) out.incident.push('شرح حادثه (دست‌کم ۲۰ حرف)');
-  if ((inc.type === 'fire' || inc.type === 'explosion') && !inc.fireReportNo) out.incident.push('شماره گزارش آتش‌نشانی');
+  if (!CAUSE_ISSUERS[inc.causeIssuer]) out.incident.push('صادرکننده گزارش علت حادثه');
+  if (!inc.causeReportNo) out.incident.push('شماره گزارش علت حادثه');
+  if (!parseJalali(inc.causeReportDate)) out.incident.push('تاریخ گزارش علت حادثه');
+  if (!inc.causeStatesGas) out.incident.push('تأیید قید علت گاز در گزارش');
 
   const dmg = c.damage || { kinds: [] };
   if (!dmg.kinds || !dmg.kinds.length) out.damage.push('نوع خسارت');
@@ -224,18 +230,6 @@ export function missingForSubmit(c) {
 
 export function openDeficiencies(c) { return (c.deficiencies || []).filter(d => d.status === 'open'); }
 
-export function gasReportIssues(c) {
-  const r = c.gasReport || {};
-  const out = [];
-  if (!r.inspector) out.push('نام کارشناس بازدید');
-  if (!parseJalali(r.visitDate)) out.push('تاریخ بازدید');
-  if (!r.cause) out.push('علت فنی حادثه');
-  if (!r.afterMeter) out.push('محل وقوع نسبت به کنتور');
-  if (!r.opinion) out.push('نظر کارشناس درباره پوشش بیمه');
-  if (!(c.docs.gas_report || []).length) out.push('بارگذاری صورت‌جلسه بازدید');
-  return out;
-}
-
 // ---------- محاسبه خسارت قابل پرداخت ----------
 export function computePayable(items, settings = DEFAULT_SETTINGS, deathCount = 0) {
   const sum = cat => items.filter(i => i.category === cat).reduce((a, i) => a + Math.max(0, +i.approved || 0), 0);
@@ -262,8 +256,6 @@ export const ACTIONS = {
                   guard: c => openDeficiencies(c).some(d => !d.reply) ? null : 'دست‌کم یک مورد نقص جدید ثبت کنید.' },
   gas_forward:  { role: 'gas', from: ['gas_review'], to: 'sent_insurer', label: 'تأیید و ارسال به بیمه‌گر',
                   guard: c => {
-                    const g = gasReportIssues(c);
-                    if (g.length) return 'گزارش بازدید ناقص است: ' + g.join('، ');
                     const s = missingForSubmit({ ...c, status: 'draft' });
                     if (s.length) return 'مدارک مشترک ناقص است: ' + s.join('، ');
                     if (openDeficiencies(c).some(d => !d.reply)) return 'موارد نقص باز وجود دارد.';
@@ -305,11 +297,13 @@ export function canDo(c, role, actionId) {
 }
 
 // اعمال یک عمل روی پرونده؛ پرونده جدید برمی‌گرداند (ورودی را تغییر نمی‌دهد).
-export function applyAction(claim, actionId, actor, note = '', now = new Date()) {
+// opts.causeConfirmed: کارشناس گاز هنگام ارسال به بیمه‌گر تأیید می‌کند که در گزارش، علت گاز قید شده است
+export function applyAction(claim, actionId, actor, note = '', now = new Date(), opts = {}) {
   const err = canDo(claim, actor.role, actionId);
   if (err) throw new Error(err);
   const a = ACTIONS[actionId];
   if (a.needsNote && !note.trim()) throw new Error('نوشتن توضیح برای این عمل الزامی است.');
+  if (actionId === 'gas_forward' && !opts.causeConfirmed) throw new Error('تأیید کنید که گزارش علت حادثه را دیده‌اید و در آن «گاز» به‌عنوان علت قید شده است.');
   const c = structuredClone(claim);
   const at = now.toISOString();
   c.status = a.to;
@@ -321,7 +315,7 @@ export function applyAction(claim, actionId, actor, note = '', now = new Date())
   if (actionId === 'gas_forward' || actionId === 'gas_answer') {
     for (const d of c.deficiencies) if (d.status === 'open') { d.status = 'closed'; d.closedAt = at; }
   }
-  if (actionId === 'gas_forward') c.forwardedAt = at;
+  if (actionId === 'gas_forward') { c.forwardedAt = at; c.causeCheck = { by: actor.name, at }; }
   if (actionId === 'gas_return') {
     // استعلام‌های بیمه‌گر که به مشترک ارجاع شده باز می‌مانند تا مشترک پاسخ دهد
     c.returnedAt = at;

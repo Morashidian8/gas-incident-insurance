@@ -298,10 +298,10 @@ class GII_REST {
 			$c     = GII_Store::save_claim( array(
 				'code' => GII_WF::claim_code( GII_Store::next_seq() ), 'subscriberId' => (string) $u->ID, 'createdBy' => $staff['id'], 'createdAt' => $now,
 				'status' => 'draft', 'statusAt' => $now, 'submitCount' => 0,
-				'incident' => array( 'date' => GII_WF::jalali_string( $ts ), 'time' => '', 'type' => $f['type'], 'placeType' => 'residential', 'address' => $f['address'], 'postalCode' => '', 'description' => '', 'fireReportNo' => '', 'policeReportNo' => '' ),
+				'incident' => array( 'date' => GII_WF::jalali_string( $ts ), 'time' => '', 'type' => $f['type'], 'placeType' => 'residential', 'address' => $f['address'], 'postalCode' => '', 'description' => '', 'causeIssuer' => '', 'causeReportNo' => '', 'causeReportDate' => '', 'causeStatesGas' => false, 'policeReportNo' => '' ),
 				'damage' => array( 'kinds' => array(), 'items' => array(), 'injured' => array(), 'deceased' => array() ),
 				'photos' => array(), 'docs' => array(), 'files' => array(), 'bank' => array( 'sheba' => '', 'holder' => $u->display_name ), 'declaration' => false,
-				'deficiencies' => array(), 'messages' => array(), 'gasReport' => array(), 'assessment' => null, 'payment' => null,
+				'deficiencies' => array(), 'messages' => array(), 'assessment' => null, 'payment' => null,
 				'timeline' => array( array( 'at' => $now, 'by' => $staff['name'], 'role' => 'gas', 'action' => 'create',
 					'label' => $existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک',
 					'note' => implode( ' — ', array_filter( array( $f['note'], $late ? 'اعلام با تأخیر: بیش از ' . $s['reportWindowDays'] . ' روز پس از حادثه' : '' ) ) ) ) ),
@@ -316,7 +316,6 @@ class GII_REST {
 	}
 
 	// ---------- ویرایش فیلدهای پرونده ----------
-	const CAUSES = array( 'hose', 'appliance', 'flue', 'pipe', 'ventilation', 'before_meter', 'unrelated', 'other' );
 	private static function clean_list( $list, $fn, $max = 100 ) {
 		return array_values( array_map( $fn, array_slice( array_filter( (array) $list, 'is_array' ), 0, $max ) ) );
 	}
@@ -335,7 +334,11 @@ class GII_REST {
 					'type' => isset( GII_WF::INCIDENT_TYPES[ $i['type'] ?? '' ] ) ? $i['type'] : '',
 					'placeType' => self::pick( $i['placeType'] ?? '', GII_WF::PLACE_TYPES ),
 					'address' => self::area( $i['address'] ?? '', 500 ), 'postalCode' => self::digits( $i['postalCode'] ?? '', 10 ),
-					'description' => self::area( $i['description'] ?? '' ), 'fireReportNo' => self::txt( GII_WF::normalize_digits( $i['fireReportNo'] ?? '' ), 40 ),
+					'description' => self::area( $i['description'] ?? '' ),
+					'causeIssuer' => self::pick( $i['causeIssuer'] ?? '', array_keys( GII_WF::CAUSE_ISSUERS ) ),
+					'causeReportNo' => self::txt( GII_WF::normalize_digits( $i['causeReportNo'] ?? '' ), 40 ),
+					'causeReportDate' => self::digits( $i['causeReportDate'] ?? '' ),
+					'causeStatesGas' => ! empty( $i['causeStatesGas'] ),
 					'policeReportNo' => self::txt( GII_WF::normalize_digits( $i['policeReportNo'] ?? '' ), 40 ),
 				);
 			}
@@ -355,16 +358,6 @@ class GII_REST {
 			if ( isset( $in['declaration'] ) ) {
 				$c['declaration'] = (bool) $in['declaration'];
 			}
-			$did = true;
-		}
-		if ( 'gas' === $role && in_array( $st, array( 'submitted', 'gas_review' ), true ) && isset( $in['gasReport'] ) ) {
-			$g              = (array) $in['gasReport'];
-			$c['gasReport'] = array(
-				'inspector' => self::txt( $g['inspector'] ?? '', 100 ), 'visitDate' => self::digits( $g['visitDate'] ?? '' ),
-				'cause' => self::pick( $g['cause'] ?? '', self::CAUSES ), 'afterMeter' => self::pick( $g['afterMeter'] ?? '', array( 'after', 'before' ) ),
-				'appliance' => self::pick( $g['appliance'] ?? '', array( 'standard', 'nonstandard', 'unknown' ) ),
-				'opinion' => self::pick( $g['opinion'] ?? '', array( 'covered', 'needs_review', 'not_covered' ) ), 'notes' => self::area( $g['notes'] ?? '' ),
-			);
 			$did = true;
 		}
 		if ( 'insurer' === $role && in_array( $st, array( 'insurer_review', 'objection' ), true ) && isset( $in['assessment'] ) ) {
@@ -403,7 +396,8 @@ class GII_REST {
 			$c['payment']['amount'] = $c['payment']['amount'] ?? GII_WF::payable_of( $c, GII_Store::settings() );
 		}
 		try {
-			$c = GII_WF::apply_action( $c, $id, GII_Store::actor(), $note );
+			// ارسال به بیمه‌گر فقط با تأیید صریح کارشناس گاز که علت «گاز» در گزارش آتش‌نشانی یا کارشناس قید شده است
+			$c = GII_WF::apply_action( $c, $id, GII_Store::actor(), $note, null, array( 'causeConfirmed' => ! empty( $req['causeConfirmed'] ) ) );
 		} catch ( GII_WF_Error $e ) {
 			return self::err( $e->getMessage() );
 		}
@@ -569,7 +563,7 @@ class GII_REST {
 			$d = GII_WF::doc_type( $target );
 			return $d && 'subscriber' === $d['uploader'] && GII_WF::doc_visible( $c, $target );
 		}
-		return 'gas' === $role && 'gas_report' === $target && in_array( $c['status'], array( 'submitted', 'gas_review', 'insurer_query' ), true );
+		return false;
 	}
 	private static function target_of( $c, $fid ) {
 		if ( in_array( $fid, (array) $c['photos'], true ) ) return 'photos';
