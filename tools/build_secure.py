@@ -3,6 +3,8 @@
 یک فایل HTML تکی می‌سازد که:
   - کل برنامه (کد، سبک، فونت‌ها) داخلش با AES-256-GCM رمز شده؛ کلید با PBKDF2-SHA256 از رمز ساخته می‌شود.
   - بدون رمز چیزی از برنامه دیده یا خوانده نمی‌شود؛ رمزگشایی با WebCrypto خود مرورگر و بدون اینترنت.
+    اگر WebCrypto در دسترس نباشد (فایل باز شده از پیام‌رسان یا مدیر فایل اندروید، مرورگر قدیمی)
+    همان رمزگشایی با کد جاوااسکریپت داخل صفحه انجام می‌شود.
   - تاریخ انقضا دارد و پس از آن اجرا نمی‌شود.
   - روی همه صفحه‌ها واترمارک «نسخه نمایشی محرمانه» (و نام گیرنده) دارد.
   - کد فشرده و درهم (terser) است و هیچ نشانی بیرونی (GitHub، Google Fonts و...) در آن نیست.
@@ -16,7 +18,6 @@
 import argparse
 import base64
 import datetime as dt
-import gzip
 import json
 import os
 import subprocess
@@ -69,7 +70,7 @@ def build(password, days, name, terser, out, logo, org):
     payload = json.dumps({"js": js, "css": css, "exp": int(exp.timestamp() * 1000), "name": name}, ensure_ascii=False).encode()
     salt, iv = os.urandom(16), os.urandom(12)
     key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITERATIONS).derive(password.encode())
-    blob = AESGCM(key).encrypt(iv, gzip.compress(payload, 9), None)
+    blob = AESGCM(key).encrypt(iv, payload, None)
     enc = {"s": base64.b64encode(salt).decode(), "i": base64.b64encode(iv).decode(), "n": ITERATIONS, "d": base64.b64encode(blob).decode(), "e": int(exp.timestamp() * 1000)}
 
     logo_uri = logo_data_url(logo) if logo else ""
@@ -101,6 +102,7 @@ TEMPLATE = r"""<!doctype html>
   .card button.alt { background: #f26b21; }
   .card button:disabled { opacity: .6; }
   .err { color: #d9443a !important; font-weight: 700; min-height: 1.4em; }
+  .nojs { background: #fff4e5; border: 1.5px solid #f2a65a; border-radius: 12px; padding: 10px; color: #8a4b0f !important; font-weight: 700; }
   .tag { display: inline-block; background: #fdf0e2; color: #b45a12; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin: 0 auto; }
   #wm { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; opacity: .11; background-repeat: repeat; }
   @media print { body * { display: none !important; } body::after { content: "چاپ این نسخه مجاز نیست."; display: block; padding: 40px; color: #000; } }
@@ -112,8 +114,9 @@ TEMPLATE = r"""<!doctype html>
   <span class="tag">نسخه نمایشی محرمانه</span>
   <h1>سامانه بیمه حوادث مشترکین گاز</h1>
   <p>این فایل رمزگذاری شده است. رمز را از فرستنده بگیرید.</p>
-  <input id="pw" type="password" autocomplete="off" placeholder="رمز" aria-label="رمز">
-  <button id="go">باز کردن</button>
+  <p class="nojs" id="nojs">این پیش‌نمایش برنامه اجرا نمی‌کند. فایل را ذخیره کنید و با مرورگر <b>کروم</b> یا <b>سافاری</b> باز کنید.<br>(در تلگرام/واتس‌اپ: «ذخیره در دانلودها» یا «باز کردن با…» ← Chrome)</p>
+  <input id="pw" type="password" autocomplete="off" placeholder="رمز" aria-label="رمز" disabled>
+  <button id="go" disabled>باز کردن</button>
   <p class="err" id="err"></p>
   <p id="exp"></p>
 </div></div>
@@ -121,30 +124,156 @@ TEMPLATE = r"""<!doctype html>
 (function () {
   var ENC = __ENC__;
   var $ = function (id) { return document.getElementById(id); };
+  $('nojs').style.display = 'none';
+  $('pw').disabled = false; $('go').disabled = false;
   var fa = function (d) { try { return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { dateStyle: 'long' }).format(d); } catch (e) { return d.toLocaleDateString(); } };
   $('exp').textContent = 'اعتبار این نسخه تا ' + fa(new Date(ENC.e));
-  var b64 = function (s) { return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); };
+  var b64 = function (s) { var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; };
+  var enc = function (s) { var u = unescape(encodeURIComponent(s)), a = new Uint8Array(u.length); for (var i = 0; i < u.length; i++) a[i] = u.charCodeAt(i); return a; };
+  var dec = function (a) {
+    if (window.TextDecoder) return new TextDecoder().decode(a);
+    var s = ''; for (var i = 0; i < a.length; i += 8192) s += String.fromCharCode.apply(null, a.subarray(i, i + 8192));
+    return decodeURIComponent(escape(s));
+  };
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   document.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && /^[supSUP]$/.test(e.key)) e.preventDefault(); });
 
-  async function unlock() {
+  // ---- رمزگشایی با WebCrypto ----
+  function viaWebCrypto(pw) {
+    var S = crypto.subtle;
+    return S.importKey('raw', enc(pw), 'PBKDF2', false, ['deriveKey']).then(function (base) {
+      return S.deriveKey({ name: 'PBKDF2', salt: b64(ENC.s), iterations: ENC.n, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    }).then(function (key) {
+      return S.decrypt({ name: 'AES-GCM', iv: b64(ENC.i) }, key, b64(ENC.d)).then(function (b) { return new Uint8Array(b); }, function () { throw new Error('pw'); });
+    });
+  }
+
+  // ---- رمزگشایی بدون WebCrypto: SHA-256، PBKDF2 و AES-256-CTR (بخش رمز GCM) ----
+  var K256 = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+  var IV0 = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  var Wb = new Uint32Array(64);
+  function compress(h, m) { // h: وضعیت ۸ کلمه‌ای، m: ۱۶ کلمه
+    var w = Wb, i, t1, t2, x, y;
+    for (i = 0; i < 16; i++) w[i] = m[i];
+    for (i = 16; i < 64; i++) {
+      x = w[i - 15]; y = w[i - 2];
+      w[i] = (((x >>> 7 | x << 25) ^ (x >>> 18 | x << 14) ^ (x >>> 3)) + w[i - 7] + ((y >>> 17 | y << 15) ^ (y >>> 19 | y << 13) ^ (y >>> 10)) + w[i - 16]) | 0;
+    }
+    var a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], k = h[7];
+    for (i = 0; i < 64; i++) {
+      t1 = (k + ((e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7)) + ((e & f) ^ (~e & g)) + K256[i] + w[i]) | 0;
+      t2 = (((a >>> 2 | a << 30) ^ (a >>> 13 | a << 19) ^ (a >>> 22 | a << 10)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      k = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    h[0] = (h[0] + a) | 0; h[1] = (h[1] + b) | 0; h[2] = (h[2] + c) | 0; h[3] = (h[3] + d) | 0;
+    h[4] = (h[4] + e) | 0; h[5] = (h[5] + f) | 0; h[6] = (h[6] + g) | 0; h[7] = (h[7] + k) | 0;
+  }
+  function sha256(bytes) {
+    var n = bytes.length, len = ((n + 9 + 63) >> 6) << 6, p = new Uint8Array(len), h = IV0.slice(), m = new Int32Array(16), i, j;
+    p.set(bytes); p[n] = 0x80;
+    var bits = n * 8; p[len - 4] = bits >>> 24; p[len - 3] = bits >>> 16; p[len - 2] = bits >>> 8; p[len - 1] = bits; p[len - 5] = Math.floor(bits / 4294967296);
+    for (i = 0; i < len; i += 64) { for (j = 0; j < 16; j++) m[j] = p[i + j * 4] << 24 | p[i + j * 4 + 1] << 16 | p[i + j * 4 + 2] << 8 | p[i + j * 4 + 3]; compress(h, m); }
+    return h;
+  }
+  var words2bytes = function (h) { var o = new Uint8Array(h.length * 4); for (var i = 0; i < h.length; i++) { o[i * 4] = h[i] >>> 24; o[i * 4 + 1] = h[i] >>> 16; o[i * 4 + 2] = h[i] >>> 8; o[i * 4 + 3] = h[i]; } return o; };
+  // PBKDF2-HMAC-SHA256 برای ۳۲ بایت (یک بلوک)؛ تکه‌تکه تا صفحه قفل نشود
+  function pbkdf2(pw, salt, iters, done) {
+    var key = pw.length > 64 ? words2bytes(sha256(pw)) : pw, ip = new Uint8Array(64), op = new Uint8Array(64), i;
+    for (i = 0; i < 64; i++) { ip[i] = (key[i] || 0) ^ 0x36; op[i] = (key[i] || 0) ^ 0x5c; }
+    var istate = IV0.slice(), ostate = IV0.slice(), m = new Int32Array(16);
+    var load = function (b) { for (var j = 0; j < 16; j++) m[j] = b[j * 4] << 24 | b[j * 4 + 1] << 16 | b[j * 4 + 2] << 8 | b[j * 4 + 3]; };
+    load(ip); compress(istate, m); load(op); compress(ostate, m);
+    var hmac = function (msg) { var inner = sha256Cont(istate, msg); return sha256Cont(ostate, words2bytes(inner)); };
+    var first = new Uint8Array(salt.length + 4); first.set(salt); first[salt.length + 3] = 1;
+    var u = hmac(first), t = u.slice(), blk = new Int32Array(16), h = new Int32Array(8), count = 1;
+    function step() {
+      var stop = Math.min(iters, count + 4000);
+      for (; count < stop; count++) {
+        // HMAC روی ۳۲ بایت: یک فشرده‌سازی داخلی و یک بیرونی
+        for (var j = 0; j < 8; j++) blk[j] = u[j]; blk[8] = 0x80000000; for (j = 9; j < 15; j++) blk[j] = 0; blk[15] = (64 + 32) * 8;
+        for (j = 0; j < 8; j++) h[j] = istate[j]; compress(h, blk);
+        for (j = 0; j < 8; j++) blk[j] = h[j];
+        for (j = 0; j < 8; j++) h[j] = ostate[j]; compress(h, blk);
+        for (j = 0; j < 8; j++) { u[j] = h[j]; t[j] ^= h[j]; }
+      }
+      if (count < iters) { $('go').textContent = 'در حال باز کردن… ' + Math.round(count / iters * 100) + '٪'; setTimeout(step, 0); }
+      else done(words2bytes(t));
+    }
+    step();
+  }
+  function sha256Cont(state, msg) { // ادامه هش پس از یک بلوک ۶۴ بایتی
+    var n = msg.length, len = ((n + 9 + 63) >> 6) << 6, p = new Uint8Array(len), h = Array.prototype.slice.call(state), m = new Int32Array(16), i, j;
+    p.set(msg); p[n] = 0x80; var bits = (n + 64) * 8; p[len - 4] = bits >>> 24; p[len - 3] = bits >>> 16; p[len - 2] = bits >>> 8; p[len - 1] = bits;
+    for (i = 0; i < len; i += 64) { for (j = 0; j < 16; j++) m[j] = p[i + j * 4] << 24 | p[i + j * 4 + 1] << 16 | p[i + j * 4 + 2] << 8 | p[i + j * 4 + 3]; compress(h, m); }
+    return h;
+  }
+  // AES-256 (فقط رمزکردن بلوک، برای حالت CTR)
+  var SB = new Uint8Array(256), T0 = new Uint32Array(256), T1 = new Uint32Array(256), T2 = new Uint32Array(256), T3 = new Uint32Array(256);
+  (function () {
+    var mul = function (a, b) { var r = 0; while (b) { if (b & 1) r ^= a; a = a & 0x80 ? (a << 1) ^ 0x11b : a << 1; b >>= 1; } return r; };
+    var rot = function (v, n) { return ((v << n) | (v >> (8 - n))) & 255; };
+    for (var x = 0; x < 256; x++) {
+      var inv = 0; if (x) for (var y = 1; y < 256; y++) if (mul(x, y) === 1) { inv = y; break; }
+      var s = inv ^ rot(inv, 1) ^ rot(inv, 2) ^ rot(inv, 3) ^ rot(inv, 4) ^ 0x63;
+      SB[x] = s;
+      var v = (mul(s, 2) << 24 | s << 16 | s << 8 | mul(s, 3)) >>> 0;
+      T0[x] = v; T1[x] = v << 24 | v >>> 8; T2[x] = v << 16 | v >>> 16; T3[x] = v << 8 | v >>> 24;
+    }
+  })();
+  function expandKey(k) {
+    var w = new Uint32Array(60), i, t, rc = 1;
+    for (i = 0; i < 8; i++) w[i] = k[i * 4] << 24 | k[i * 4 + 1] << 16 | k[i * 4 + 2] << 8 | k[i * 4 + 3];
+    for (i = 8; i < 60; i++) {
+      t = w[i - 1];
+      if (i % 8 === 0) { t = SB[t >>> 16 & 255] << 24 | SB[t >>> 8 & 255] << 16 | SB[t & 255] << 8 | SB[t >>> 24]; t ^= rc << 24; rc = rc << 1 ^ (rc & 0x80 ? 0x11b : 0); }
+      else if (i % 8 === 4) t = SB[t >>> 24] << 24 | SB[t >>> 16 & 255] << 16 | SB[t >>> 8 & 255] << 8 | SB[t & 255];
+      w[i] = w[i - 8] ^ t;
+    }
+    return w;
+  }
+  function encBlock(w, b, o) {
+    var s0 = b[0] ^ w[0], s1 = b[1] ^ w[1], s2 = b[2] ^ w[2], s3 = b[3] ^ w[3], t0, t1, t2, t3, r, k = 4;
+    for (r = 1; r < 14; r++, k += 4) {
+      t0 = T0[s0 >>> 24] ^ T1[s1 >>> 16 & 255] ^ T2[s2 >>> 8 & 255] ^ T3[s3 & 255] ^ w[k];
+      t1 = T0[s1 >>> 24] ^ T1[s2 >>> 16 & 255] ^ T2[s3 >>> 8 & 255] ^ T3[s0 & 255] ^ w[k + 1];
+      t2 = T0[s2 >>> 24] ^ T1[s3 >>> 16 & 255] ^ T2[s0 >>> 8 & 255] ^ T3[s1 & 255] ^ w[k + 2];
+      t3 = T0[s3 >>> 24] ^ T1[s0 >>> 16 & 255] ^ T2[s1 >>> 8 & 255] ^ T3[s2 & 255] ^ w[k + 3];
+      s0 = t0; s1 = t1; s2 = t2; s3 = t3;
+    }
+    o[0] = (SB[s0 >>> 24] << 24 | SB[s1 >>> 16 & 255] << 16 | SB[s2 >>> 8 & 255] << 8 | SB[s3 & 255]) ^ w[k];
+    o[1] = (SB[s1 >>> 24] << 24 | SB[s2 >>> 16 & 255] << 16 | SB[s3 >>> 8 & 255] << 8 | SB[s0 & 255]) ^ w[k + 1];
+    o[2] = (SB[s2 >>> 24] << 24 | SB[s3 >>> 16 & 255] << 16 | SB[s0 >>> 8 & 255] << 8 | SB[s1 & 255]) ^ w[k + 2];
+    o[3] = (SB[s3 >>> 24] << 24 | SB[s0 >>> 16 & 255] << 16 | SB[s1 >>> 8 & 255] << 8 | SB[s2 & 255]) ^ w[k + 3];
+  }
+  function ctrDecrypt(key, iv, data) { // GCM: شمارنده از IV||2 شروع می‌شود؛ ۱۶ بایت آخر برچسب است
+    var w = expandKey(key), n = data.length - 16, out = new Uint8Array(n), ctr = new Uint32Array(4), ks = new Uint32Array(4), i, j, c = 2;
+    ctr[0] = iv[0] << 24 | iv[1] << 16 | iv[2] << 8 | iv[3]; ctr[1] = iv[4] << 24 | iv[5] << 16 | iv[6] << 8 | iv[7]; ctr[2] = iv[8] << 24 | iv[9] << 16 | iv[10] << 8 | iv[11];
+    for (i = 0; i < n; i += 16, c++) {
+      ctr[3] = c; encBlock(w, ctr, ks);
+      for (j = 0; j < 16 && i + j < n; j++) out[i + j] = data[i + j] ^ (ks[j >> 2] >>> (24 - (j & 3) * 8));
+    }
+    return out;
+  }
+  function viaJs(pw) {
+    return new Promise(function (res) {
+      setTimeout(function () { pbkdf2(enc(pw), b64(ENC.s), ENC.n, function (key) { res(ctrDecrypt(key, b64(ENC.i), b64(ENC.d))); }); }, 30);
+    });
+  }
+  window.__giiSelfTest = function () { return { sha: Array.prototype.map.call(words2bytes(sha256(enc('abc'))), function (b) { return (b + 256).toString(16).slice(1); }).join('') }; };
+
+  function unlock() {
     var pw = $('pw').value; if (!pw) return;
     $('go').disabled = true; $('err').textContent = ''; $('go').textContent = 'در حال باز کردن…';
-    try {
-      if (!window.crypto || !crypto.subtle || !window.DecompressionStream) throw new Error('old');
-      var base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveKey']);
-      var key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(ENC.s), iterations: ENC.n, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-      var plain;
-      try { plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(ENC.i) }, key, b64(ENC.d)); }
-      catch (e) { throw new Error('pw'); }
-      var text = await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
-      var P = JSON.parse(text);
+    var hasWC = false; try { hasWC = !!(window.crypto && crypto.subtle && window.isSecureContext !== false); } catch (e) {}
+    (hasWC ? viaWebCrypto(pw).catch(function (e) { if (e.message === 'pw') throw e; return viaJs(pw); }) : viaJs(pw)).then(function (plain) {
+      var P; try { P = JSON.parse(dec(plain)); } catch (e) { throw new Error('pw'); }
+      if (!P || !P.js) throw new Error('pw');
       if (Date.now() > P.exp) throw new Error('exp');
       choose(P);
-    } catch (e) {
-      $('err').textContent = e.message === 'pw' ? 'رمز نادرست است.' : e.message === 'exp' ? 'اعتبار این نسخه تمام شده است.' : e.message === 'old' ? 'این مرورگر قدیمی است؛ با کروم یا سافاری جدید باز کنید.' : 'باز کردن ممکن نشد.';
+    }).catch(function (e) {
+      $('err').textContent = e.message === 'pw' ? 'رمز نادرست است.' : e.message === 'exp' ? 'اعتبار این نسخه تمام شده است.' : 'باز کردن ممکن نشد. فایل را با مرورگر کروم یا سافاری باز کنید.';
       $('go').disabled = false; $('go').textContent = 'باز کردن';
-    }
+    });
   }
   function choose(P) {
     $('lock').querySelector('.card').innerHTML = '<span class="tag">نسخه نمایشی محرمانه</span><h1>کدام نسخه نمایش داده شود؟</h1>'
