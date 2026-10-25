@@ -56,6 +56,18 @@ def fonts_css():
     return css
 
 
+def norm_password(pw):
+    """فاصله، خط تیره و نویسه‌های نامرئی نادیده؛ رقم فارسی/عربی = رقم لاتین؛ حروف بزرگ و کوچک یکسان.
+    همین کار در صفحه قفل هم انجام می‌شود تا رمز تایپ‌شده با صفحه‌کلید فارسی یا کپی‌شده با فاصله هم کار کند."""
+    out = ""
+    for ch in pw:
+        o = ord(ch)
+        if 0x6F0 <= o <= 0x6F9: ch = str(o - 0x6F0)
+        elif 0x660 <= o <= 0x669: ch = str(o - 0x660)
+        if ch.isascii() and ch.isalnum(): out += ch.upper()
+    return out
+
+
 def build(password, days, name, terser, out, logo, org):
     js = bundle_js(logo, org)
     # در نسخه رمزدار پیوند به نسخه دیگر و سرویس‌ورکر لازم نیست (نشانی‌ای هم لو نمی‌رود)
@@ -69,7 +81,7 @@ def build(password, days, name, terser, out, logo, org):
     exp = dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=days)
     payload = json.dumps({"js": js, "css": css, "exp": int(exp.timestamp() * 1000), "name": name}, ensure_ascii=False).encode()
     salt, iv = os.urandom(16), os.urandom(12)
-    key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITERATIONS).derive(password.encode())
+    key = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=ITERATIONS).derive(norm_password(password).encode())
     blob = AESGCM(key).encrypt(iv, payload, None)
     enc = {"s": base64.b64encode(salt).decode(), "i": base64.b64encode(iv).decode(), "n": ITERATIONS, "d": base64.b64encode(blob).decode(), "e": int(exp.timestamp() * 1000)}
 
@@ -99,6 +111,7 @@ TEMPLATE = r"""<!doctype html>
   .card input { font: inherit; font-size: 16px; padding: 12px; border-radius: 12px; border: 1.5px solid #d5dee7; text-align: center; direction: ltr; }
   .card input:focus { outline: none; border-color: #3a8cc3; }
   .card button { font: inherit; font-weight: 700; font-size: 15px; padding: 12px; border-radius: 14px; border: 0; background: #3a8cc3; color: #fff; cursor: pointer; }
+  .card button.link { background: none; color: #3a8cc3; padding: 0; font-size: 13px; font-weight: 400; }
   .card button.alt { background: #f26b21; }
   .card button:disabled { opacity: .6; }
   .err { color: #d9443a !important; font-weight: 700; min-height: 1.4em; }
@@ -115,7 +128,8 @@ TEMPLATE = r"""<!doctype html>
   <h1>سامانه بیمه حوادث مشترکین گاز</h1>
   <p>این فایل رمزگذاری شده است. رمز را از فرستنده بگیرید.</p>
   <p class="nojs" id="nojs">این پیش‌نمایش برنامه اجرا نمی‌کند. فایل را ذخیره کنید و با مرورگر <b>کروم</b> یا <b>سافاری</b> باز کنید.<br>(در تلگرام/واتس‌اپ: «ذخیره در دانلودها» یا «باز کردن با…» ← Chrome)</p>
-  <input id="pw" type="password" autocomplete="off" placeholder="رمز" aria-label="رمز" disabled>
+  <input id="pw" type="password" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="latin" placeholder="رمز" aria-label="رمز" disabled>
+  <button type="button" class="link" id="show">نمایش رمز</button>
   <button id="go" disabled>باز کردن</button>
   <p class="err" id="err"></p>
   <p id="exp"></p>
@@ -261,8 +275,15 @@ TEMPLATE = r"""<!doctype html>
   }
   window.__giiSelfTest = function () { return { sha: Array.prototype.map.call(words2bytes(sha256(enc('abc'))), function (b) { return (b + 256).toString(16).slice(1); }).join('') }; };
 
+  // مانند norm_password در سازنده
+  function normPw(v) {
+    return v.replace(/[\u06F0-\u06F9]/g, function (d) { return String(d.charCodeAt(0) - 0x6F0); })
+      .replace(/[\u0660-\u0669]/g, function (d) { return String(d.charCodeAt(0) - 0x660); })
+      .replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  }
+  $('show').onclick = function () { var i = $('pw'); i.type = i.type === 'password' ? 'text' : 'password'; $('show').textContent = i.type === 'password' ? 'نمایش رمز' : 'پنهان کردن رمز'; };
   function unlock() {
-    var pw = $('pw').value; if (!pw) return;
+    var pw = normPw($('pw').value); if (!pw) return;
     $('go').disabled = true; $('err').textContent = ''; $('go').textContent = 'در حال باز کردن…';
     var hasWC = false; try { hasWC = !!(window.crypto && crypto.subtle && window.isSecureContext !== false); } catch (e) {}
     (hasWC ? viaWebCrypto(pw).catch(function (e) { if (e.message === 'pw') throw e; return viaJs(pw); }) : viaJs(pw)).then(function (plain) {
@@ -271,7 +292,7 @@ TEMPLATE = r"""<!doctype html>
       if (Date.now() > P.exp) throw new Error('exp');
       choose(P);
     }).catch(function (e) {
-      $('err').textContent = e.message === 'pw' ? 'رمز نادرست است.' : e.message === 'exp' ? 'اعتبار این نسخه تمام شده است.' : 'باز کردن ممکن نشد. فایل را با مرورگر کروم یا سافاری باز کنید.';
+      $('err').textContent = e.message === 'pw' ? 'رمز نادرست است. با «نمایش رمز» آن را با رمزی که گرفته‌اید مقایسه کنید (حروف انگلیسی).' : e.message === 'exp' ? 'اعتبار این نسخه تمام شده است.' : 'باز کردن ممکن نشد. فایل را با مرورگر کروم یا سافاری باز کنید.';
       $('go').disabled = false; $('go').textContent = 'باز کردن';
     });
   }
