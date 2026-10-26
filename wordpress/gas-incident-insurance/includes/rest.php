@@ -629,10 +629,23 @@ class GII_REST {
 		$in    = (array) $req->get_json_params();
 		$patch = array();
 		foreach ( GII_WF::DEFAULT_SETTINGS as $k => $v ) {
-			if ( ! array_key_exists( $k, $in ) ) continue;
+			if ( ! array_key_exists( $k, $in ) || is_array( $v ) ) continue;
 			$patch[ $k ] = is_int( $v ) ? self::int( $in[ $k ] ) : self::txt( GII_WF::normalize_digits( $in[ $k ] ), 100 );
 		}
 		if ( array_key_exists( 'orgName', $in ) ) $patch['orgName'] = self::txt( $in['orgName'], 120 );
+		if ( array_key_exists( 'fireOffers', $in ) ) {
+			$offers = array();
+			foreach ( array_slice( array_values( (array) $in['fireOffers'] ), 0, 3 ) as $o ) {
+				$o   = (array) $o;
+				$url = trim( (string) ( $o['url'] ?? '' ) );
+				if ( '' !== $url && ! preg_match( '#^https://[^\s"\'<>]+$#i', $url ) ) return self::err( 'نشانی خرید بیمه باید با https:// شروع شود.' );
+				$offers[] = array(
+					'insurer' => self::txt( $o['insurer'] ?? '', 80 ), 'plan' => self::txt( $o['plan'] ?? '', 80 ),
+					'price' => self::txt( $o['price'] ?? '', 80 ), 'cover' => self::txt( $o['cover'] ?? '', 240 ), 'url' => esc_url_raw( $url, array( 'https' ) ),
+				);
+			}
+			$patch['fireOffers'] = $offers;
+		}
 		if ( array_key_exists( 'logoDataUrl', $in ) ) {
 			$logo = (string) $in['logoDataUrl'];
 			if ( '' !== $logo && ( strlen( $logo ) > 700000 || ! preg_match( '#^data:image/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$#', $logo ) ) ) {

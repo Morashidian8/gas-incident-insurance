@@ -136,3 +136,29 @@ test('مدارک لازم بر اساس نوع خسارت', () => {
   assert.ok(ids().includes('cause_report'), 'گزارش علت برای همه انواع حادثه لازم است');
   assert.ok(!W.DOC_TYPES.some(d => d.uploader === 'gas'), 'مدرکی برای بارگذاری شرکت گاز نمانده');
 });
+
+test('گزارش ماهانه بر اساس نوع حادثه و ماه وقوع', () => {
+  const mk = (date, type, status = 'paid', forwarded = true) => ({ incident: { date, type }, createdAt: '2026-01-01T00:00:00Z', status, forwardedAt: forwarded ? 'x' : undefined });
+  const cs = [mk('1404/11/03', 'co'), mk('۱۴۰۴/۱۱/۲۰', 'co'), mk('1404/11/05', 'fire'), mk('1404/10/01', 'explosion'), mk('1405/01/02', 'leak'), mk('', 'fire', 'draft', false)];
+  const m = W.monthlyMatrix(cs, 1404);
+  assert.equal(m.rows[10].co, 2, 'دو مسمومیت در بهمن');
+  assert.equal(m.rows[10].fire, 1);
+  assert.equal(m.rows[9].explosion, 1);
+  assert.equal(m.all, 5, 'پرونده بی‌تاریخ هم در دی ۱۴۰۴ شمرده می‌شود');
+  assert.equal(W.filterReport(cs, { year: 1404, month: 11, type: 'co' }).length, 2);
+  // بدون تاریخ وقوع، ماه تشکیل پرونده (دی ۱۴۰۴) ملاک است
+  assert.deepEqual(W.incidentMonth(cs[5]), { y: 1404, m: 10 });
+  const L = W.liveStatus(cs);
+  assert.equal(L.total, 6);
+  assert.equal(L.referred, 5);
+  assert.equal(L.groups.find(g => g.id === 'paid').count, 5);
+  assert.equal(L.groups.reduce((a, g) => a + g.count, 0), 6, 'هر وضعیت دقیقاً در یک گروه');
+  assert.deepEqual(Object.keys(W.STATUS).sort(), W.LIVE_GROUPS.flatMap(g => g.statuses).sort());
+});
+
+test('CSV و نشانی خرید بیمه', () => {
+  assert.equal(W.toCsv([['a', 'b,c'], ['x"y', 1]]), 'a,"b,c"\r\n"x""y",1');
+  assert.equal(W.safeOfferUrl(' https://bimeh.example/fire?x=1 '), 'https://bimeh.example/fire?x=1');
+  for (const bad of ['http://a.ir', 'javascript:alert(1)', 'https://a.ir/"onmouseover', '']) assert.equal(W.safeOfferUrl(bad), '');
+  assert.equal(W.DEFAULT_SETTINGS.fireOffers.length, 3);
+});

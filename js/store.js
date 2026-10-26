@@ -1,10 +1,10 @@
 // ذخیره‌سازی محلی نسخه نمایشی: داده‌ها در localStorage و فایل‌ها در IndexedDB.
 // در نسخه عملیاتی این لایه با API سرور جایگزین می‌شود (docs/DESIGN.md بخش معماری).
-import { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId } from './workflow.js';
+import { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId, computePayable } from './workflow.js';
 
 const KEY = 'gii.db.v1';
 // با تغییر ساختار داده نمایشی بالا می‌رود تا مرورگرهای قبلی داده نمونه تازه بگیرند
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 let db = null;
 
 export function uid(p = 'id') { return p + '-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
@@ -287,8 +287,86 @@ export async function seed() {
   notify({ toUser: users[0].id, text: `برای پرونده ${c1.code} نقص اعلام شد. لطفاً اصلاح و دوباره ارسال کنید.`, claimId: c1.id });
   notify({ toUser: users[1].id, text: `مبلغ خسارت پرونده ${c2.code} تعیین شد. لطفاً بررسی و تأیید کنید.`, claimId: c2.id });
   notify({ toRole: 'insurer', text: `پرونده ${db.claims[4].code} از شرکت گاز دریافت شد.`, claimId: db.claims[4].id });
+  await archive();
   sendSms(users[2].mobile, `مشترک گرامی، پرونده خسارت گاز شما تشکیل شد. نام کاربری: ${users[2].username} — رمز موقت: ۱۲۳۴۵۶`);
   void admin; void now;
+
+  // پرونده‌های بایگانی و جاری بیشتر (بدون فایل) تا گزارش ماهانه و داشبورد وضعیت داده واقعی‌نما داشته باشد.
+  // همین فرمول در wordpress/.../includes/seed.php تکرار شده است.
+  async function archive() {
+    for (const a of archiveSpecs()) {
+      const u = await mk({ role: 'subscriber', username: a.subNo, name: a.name, nationalId: nid(a.b9) || nid(a.b9.slice(0, 8) + '1'), subscriptionNo: a.subNo, mobile: a.mobile, address: a.address }, a.pw);
+      const c = await claim(u, { age: a.age, status: a.status, incident: { ...a.incident, causeReportDate: jalaliString(daysAgo(a.age + 1)) }, damage: a.damage, steps: a.steps, extra: { submitCount: 1 } });
+      if (a.assessment) c.assessment = { ...a.assessment, at: daysAgo(a.assessAgo).toISOString(), visitDate: jalaliString(daysAgo(a.assessAgo + 3)) };
+      if (a.status === 'payment' || a.status === 'paid') c.acceptedAt = daysAgo(a.acceptAgo).toISOString();
+      if (a.status === 'paid') {
+        const amount = computePayable(c.assessment.items, db.settings).payable;
+        c.payment = { ref: a.ref, date: jalaliString(daysAgo(a.payAgo)), amount };
+        c.finance = { stage: 'bank',
+          review: { reviewer: 'واحد مالی بیمه‌گر', shebaMatch: true, note: '', at: daysAgo(a.payAgo + 5).toISOString(), by: ins.name },
+          voucher: { voucherNo: a.voucher, date: jalaliString(daysAgo(a.payAgo + 3)), amount, at: daysAgo(a.payAgo + 3).toISOString(), by: ins.name },
+          bank: { method: 'paya', ref: 'P-' + a.ref.slice(-8), date: jalaliString(daysAgo(a.payAgo + 1)), at: daysAgo(a.payAgo + 1).toISOString(), by: ins.name } };
+        c.paidAt = daysAgo(a.payAgo).toISOString();
+      }
+    }
+  }
   save();
   return db;
 }
+
+// مشخصات قطعی پرونده‌های بایگانی؛ ترتیب و فرمول‌ها با GII_Seed::archive_specs در وردپرس یکی است
+export function archiveSpecs() {
+  const FIRST = ['امیر', 'نرگس', 'حسین', 'لیلا', 'مهدی', 'سمیرا', 'بهرام', 'الهام', 'کاوه', 'شیما', 'داوود', 'مینا', 'پرویز', 'نازنین'];
+  const LAST = ['صادقی', 'حیدری', 'رحیمی', 'اکبری', 'قاسمی', 'یزدانی', 'عباسی', 'نظری', 'فرهادی', 'شریفی', 'بهرامی', 'کاظمی'];
+  const AREAS = ['تهران، پونک', 'تهران، سعادت‌آباد', 'کرج، مهرشهر', 'تهران، هفت‌حوض', 'اسلامشهر، خیابان امام', 'تهران، شهرک غرب', 'ورامین، بلوار بسیج', 'تهران، جنت‌آباد'];
+  const TYPES = ['fire', 'co', 'explosion', 'fire', 'co', 'fire', 'explosion', 'co', 'leak', 'fire'];
+  const DESC = {
+    fire: 'آتش‌سوزی ناشی از نشت گاز از اتصالات اجاق یا بخاری',
+    explosion: 'انفجار ناشی از تجمع گاز طبیعی در فضای بسته',
+    co: 'مسمومیت با مونوکسید کربن به علت نقص دودکش وسیله گازسوز',
+    leak: 'نشت گاز از لوله‌کشی داخلی و آسیب به تأسیسات',
+  };
+  // روزهای پس از تشکیل پرونده برای هر مرحله
+  const STEP = { submit: [1, 'ارسال پرونده به شرکت گاز', 'subscriber'], gas_start: [2, 'شروع بررسی', 'gas'], gas_forward: [4, 'تأیید و ارسال به بیمه‌گر', 'gas'],
+    ins_start: [6, 'پذیرش و شروع ارزیابی', 'insurer'], ins_query: [9, 'درخواست مدارک تکمیلی', 'insurer'], ins_assess: [14, 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer'],
+    object: [16, 'اعتراض به مبلغ', 'subscriber'], accept: [16, 'قبول مبلغ و درخواست پرداخت', 'subscriber'], ins_reject: [12, 'رد پرونده', 'insurer'], ins_pay: [26, 'ثبت واریز', 'insurer'] };
+  const PATH = {
+    sent_insurer: ['submit', 'gas_start', 'gas_forward'],
+    insurer_review: ['submit', 'gas_start', 'gas_forward', 'ins_start'],
+    insurer_query: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_query'],
+    assessed: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess'],
+    objection: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'object'],
+    payment: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'accept'],
+    paid: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'accept', 'ins_pay'],
+    rejected: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_reject'],
+  };
+  const out = [];
+  for (let i = 0; i < 40; i++) {
+    const age = 16 + i * 8;
+    const status = age > 120 ? (i % 9 === 4 ? 'rejected' : 'paid')
+      : age > 75 ? ['paid', 'payment', 'paid', 'assessed'][i % 4]
+      : age > 45 ? ['insurer_review', 'payment', 'assessed', 'insurer_query', 'paid'][i % 5]
+      : ['sent_insurer', 'insurer_review', 'objection', 'sent_insurer'][i % 4];
+    const type = TYPES[i % TYPES.length];
+    const amount = 60000000 + ((i * 37) % 20) * 15000000;
+    const name = FIRST[i % FIRST.length] + ' ' + LAST[(i * 5) % LAST.length];
+    const damage = type === 'co'
+      ? { kinds: ['medical'], items: [], injured: [{ name, nationalId: '', relation: 'خود مشترک', hospital: 'بیمارستان لقمان', amount }] }
+      : { kinds: ['property'], items: [{ title: type === 'explosion' ? 'در، پنجره و شیشه‌ها' : 'لوازم و تأسیسات آسیب‌دیده', qty: 1, amount }] };
+    const steps = PATH[status].map(a => [a, STEP[a][1], STEP[a][2], age - STEP[a][0], a === 'ins_reject' ? 'علت حادثه در گزارش، گاز طبیعی نیست.' : a === 'object' ? 'مبلغ کمتر از برآورد فاکتورهاست.' : '']);
+    const assessed = PATH[status].includes('ins_assess');
+    const approved = Math.round(amount * (0.8 + (i % 3) * 0.05) / 100000) * 100000;
+    out.push({
+      age, status, name, pw: 'arch-' + (7300 + i) + '-x',
+      subNo: String(1100000000 + i * 7919), b9: String(110000000 + i * 104729).slice(0, 9), mobile: '0912' + String(4000000 + i * 1237).slice(0, 7),
+      address: AREAS[i % AREAS.length] + '، پلاک ' + (i + 3),
+      incident: { type, description: DESC[type], causeIssuer: type === 'co' ? 'expert' : 'fire', causeReportNo: String(30000 + i * 211), causeReportDate: null, causeStatesGas: true },
+      damage, steps,
+      assessment: assessed ? { adjuster: ['مهندس نادر شریفی', 'مهندس پریسا امینی'][i % 2], note: '', items: [{ category: type === 'co' ? 'medical' : 'property', title: type === 'co' ? 'هزینه درمان' : damage.items[0].title, claimed: amount, approved }] } : null,
+      assessAgo: age - STEP.ins_assess[0], acceptAgo: age - STEP.accept[0], payAgo: age - STEP.ins_pay[0],
+      ref: '1404' + String(10000000 + i * 7331), voucher: 'H-' + (age > 220 ? '1404' : '1405') + '-' + String(100 + i).padStart(6, '0'),
+    });
+  }
+  return out;
+}
+

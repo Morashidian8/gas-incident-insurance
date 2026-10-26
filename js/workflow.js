@@ -79,7 +79,16 @@ export const DEFAULT_SETTINGS = {
   // لوگو و نام سازمان در صفحه ورود و نوار بالا؛ مدیر در تنظیمات بارگذاری می‌کند
   orgName: '',
   logoDataUrl: '',
+  // سه طرح بیمه آتش‌سوزی که در صفحه ورود پیشنهاد می‌شود؛ نام، نرخ و نشانی خرید را مدیر وارد می‌کند
+  fireOffers: [
+    { insurer: 'بیمه‌گر الف (نمونه)', plan: 'طرح پایه آتش‌سوزی منزل', price: '۱٬۲۰۰٬۰۰۰ تومان در سال', cover: 'آتش‌سوزی، انفجار و صاعقه — سرمایه تا ۵۰۰ میلیون تومان', url: '' },
+    { insurer: 'بیمه‌گر ب (نمونه)', plan: 'طرح متوسط', price: '۲٬۴۰۰٬۰۰۰ تومان در سال', cover: 'طرح پایه + ترکیدگی لوله، زلزله و سیل — سرمایه تا ۱ میلیارد تومان', url: '' },
+    { insurer: 'بیمه‌گر ج (نمونه)', plan: 'طرح جامع', price: '۴٬۵۰۰٬۰۰۰ تومان در سال', cover: 'طرح متوسط + سرقت با شکست حفاظ و مسئولیت در برابر همسایگان — سرمایه تا ۲ میلیارد تومان', url: '' },
+  ],
 };
+export const FIRE_OFFER_FIELDS = { insurer: 'نام بیمه‌گر', plan: 'عنوان طرح', price: 'نرخ / حق بیمه', cover: 'پوشش‌ها', url: 'نشانی خرید (https://…)' };
+// فقط نشانی https پذیرفته می‌شود تا پیوند صفحه ورود به جای ناامن یا اسکریپت نرود
+export function safeOfferUrl(u) { return /^https:\/\/[^\s"'<>]+$/i.test(String(u || '').trim()) ? String(u).trim() : ''; }
 
 export function hasKind(c, k) { return !!(c.damage && c.damage.kinds && c.damage.kinds.includes(k)); }
 
@@ -397,3 +406,58 @@ export function applyFinance(claim, step, data, actor, now = new Date()) {
   c.timeline.push({ at, by: actor.name, role: actor.role, action: step, label: f.label, note });
   return c;
 }
+
+// ---------- گزارش‌ها ----------
+export const MONTHS = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+// دسته‌های گزارش: سه نوع اصلی و «سایر» برای نشت گاز
+export const REPORT_TYPES = { fire: 'آتش‌سوزی', explosion: 'انفجار', co: 'مسمومیت (گازگرفتگی)', leak: 'سایر (نشت گاز)' };
+// ماه حادثه بر اساس تاریخ وقوع؛ اگر تاریخ وقوع هنوز وارد نشده، تاریخ تشکیل پرونده
+export function incidentMonth(c) {
+  const d = parseJalali(c.incident && c.incident.date);
+  const { jy, jm } = toJalali(d || c.createdAt);
+  return { y: jy, m: jm };
+}
+// جدول ماه × نوع حادثه برای یک سال: rows[m-1][type] و جمع‌ها
+export function monthlyMatrix(claims, year) {
+  const rows = MONTHS.map(() => Object.fromEntries(Object.keys(REPORT_TYPES).map(t => [t, 0])));
+  const totals = Object.fromEntries(Object.keys(REPORT_TYPES).map(t => [t, 0]));
+  let all = 0;
+  for (const c of claims) {
+    const { y, m } = incidentMonth(c);
+    const t = c.incident && REPORT_TYPES[c.incident.type] ? c.incident.type : 'leak';
+    if (y !== year) continue;
+    rows[m - 1][t]++; totals[t]++; all++;
+  }
+  return { rows, totals, all };
+}
+export function filterReport(claims, { year = null, month = null, type = null } = {}) {
+  return claims.filter(c => {
+    const { y, m } = incidentMonth(c);
+    const t = c.incident && REPORT_TYPES[c.incident.type] ? c.incident.type : 'leak';
+    return (!year || y === year) && (!month || m === month) && (!type || t === type);
+  });
+}
+// گروه‌های داشبورد وضعیت لحظه‌ای
+export const LIVE_GROUPS = [
+  { id: 'subscriber', label: 'نزد مشترک', sub: 'در حال تکمیل یا رفع نقص', statuses: ['draft', 'returned'], tone: 'neutral' },
+  { id: 'gas', label: 'در بررسی شرکت گاز', sub: 'ارسال‌شده توسط مشترک', statuses: ['submitted', 'gas_review'], tone: 'info' },
+  { id: 'referred', label: 'ارجاع به بیمه', sub: 'رسیده، هنوز بررسی شروع نشده', statuses: ['sent_insurer'], tone: 'violet' },
+  { id: 'insurer', label: 'در دست بررسی بیمه', sub: 'ارزیابی، استعلام یا اعتراض', statuses: ['insurer_review', 'insurer_query', 'objection'], tone: 'warn' },
+  { id: 'assessed', label: 'تعیین خسارت', sub: 'منتظر تأیید مشترک', statuses: ['assessed'], tone: 'accent' },
+  { id: 'payment', label: 'در انتظار پرداخت', sub: 'حواله و ارسال به بانک', statuses: ['payment'], tone: 'accent2' },
+  { id: 'paid', label: 'پرداخت‌شده توسط بیمه', sub: 'واریز به حساب مشترک', statuses: ['paid'], tone: 'ok' },
+  { id: 'rejected', label: 'رد شده', sub: 'خارج از پوشش', statuses: ['rejected'], tone: 'bad' },
+];
+export function liveStatus(claims) {
+  const groups = LIVE_GROUPS.map(g => ({ ...g, count: claims.filter(c => g.statuses.includes(c.status)).length }));
+  const referred = claims.filter(c => c.forwardedAt).length;
+  return { total: claims.length, referred, groups };
+}
+// متن CSV سازگار با اکسل (جداکننده کاما، نقل‌قول استاندارد؛ BOM را فراخواننده اضافه می‌کند)
+export function toCsv(rows) {
+  return rows.map(r => r.map(v => {
+    const s = v == null ? '' : String(v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }).join(',')).join('\r\n');
+}
+

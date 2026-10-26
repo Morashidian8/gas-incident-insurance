@@ -113,6 +113,9 @@ function render() {
   if (tab) { const y = window.scrollY; tab.scrollIntoView({ block: 'nearest', inline: 'center' }); window.scrollTo({ top: y }); }
 }
 
+// بازسازی صفحه بدون پرش به بالا (فیلترهای گزارش، تازه‌سازی خودکار)
+function renderKeep() { const y = window.scrollY; render(); window.scrollTo({ top: y }); }
+
 // اگر مدیر چیزی تنظیم نکرده باشد، مقدار پیش‌فرض نسخه ساخته‌شده (tools/build_single.py --logo) به کار می‌رود
 const brandSetting = k => (k in db.settings ? db.settings[k] : W.DEFAULT_SETTINGS[k]) || '';
 function logoHtml(size) {
@@ -154,10 +157,10 @@ function topbar() {
 function navItems() {
   const r = st.user.role;
   const unread = totalUnreadMsgs();
-  const homeViews = ['home', 'sections', 'sec', 'track', 'register', 'registered', 'review', 'users', 'settings', 'reports', 'sms'];
+  const homeViews = ['home', 'sections', 'sec', 'track', 'register', 'registered', 'review', 'users', 'settings', 'sms'];
   return [
     { id: 'home', label: 'خانه', ic: 'home', on: homeViews.includes(st.view) },
-    ...(r !== 'subscriber' ? [{ id: 'list', label: 'پرونده‌ها', ic: 'inbox', on: st.view === 'list', hideSm: true }] : []),
+    ...(r !== 'subscriber' ? [{ id: 'list', label: 'پرونده‌ها', ic: 'inbox', on: st.view === 'list', hideSm: true }, { id: 'reports', label: 'گزارش', ic: 'chart', on: st.view === 'reports' }] : []),
     { id: 'messenger', label: 'پیام‌رسان', ic: 'send', on: ['inbox', 'thread'].includes(st.view), dot: unread },
     { id: 'profile', label: 'پروفایل', ic: 'user', on: false },
   ];
@@ -301,6 +304,7 @@ function viewLogin() {
       <p>ثبت، تکمیل و پیگیری پرونده خسارت حوادث ناشی از گاز طبیعی؛ از مشترک تا شرکت گاز و بیمه‌گر.</p></div></div>
     <main class="page narrow login-card">
       ${loginForm()}
+      ${fireCta()}
       <div class="flow">
         <div>${icon('upload')}<b>مشترک</b>بارگذاری مدارک</div>
         <div>${icon('flame')}<b>شرکت گاز</b>بررسی و تأیید</div>
@@ -412,7 +416,7 @@ function viewLanding() {
         </ul>
         <div class="hero-cta"><a class="btn ember" href="#journey">${icon('history')} مسیر پرونده را ببینید</a>${OTHER_URL ? `<a class="btn ghost-light" href="${esc(OTHER_URL)}">${icon('sms')} اپ موبایل</a>` : ''}</div>
       </div>
-      <div class="hero-login"><div class="glass"><h2>ورود به سامانه</h2>${loginForm()}</div></div>
+      <div class="hero-login"><div class="glass"><h2>ورود به سامانه</h2>${loginForm()}</div>${fireCta()}</div>
     </div></section>
     <div class="band">${journeyHtml()}</div>
     <section id="docs" class="wrap sec">
@@ -873,6 +877,11 @@ function viewList() {
     <div id="claimList" style="display:flex;flex-direction:column;gap:10px">${listHtml()}</div>`;
 }
 
+function dashLink() {
+  const L = W.liveStatus(visibleClaims());
+  const paid = L.groups.find(g => g.id === 'paid').count;
+  return `<button class="dash-link" data-go="reports"><span class="dl-ic">${icon('chart')}</span><span class="dl-t"><b>گزارش‌ها و داشبورد لحظه‌ای</b><small>${fa(L.total)} پرونده · ${fa(L.referred)} ارجاع به بیمه · ${fa(paid)} پرداخت‌شده — گزارش ماهانه و خروجی Excel</small></span>${icon('chevL', 'chev')}</button>`;
+}
 function gasHome() {
   const n = s => db.claims.filter(c => s.includes(c.status)).length;
   const todo = db.claims.filter(c => W.waitingOn(c) === 'gas');
@@ -889,6 +898,7 @@ function gasHome() {
     ${tile({ go: 'list', p: { f: 'insurer' }, art: 'sendShield', a: 'var(--blue)', b: 'var(--green)', title: 'نزد بیمه‌گر', sub: 'ارزیابی و پرداخت', btn: 'ورود', count: n(['sent_insurer', 'insurer_review', 'assessed', 'objection', 'payment']) })}
     ${tile({ go: 'list', p: { f: 'closed' }, color: 'green', art: 'payment', a: 'var(--green)', b: 'var(--orange)', title: 'بایگانی', sub: 'پرداخت‌شده یا رد شده', btn: 'ورود', count: n(['paid', 'rejected']) })}
   </div></div>
+  ${dashLink()}
   <div class="section-label">آخرین تغییرات</div>
   <div style="display:flex;flex-direction:column;gap:10px">${recent.map(claimRow).join('')}</div>`;
 }
@@ -910,7 +920,8 @@ function insurerHome() {
     ${tile({ go: 'list', p: { f: 'wait' }, color: 'orange', art: 'timeline', a: 'var(--orange)', b: 'var(--blue)', title: 'منتظر تأیید مشترک', sub: 'مبلغ اعلام شده', btn: 'ورود', count: n(['assessed']) })}
     ${tile({ go: 'list', p: { f: 'pay' }, color: 'green', art: 'payment', a: 'var(--green)', b: 'var(--orange)', title: 'آماده پرداخت', sub: pending ? money(pending) : 'موردی نیست', btn: 'ورود', count: n(['payment']) })}
     ${tile({ go: 'list', p: { f: 'closed' }, art: 'docsCheck', a: 'var(--blue)', b: 'var(--green)', title: 'بایگانی', sub: 'پرداخت‌شده یا رد شده', btn: 'ورود', count: n(['paid', 'rejected']) })}
-  </div></div>`;
+  </div></div>
+  ${dashLink()}`;
 }
 
 // ---------- صفحه بررسی پرونده (کارکنان) ----------
@@ -1101,7 +1112,7 @@ function adminHome() {
   <div class="well"><div class="tiles t3">
     ${tile({ go: 'users', art: 'people', a: 'var(--blue)', b: 'var(--green)', title: 'کاربران', sub: 'کارکنان و مشترکین', btn: 'ورود', count: db.users.length })}
     ${tile({ go: 'settings', color: 'green', art: 'gear', a: 'var(--green)', b: 'var(--blue)', title: 'تنظیمات بیمه‌نامه', sub: 'سقف‌ها، فرانشیز، مهلت‌ها', btn: 'ورود' })}
-    ${tile({ go: 'reports', color: 'violet', art: 'chart', a: 'var(--violet)', b: 'var(--orange)', title: 'گزارش‌ها', sub: 'آمار وضعیت و عملکرد', btn: 'ورود' })}
+    ${tile({ go: 'reports', color: 'violet', art: 'chart', a: 'var(--violet)', b: 'var(--orange)', title: 'گزارش‌ها و داشبورد', sub: 'وضعیت لحظه‌ای، ماهانه و خروجی Excel', btn: 'ورود' })}
     ${tile({ go: 'list', p: { f: 'all' }, art: 'inbox', a: 'var(--blue)', b: 'var(--orange)', title: 'همه پرونده‌ها', sub: 'جستجو و مشاهده', btn: 'ورود', count: db.claims.length })}
     ${tile({ go: 'sms', color: 'orange', art: 'sms', a: 'var(--orange)', b: 'var(--blue)', title: 'پیامک‌ها', sub: 'گزارش پیامک‌های ارسالی', btn: 'ورود', count: db.sms.length })}
     ${!demoOn() ? '' : tile({ act: 'resetDemo', color: 'red', art: 'timeline', a: 'var(--red)', b: 'var(--orange)', title: 'بازنشانی نمایشی', sub: 'بازگشت به داده‌های نمونه', btn: 'بازنشانی' })}
@@ -1131,27 +1142,222 @@ function viewSettings() {
     <div class="grid2">${f('policyNo', 'شماره بیمه‌نامه')}${f('policyStart', 'شروع')}${f('policyEnd', 'پایان')}${f('deductiblePercent', 'فرانشیز خسارت مالی (٪)')}</div>
     <div class="grid2">${f('propertyCapRial', 'سقف خسارت مالی (ریال)')}${f('medicalCapRial', 'سقف هزینه درمان (ریال)')}${f('deathCapRial', 'سقف فوت هر نفر (ریال)')}${f('reportWindowDays', 'مهلت اعلام حادثه (روز)')}</div>
     <div class="grid2">${f('gasSlaDays', 'مهلت بررسی شرکت گاز (روز)')}${f('insurerSlaDays', 'مهلت بررسی بیمه‌گر (روز)')}${f('fixSlaDays', 'مهلت رفع نقص مشترک (روز)')}</div>
+    <div class="section-label">${icon('flame')} بیمه آتش‌سوزی در صفحه ورود</div>
+    <div class="note info">${icon('help')}<div>این سه طرح با دکمه «خرید بیمه آتش‌سوزی منزل» در صفحه ورود نمایش داده می‌شوند. با زدن هر طرح، سایت همان بیمه‌گر باز می‌شود. نشانی باید با <span dir="ltr">https://</span> شروع شود. برای پنهان کردن یک طرح، نام بیمه‌گر و عنوان آن را خالی بگذارید.</div></div>
+    ${[0, 1, 2].map(i => { const o = (Array.isArray(s.fireOffers) ? s.fireOffers : W.DEFAULT_SETTINGS.fireOffers)[i] || {};
+      return `<fieldset class="offer-set"><legend>طرح ${fa(i + 1)} — ${['پایه', 'متوسط', 'جامع'][i]}</legend><div class="grid2">${Object.entries(W.FIRE_OFFER_FIELDS).map(([k, l]) => `<label class="fld"><span>${l}</span><input name="fo${i}_${k}" class="${k === 'url' ? 'ltr' : ''}" value="${esc(o[k] || '')}" ${k === 'url' ? 'type="url" inputmode="url" placeholder="https://"' : ''}></label>`).join('')}</div></fieldset>`; }).join('')}
     <button class="btn green" type="submit">ذخیره تنظیمات</button></form>`;
 }
+// ---------- گزارش‌ها و داشبورد ----------
+// گاز و مدیر همه پرونده‌ها را می‌بینند؛ بیمه‌گر فقط پرونده‌های ارجاع‌شده را
+let liveAt = new Date();
+const claimedOf = c => (c.damage.items || []).reduce((x, i) => x + num(i.amount) * (num(i.qty) || 1), 0) + (c.damage.injured || []).reduce((x, i) => x + num(i.amount), 0);
+const approvedOf = c => c.assessment ? W.computePayable(c.assessment.items || [], db.settings, c.damage.deceased?.length || 0).payable : 0;
+const paidOf = c => c.status === 'paid' ? +(c.payment?.amount || 0) : 0;
+const repType = c => (W.REPORT_TYPES[c.incident.type] ? c.incident.type : 'leak');
+const stamp = () => W.jalaliString(new Date()).replace(/\//g, '-');
+
 function viewReports() {
-  const cs = db.claims;
+  const cs = visibleClaims();
+  const sub = st.user.role === 'insurer' ? 'پرونده‌های ارجاع‌شده به بیمه‌گر' : 'همه پرونده‌های سامانه';
+  return pageTitle('گزارش‌ها و داشبورد', sub) + liveBlock(cs) + monthlyBlock(cs) + perfBlock(cs);
+}
+function liveBlock(cs) {
+  const L = W.liveStatus(cs);
+  const by = id => L.groups.find(x => x.id === id).count;
+  const pct = n => (L.total ? Math.round((n * 100) / L.total) : 0);
+  const atInsurer = by('referred') + by('insurer');
+  const g = st.p.g || '';
+  const sel = W.LIVE_GROUPS.find(x => x.id === g);
+  const sum = `از ${fa(L.total)} پرونده، ${fa(L.referred)} پرونده به بیمه ارجاع شده است: ${fa(atInsurer)} در دست بررسی بیمه، ${fa(by('assessed'))} منتظر تأیید مبلغ توسط مشترک، ${fa(by('payment'))} در انتظار پرداخت و ${fa(by('paid'))} پرداخت‌شده${by('rejected') ? `؛ ${fa(by('rejected'))} پرونده رد شده است` : ''}.`;
+  const big = [['کل پرونده‌ها', L.total, 'inbox', ''], ['ارجاع‌شده به بیمه', L.referred, 'sendShield', 'violet'], ['در دست بررسی بیمه', atInsurer, 'clock', 'warn'], ['پرداخت‌شده توسط بیمه', by('paid'), 'money', 'ok']];
+  return `<section class="rep-card" id="rep-live">
+    <div class="rep-head"><div><h2>${icon('meter')} وضعیت لحظه‌ای پرونده‌ها</h2>
+      <p class="live-at"><span class="live-dot" aria-hidden="true"></span>به‌روز شده ساعت <span class="num">${fa(liveAt.toLocaleTimeString('en-GB'))}</span> · هر ۱۵ ثانیه خودکار</p></div>
+      <div class="rep-tools"><button class="btn sm ghost" data-act="repRefresh">${icon('refresh')} تازه‌سازی</button><button class="btn sm green" data-act="expLive">${icon('download')} خروجی Excel</button></div></div>
+    <div class="big-kpis">${big.map(([l, n, ic, tone]) => `<div class="bk ${tone}"><span class="ic">${icon(ic)}</span><span class="v num">${fa(n)}</span><span class="l">${l}</span>${L.total && l !== 'کل پرونده‌ها' ? `<span class="p num">${fa(pct(n))}٪ از کل</span>` : ''}</div>`).join('')}</div>
+    <p class="rep-sum">${sum}</p>
+    <div class="stack" role="img" aria-label="سهم هر وضعیت">${L.groups.filter(x => x.count).map(x => `<span class="seg t-${x.tone}" style="flex:${x.count}" title="${x.label}: ${fa(x.count)}"></span>`).join('')}</div>
+    <div class="live-grid">${L.groups.map(x => `<button class="lg t-${x.tone} ${g === x.id ? 'on' : ''}" data-act="rep" data-p='{"g":"${g === x.id ? '' : x.id}"}' aria-pressed="${g === x.id}">
+      <span class="sw"></span><span class="n num">${fa(x.count)}</span><span class="l">${x.label}</span><span class="s">${x.sub}</span><span class="p num">${fa(pct(x.count))}٪</span></button>`).join('')}</div>
+    ${sel ? claimTable(cs.filter(c => sel.statuses.includes(c.status)), `پرونده‌های «${sel.label}»`) : `<p class="hint-s">${icon('help')} روی هر وضعیت بزنید تا فهرست پرونده‌هایش را ببینید.</p>`}
+  </section>`;
+}
+const MTX_HEAD = { fire: 'آتش‌سوزی', explosion: 'انفجار', co: 'مسمومیت', leak: 'سایر' };
+function monthlyBlock(cs) {
+  const nowY = W.toJalali(new Date()).jy;
+  const years = [...new Set([nowY, ...cs.map(c => W.incidentMonth(c).y)])].sort((a, b) => b - a);
+  const y = +st.p.y || nowY, m = +st.p.m || 0, t = st.p.t || '';
+  const M = W.monthlyMatrix(cs, y);
+  const types = Object.entries(W.REPORT_TYPES);
+  const rowSum = r => Object.values(r).reduce((a, n) => a + n, 0);
+  const max = Math.max(1, ...M.rows.flatMap(r => Object.values(r)));
+  const cell = (mi, tk, n, heat = true) => `<button class="cell ${m === mi && t === tk ? 'on' : ''}" ${heat ? `style="--h:${(n / max).toFixed(2)}"` : ''} data-act="rep" data-p='{"m":${mi},"t":"${tk}"}' ${n ? '' : 'disabled'} aria-label="${mi ? W.MONTHS[mi - 1] : 'کل سال'} ${tk ? W.REPORT_TYPES[tk] : 'همه انواع'}: ${n}">${n ? fa(n) : '·'}</button>`;
+  const list = W.filterReport(cs, { year: y, month: m || null, type: t || null });
+  const label = `${t ? W.REPORT_TYPES[t] : 'همه حوادث'} — ${m ? W.MONTHS[m - 1] + ' ' : 'سال '}${fa(y)}`;
+  return `<section class="rep-card" id="rep-month">
+    <div class="rep-head"><div><h2>${icon('chart')} حوادث به تفکیک ماه و نوع</h2><p class="muted-s">بر اساس تاریخ وقوع حادثه</p></div>
+      <div class="rep-tools"><label class="sel"><span>سال</span><select data-rep="y">${years.map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${fa(v)}</option>`).join('')}</select></label>
+        <button class="btn sm green" data-act="expMonthly" data-y="${y}">${icon('download')} خروجی Excel جدول</button></div></div>
+    <div class="chips">${[['', 'همه انواع'], ...types].map(([k, l]) => `<button class="chip ${t === k ? 'on' : ''}" data-act="rep" data-p='{"t":"${k}"}'>${l} <span class="num">${fa(k ? M.totals[k] : M.all)}</span></button>`).join('')}</div>
+    <div class="tbl-wrap"><table class="mtx"><thead><tr><th>ماه</th>${types.map(([k, l]) => `<th title="${l}">${MTX_HEAD[k]}</th>`).join('')}<th>جمع</th></tr></thead>
+      <tbody>${M.rows.map((r, i) => `<tr class="${m === i + 1 ? 'on' : ''}"><th><button class="mname" data-act="rep" data-p='{"m":${i + 1},"t":""}'>${W.MONTHS[i]}</button></th>${types.map(([k]) => `<td>${cell(i + 1, k, r[k])}</td>`).join('')}<td class="tot">${cell(i + 1, '', rowSum(r), false)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><th><button class="mname" data-act="rep" data-p='{"m":0,"t":""}'>جمع سال</button></th>${types.map(([k]) => `<td>${cell(0, k, M.totals[k], false)}</td>`).join('')}<td class="tot">${cell(0, '', M.all, false)}</td></tr></tfoot></table></div>
+    <div class="sel-bar"><div><b>${esc(label)}</b><span class="num">${fa(list.length)} حادثه</span></div>
+      <div class="rep-tools"><button class="btn sm green" data-act="expDetail" ${list.length ? '' : 'disabled'}>${icon('download')} خروجی Excel با جزئیات</button><button class="btn sm ghost" data-act="printSel" ${list.length ? '' : 'disabled'}>${icon('print')} گزارش چاپی</button></div></div>
+    ${claimTable(list, '')}
+  </section>`;
+}
+function claimTable(list, title) {
+  const rows = list.slice().sort((a, b) => (b.incident.date || '').localeCompare(a.incident.date || ''));
+  if (!rows.length) return `<div class="empty">${illo('inbox')}<span>پرونده‌ای در این دسته نیست.</span></div>`;
+  const shown = rows.slice(0, 150);
+  return `${title ? `<h3 class="tbl-title">${esc(title)} <span class="num">(${fa(rows.length)})</span></h3>` : ''}<div class="tbl-wrap"><table class="ctbl"><thead><tr><th>کد پرونده</th><th>مشترک</th><th>تاریخ حادثه</th><th>نوع</th><th>وضعیت</th><th>ادعا (ریال)</th><th>پرداختی (ریال)</th><th></th></tr></thead><tbody>
+    ${shown.map(c => `<tr><td class="num" dir="ltr">${esc(c.code)}</td><td>${esc(userById(c.subscriberId)?.name || '')}</td><td class="num">${fa(c.incident.date || '—')}</td><td>${W.REPORT_TYPES[repType(c)]}</td><td>${badge(c)}</td><td class="num">${nf.format(claimedOf(c))}</td><td class="num">${paidOf(c) ? nf.format(paidOf(c)) : '—'}</td>
+      <td class="acts"><button class="btn sm ghost" data-act="claimReport" data-id="${c.id}" title="گزارش کامل پرونده">${icon('doc')} جزئیات</button><button class="btn sm ghost" data-go="review" data-p='{"id":"${c.id}"}' aria-label="باز کردن پرونده">${icon('chevL')}</button></td></tr>`).join('')}
+  </tbody></table></div>${rows.length > shown.length ? `<p class="hint-s">${fa(rows.length - shown.length)} پرونده دیگر در خروجی Excel آمده است.</p>` : ''}`;
+}
+function perfBlock(cs) {
   const counts = Object.keys(W.STATUS).map(k => [k, cs.filter(c => c.status === k).length]).filter(([, n]) => n);
   const max = Math.max(1, ...counts.map(([, n]) => n));
   const paid = cs.filter(c => c.status === 'paid');
   const avgDays = paid.length ? Math.round(paid.reduce((a, c) => a + W.daysBetween(c.createdAt, c.paidAt || c.statusAt), 0) / paid.length) : 0;
-  const claimed = cs.reduce((a, c) => a + (c.damage.items || []).reduce((x, i) => x + num(i.amount), 0) + (c.damage.injured || []).reduce((x, i) => x + num(i.amount), 0), 0);
   const overdue = cs.filter(c => W.slaInfo(c, db.settings)?.overdue).length;
   const returns = cs.reduce((a, c) => a + c.timeline.filter(t => t.action === 'gas_return').length, 0);
-  return pageTitle('گزارش‌ها') + `<div class="kpis">
-      <div class="kpi"><div class="l">کل پرونده‌ها</div><div class="v">${fa(cs.length)}</div></div>
-      <div class="kpi"><div class="l">میانگین تا پرداخت</div><div class="v">${fa(avgDays)} روز</div></div>
+  return `<section class="rep-card"><div class="rep-head"><div><h2>${icon('timeline')} عملکرد و مبالغ</h2></div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">میانگین تشکیل تا پرداخت</div><div class="v">${fa(avgDays)} روز</div></div>
       <div class="kpi"><div class="l">پرونده‌های دارای تأخیر</div><div class="v">${fa(overdue)}</div></div>
       <div class="kpi"><div class="l">دفعات اعلام نقص</div><div class="v">${fa(returns)}</div></div>
-      <div class="kpi"><div class="l">جمع ادعا</div><div class="v" style="font-size:17px">${money(claimed)}</div></div>
-      <div class="kpi"><div class="l">جمع پرداخت</div><div class="v" style="font-size:17px">${money(paid.reduce((a, c) => a + (c.payment?.amount || 0), 0))}</div></div>
+      <div class="kpi"><div class="l">جمع ادعا</div><div class="v" style="font-size:17px">${money(cs.reduce((a, c) => a + claimedOf(c), 0))}</div></div>
+      <div class="kpi"><div class="l">جمع پرداخت</div><div class="v" style="font-size:17px">${money(paid.reduce((a, c) => a + paidOf(c), 0))}</div></div>
     </div>
-    <div class="form"><b>پرونده‌ها بر اساس وضعیت</b><div class="stat-bars">${counts.map(([k, n]) => `<div class="sbar"><span>${W.STATUS[k].short}</span><span class="track"><span class="fill" style="width:${(n / max) * 100}%;display:block"></span></span><b class="num">${fa(n)}</b></div>`).join('')}</div></div>`;
+    <div class="stat-bars">${counts.map(([k, n]) => `<div class="sbar"><span>${W.STATUS[k].short}</span><span class="track"><span class="fill" style="width:${(n / max) * 100}%;display:block"></span></span><b class="num">${fa(n)}</b></div>`).join('')}</div></section>`;
 }
+
+// ---------- خروجی‌ها ----------
+// CSV با BOM تا اکسل حروف فارسی را درست نشان دهد؛ نام فایل لاتین، چون برخی مرورگرها نام فارسی را به «download» تبدیل می‌کنند
+function download(name, text, type = 'text/csv;charset=utf-8') {
+  const blob = new Blob([type.startsWith('text/csv') ? '﻿' + text : text], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('فایل ' + name + ' آماده شد.');
+}
+function exportLive() {
+  const cs = visibleClaims(); const L = W.liveStatus(cs);
+  const rows = [['گزارش وضعیت لحظه‌ای پرونده‌ها'], ['تاریخ و ساعت', W.jalaliString(new Date()) + ' ' + new Date().toLocaleTimeString('en-GB')], ['کل پرونده‌ها', L.total], ['ارجاع‌شده به بیمه (تجمعی)', L.referred], [],
+    ['وضعیت', 'شرح', 'تعداد', 'درصد از کل'], ...L.groups.map(g => [g.label, g.sub, g.count, L.total ? Math.round((g.count * 1000) / L.total) / 10 : 0]), [],
+    ['کد پرونده', 'مشترک', 'نوع حادثه', 'تاریخ حادثه', 'وضعیت', 'گروه', 'در انتظار اقدام', 'تاریخ آخرین تغییر', 'روز در وضعیت فعلی', 'ارجاع به بیمه', 'مبلغ ادعا', 'مبلغ پرداختی'],
+    ...cs.map(c => [c.code, userById(c.subscriberId)?.name || '', W.REPORT_TYPES[repType(c)], c.incident.date || '', W.STATUS[c.status].label, W.LIVE_GROUPS.find(g => g.statuses.includes(c.status))?.label || '',
+      W.waitingOn(c) ? W.ROLES[W.waitingOn(c)] : '—', c.statusAt ? W.jalaliString(c.statusAt) : '', c.statusAt ? W.daysBetween(c.statusAt, new Date()) : '', c.forwardedAt ? W.jalaliString(c.forwardedAt) : '', claimedOf(c), paidOf(c)])];
+  download(`claims-status-${stamp()}.csv`, W.toCsv(rows));
+}
+function exportMonthly(y) {
+  const M = W.monthlyMatrix(visibleClaims(), y); const types = Object.entries(W.REPORT_TYPES);
+  const rows = [[`حوادث سال ${y} به تفکیک ماه و نوع (بر اساس تاریخ وقوع)`], [], ['ماه', ...types.map(([, l]) => l), 'جمع'],
+    ...M.rows.map((r, i) => [W.MONTHS[i], ...types.map(([k]) => r[k]), Object.values(r).reduce((a, n) => a + n, 0)]),
+    ['جمع سال', ...types.map(([k]) => M.totals[k]), M.all]];
+  download(`incidents-monthly-${y}.csv`, W.toCsv(rows));
+}
+function reportSelection() {
+  const nowY = W.toJalali(new Date()).jy;
+  const y = +st.p.y || nowY, m = +st.p.m || 0, t = st.p.t || '';
+  return { y, m, t, list: W.filterReport(visibleClaims(), { year: y, month: m || null, type: t || null }),
+    label: `${t ? W.REPORT_TYPES[t] : 'همه حوادث'} — ${m ? W.MONTHS[m - 1] + ' ' : 'سال '}${y}` };
+}
+function detailRows(list) {
+  const fin = c => (c.status === 'paid' ? 'واریز شد' : c.finance?.stage ? (W.FIN_STAGES.find(f => f.id === c.finance.stage)?.short || '') : '');
+  return [['کد پرونده', 'نام مشترک', 'کد ملی', 'شماره اشتراک', 'موبایل', 'نوع حادثه', 'تاریخ حادثه', 'ساعت', 'نوع محل', 'نشانی محل حادثه', 'شرح حادثه',
+    'صادرکننده گزارش علت', 'شماره گزارش علت', 'تاریخ گزارش علت', 'قید گاز در گزارش', 'انواع خسارت', 'تعداد مصدوم', 'تعداد فوتی', 'مبلغ ادعا (ریال)',
+    'وضعیت', 'در انتظار اقدام', 'تاریخ تشکیل', 'تاریخ ارجاع به بیمه', 'تأییدکننده قید گاز', 'تعداد اعلام نقص', 'ارزیاب', 'مبلغ قابل پرداخت پس از فرانشیز (ریال)',
+    'مرحله مالی', 'شماره حواله', 'شماره پیگیری واریز', 'تاریخ واریز', 'مبلغ واریزی (ریال)', 'روز از تشکیل تا پرداخت'],
+  ...list.map(c => { const u = userById(c.subscriberId) || {}; const i = c.incident;
+    return [c.code, u.name || '', u.nationalId || '', u.subscriptionNo || '', u.mobile || '', W.REPORT_TYPES[repType(c)], i.date || '', i.time || '', W.PLACE_TYPES[i.placeType] || '', i.address || '', i.description || '',
+      W.CAUSE_ISSUERS[i.causeIssuer] || '', i.causeReportNo || '', i.causeReportDate || '', i.causeStatesGas ? 'بله' : 'خیر', (c.damage.kinds || []).map(k => W.DAMAGE_KINDS[k]).join('، '),
+      (c.damage.injured || []).length, (c.damage.deceased || []).length, claimedOf(c), W.STATUS[c.status].label, W.waitingOn(c) ? W.ROLES[W.waitingOn(c)] : '—',
+      W.jalaliString(c.createdAt), c.forwardedAt ? W.jalaliString(c.forwardedAt) : '', c.causeCheck?.by || '', c.timeline.filter(x => x.action === 'gas_return' || x.action === 'ins_query').length,
+      c.assessment?.adjuster || '', approvedOf(c) || '', fin(c), c.finance?.voucher?.voucherNo || '', c.payment?.ref || '', c.payment?.date || '', paidOf(c) || '',
+      c.status === 'paid' ? W.daysBetween(c.createdAt, c.paidAt || c.statusAt) : ''];
+  })];
+}
+
+// ---------- گزارش چاپی ----------
+// صفحه‌ای جدا روی همه برنامه؛ «چاپ» آن را به PDF یا کاغذ می‌برد و «دانلود» یک فایل HTML مستقل می‌دهد
+const RP_CSS = `.rp{font-family:Vazirmatn,Tahoma,sans-serif;color:#1c2733;direction:rtl;line-height:1.8;max-width:900px;margin:0 auto;padding:24px 18px}
+.rp h1{font-size:21px;margin:0}.rp h2{font-size:16px;margin:22px 0 8px;padding:6px 10px;background:#e7f1f9;border-radius:8px;color:#2b6f9e}
+.rp .hd{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:3px solid #3a8cc3;padding-bottom:10px}
+.rp .hd small{color:#6a7b8c}.rp table{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0}
+.rp th,.rp td{border:1px solid #cad8e4;padding:5px 8px;text-align:right;vertical-align:top}.rp th{background:#f3f6f9;font-weight:700;white-space:nowrap}
+.rp .kvt th{width:34%}.rp .ok{color:#1f9d57;font-weight:700}.rp .bad{color:#d9443a;font-weight:700}.rp .foot{margin-top:24px;color:#6a7b8c;font-size:12px;border-top:1px solid #cad8e4;padding-top:8px}
+.rp .num{font-variant-numeric:tabular-nums}`;
+function rpHead(title, sub) {
+  return `<div class="hd"><div><h1>${esc(title)}</h1><small>${esc(sub)}</small></div><small>${esc(brandSetting('orgName') || 'سامانه بیمه حوادث مشترکین گاز')}<br>تهیه: ${fdt(new Date().toISOString())}</small></div>`;
+}
+const kvT = rows => `<table class="kvt">${rows.filter(Boolean).map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>`;
+function claimReportHtml(c) {
+  const u = userById(c.subscriberId) || {}; const i = c.incident; const a = c.assessment; const f = c.finance || {};
+  const pay = a ? W.computePayable(a.items || [], db.settings, c.damage.deceased?.length || 0) : null;
+  const docs = W.visibleDocs(c).map(d => [d.title, (c.docs[d.id] || []).length ? `<span class="ok">${fa((c.docs[d.id] || []).length)} فایل</span>` : '<span class="bad">بارگذاری نشده</span>']);
+  return `${rpHead('گزارش کامل پرونده ' + c.code, W.STATUS[c.status].label)}
+  <h2>مشترک</h2>${kvT([['نام', esc(u.name || '')], ['کد ملی', fa(u.nationalId || '—')], ['شماره اشتراک', fa(u.subscriptionNo || '—')], ['موبایل', fa(u.mobile || '—')]])}
+  <h2>حادثه</h2>${kvT([['نوع حادثه', esc(W.INCIDENT_TYPES[i.type] || '—')], ['تاریخ و ساعت', `${fa(i.date || '—')} ${fa(i.time || '')}`], ['نوع محل', esc(W.PLACE_TYPES[i.placeType] || '—')], ['نشانی', esc(i.address || '—')], ['شرح', esc(i.description || '—')], i.policeReportNo ? ['گزارش کلانتری', fa(i.policeReportNo)] : null])}
+  <h2>گزارش علت حادثه</h2>${kvT([['صادرکننده', esc(W.CAUSE_ISSUERS[i.causeIssuer] || '—')], ['شماره و تاریخ', `${fa(i.causeReportNo || '—')} — ${fa(i.causeReportDate || '—')}`], ['قید «گاز» در گزارش', i.causeStatesGas ? '<span class="ok">بله</span>' : '<span class="bad">خیر</span>'], ['تأیید شرکت گاز', c.causeCheck ? `${esc(c.causeCheck.by)} — ${fdt(c.causeCheck.at)}` : '—']])}
+  <h2>خسارت اعلامی</h2>
+  ${(c.damage.items || []).length ? `<table><tr><th>شرح</th><th>تعداد</th><th>مبلغ (ریال)</th></tr>${c.damage.items.map(x => `<tr><td>${esc(x.title)}</td><td class="num">${fa(x.qty || 1)}</td><td class="num">${nf.format(num(x.amount))}</td></tr>`).join('')}</table>` : ''}
+  ${(c.damage.injured || []).length ? `<table><tr><th>مصدوم</th><th>نسبت</th><th>بیمارستان</th><th>هزینه درمان (ریال)</th></tr>${c.damage.injured.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(x.relation || '')}</td><td>${esc(x.hospital || '')}</td><td class="num">${nf.format(num(x.amount))}</td></tr>`).join('')}</table>` : ''}
+  ${(c.damage.deceased || []).length ? `<table><tr><th>متوفی</th><th>نسبت</th></tr>${c.damage.deceased.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(x.relation || '')}</td></tr>`).join('')}</table>` : ''}
+  ${kvT([['جمع ادعا', money(claimedOf(c))]])}
+  <h2>مدارک</h2><table>${docs.map(([t, v]) => `<tr><th>${esc(t)}</th><td>${v}</td></tr>`).join('')}<tr><th>عکس‌های محل</th><td>${fa(c.photos.length)} عکس</td></tr></table>
+  ${(c.deficiencies || []).length ? `<h2>نقص‌ها و استعلام‌ها</h2><table><tr><th>مورد</th><th>توضیح</th><th>پاسخ</th><th>وضعیت</th></tr>${c.deficiencies.map(d => `<tr><td>${esc(d.title || '')}</td><td>${esc(d.note)}</td><td>${esc(d.reply || '—')}</td><td>${d.status === 'open' ? '<span class="bad">باز</span>' : '<span class="ok">رفع شده</span>'}</td></tr>`).join('')}</table>` : ''}
+  ${a ? `<h2>ارزیابی بیمه‌گر</h2>${kvT([['ارزیاب', esc(a.adjuster || '')], ['تاریخ بازدید', fa(a.visitDate || '—')], a.note ? ['توضیح', esc(a.note)] : null])}
+    <table><tr><th>ردیف</th><th>ادعا (ریال)</th><th>تأییدشده (ریال)</th></tr>${(a.items || []).map(x => `<tr><td>${esc(x.title)}</td><td class="num">${nf.format(+x.claimed || 0)}</td><td class="num">${nf.format(+x.approved || 0)}</td></tr>`).join('')}</table>
+    ${kvT([['فرانشیز', money(pay.deductible)], ['قابل پرداخت', `<b>${money(pay.payable)}</b>`]])}` : ''}
+  ${f.review || c.payment ? `<h2>مراحل مالی</h2>${kvT([f.review ? ['بررسی مالی', `${esc(f.review.reviewer)} — ${fdate(f.review.at)}`] : null, f.voucher ? ['حواله', `${esc(f.voucher.voucherNo)} — ${fa(f.voucher.date)} — ${money(f.voucher.amount)}`] : null, f.bank ? ['دستور پرداخت', `${esc(W.TRANSFER_METHODS[f.bank.method]?.label || '')} — ${esc(f.bank.ref)} — ${fa(f.bank.date)}`] : null, c.status === 'paid' ? ['واریز', `<span class="ok">${money(c.payment.amount)}</span> — پیگیری ${fa(c.payment.ref)} — ${fa(c.payment.date)}`] : null])}` : ''}
+  <h2>تاریخچه</h2><table><tr><th>زمان</th><th>اقدام</th><th>توسط</th><th>توضیح</th></tr>${c.timeline.map(t => `<tr><td class="num">${fdt(t.at)}</td><td>${esc(t.label)}</td><td>${esc(t.by)}</td><td>${esc(t.note || '')}</td></tr>`).join('')}</table>
+  <p class="foot">این گزارش از سامانه بیمه حوادث مشترکین گاز تهیه شده و اطلاعات هویتی و بانکی مشترک را دارد؛ آن را محرمانه نگه دارید.</p>`;
+}
+function selectionReportHtml(sel) {
+  const types = Object.entries(W.REPORT_TYPES);
+  const by = k => sel.list.filter(c => repType(c) === k).length;
+  return `${rpHead('گزارش حوادث: ' + sel.label, `${fa(sel.list.length)} پرونده`)}
+  <h2>خلاصه</h2><table><tr>${types.map(([, l]) => `<th>${l}</th>`).join('')}<th>جمع</th><th>جمع ادعا</th><th>جمع پرداختی</th></tr><tr>${types.map(([k]) => `<td class="num">${fa(by(k))}</td>`).join('')}<td class="num">${fa(sel.list.length)}</td><td class="num">${money(sel.list.reduce((a, c) => a + claimedOf(c), 0))}</td><td class="num">${money(sel.list.reduce((a, c) => a + paidOf(c), 0))}</td></tr></table>
+  <h2>فهرست پرونده‌ها</h2><table><tr><th>کد</th><th>مشترک</th><th>تاریخ حادثه</th><th>نوع</th><th>وضعیت</th><th>ادعا</th><th>پرداختی</th></tr>
+  ${sel.list.map(c => `<tr><td class="num" dir="ltr">${esc(c.code)}</td><td>${esc(userById(c.subscriberId)?.name || '')}</td><td class="num">${fa(c.incident.date || '')}</td><td>${W.REPORT_TYPES[repType(c)]}</td><td>${W.STATUS[c.status].short}</td><td class="num">${nf.format(claimedOf(c))}</td><td class="num">${paidOf(c) ? nf.format(paidOf(c)) : '—'}</td></tr>`).join('')}</table>
+  <p class="foot">جزئیات کامل هر پرونده: دکمه «جزئیات» در فهرست، یا «خروجی Excel با جزئیات».</p>`;
+}
+function openPrintDoc(title, body, file) {
+  closePrintDoc();
+  const d = document.createElement('div');
+  d.id = 'printdoc'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.dataset.title = title; d.dataset.file = file;
+  d.innerHTML = `<div class="pd-bar"><button class="btn sm" data-act="pdPrint">${icon('print')} چاپ / ذخیره PDF</button><button class="btn sm ghost" data-act="pdSave">${icon('download')} دانلود فایل</button><button class="btn sm ghost" data-act="pdClose">${icon('x')} بستن</button></div><style>${RP_CSS}</style><div class="rp">${body}</div>`;
+  document.body.appendChild(d); document.body.classList.add('has-printdoc');
+  d.querySelector('button').focus();
+}
+function closePrintDoc() { $('#printdoc')?.remove(); document.body.classList.remove('has-printdoc'); }
+
+// ---------- بیمه آتش‌سوزی (پیشنهاد صفحه ورود) ----------
+const fireOffers = () => (Array.isArray(db.settings.fireOffers) ? db.settings.fireOffers : W.DEFAULT_SETTINGS.fireOffers).filter(o => o && (o.insurer || o.plan));
+function fireCta() {
+  const n = fireOffers().length;
+  if (!n) return '';
+  return `<button class="fire-cta" type="button" data-act="fireOffers"><span class="fc-ic">${icon('flame')}</span>
+    <span class="fc-t"><b>خرید بیمه آتش‌سوزی منزل</b><small>مقایسه ${fa(n)} طرح با نرخ‌های مختلف و خرید آنلاین</small></span>${icon('chevL', 'chev')}</button>`;
+}
+function fireSheet() {
+  const tiers = ['پایه', 'متوسط', 'جامع'];
+  openSheet(`<h2>بیمه آتش‌سوزی منزل</h2>
+    <p class="lead">بیمه حوادث مشترکین گاز فقط حوادث ناشی از گاز را پوشش می‌دهد. برای پوشش آتش‌سوزی با هر علتی، یکی از این طرح‌ها را انتخاب کنید؛ خرید در سایت خود بیمه‌گر انجام می‌شود.</p>
+    <div class="offers">${fireOffers().map((o, i) => {
+      const url = W.safeOfferUrl(o.url);
+      const inner = `<span class="of-tier">${tiers[i] || ''}</span><span class="of-ins">${icon('shield')} ${esc(o.insurer)}</span><span class="of-plan">${esc(o.plan)}</span>
+        <span class="of-price">${esc(o.price)}</span><span class="of-cover">${esc(o.cover)}</span><span class="of-go">${url ? `خرید از سایت بیمه‌گر ${icon('external')}` : 'نشانی خرید هنوز ثبت نشده'}</span>`;
+      return url ? `<a class="offer t${i}" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${inner}</a>` : `<button class="offer t${i} off" type="button" data-act="offerNoUrl">${inner}</button>`;
+    }).join('')}</div>
+    <p class="hint-s">${icon('help')} نرخ و شرایط را بیمه‌گر تعیین می‌کند؛ پیش از پرداخت، شرایط بیمه‌نامه را در سایت بیمه‌گر بخوانید.</p>`);
+}
+
 function viewSms() {
   // در وردپرس هر پیامک وضعیت ارسال دارد: logged (فقط ثبت)، sent (ارسال شد) یا failed (خطا)
   const st_ = s => !s.status ? '' : s.status === 'sent' ? '<span class="badge ok">ارسال شد</span>' : s.status === 'logged' ? '<span class="badge neutral">فقط ثبت</span>' : `<span class="badge bad" title="${esc(s.status)}">خطا در ارسال</span>`;
@@ -1161,8 +1367,8 @@ function viewSms() {
 
 const VIEWS = {
   subscriber: { home: subHome, sections: subSections, sec: subSection, track: subTrack, inbox: viewInbox, thread: viewThread },
-  gas: { home: gasHome, list: viewList, review: viewReview, register: viewRegister, registered: viewRegistered, inbox: viewInbox, thread: viewThread },
-  insurer: { home: insurerHome, list: viewList, review: viewReview, inbox: viewInbox, thread: viewThread },
+  gas: { home: gasHome, list: viewList, review: viewReview, register: viewRegister, registered: viewRegistered, reports: viewReports, inbox: viewInbox, thread: viewThread },
+  insurer: { home: insurerHome, list: viewList, review: viewReview, reports: viewReports, inbox: viewInbox, thread: viewThread },
   admin: { home: adminHome, list: viewList, review: viewReview, users: viewUsers, settings: viewSettings, reports: viewReports, sms: viewSms, inbox: viewInbox, thread: viewThread },
 };
 
@@ -1183,6 +1389,10 @@ function helpSheet() {
 function guideSheet() {
   openSheet(`<h2>مسیر پرونده</h2><p class="lead">از تشکیل پرونده تا دریافت خسارت</p>${journeyHtml(true)}`);
   startJourney();
+}
+function isDark() {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
 }
 function profileSheet() {
   const dark = isDark();
@@ -1244,6 +1454,24 @@ function setPath(obj, path, val) {
 // ================= رویدادها =================
 const ACTS = {
   forgot: () => forgotSheet('id'),
+  // گزارش‌ها
+  rep: a => { st.p = { ...st.p, ...JSON.parse(a.dataset.p) }; sset('gii.view', JSON.stringify({ view: st.view, p: st.p })); renderKeep(); },
+  repRefresh: async () => { await sync().catch(() => {}); liveAt = new Date(); renderKeep(); toast('داده‌ها تازه شد.'); },
+  expLive: () => exportLive(),
+  expMonthly: a => exportMonthly(+a.dataset.y),
+  expDetail: () => { const sel = reportSelection(); download(`claims-detail-${sel.y}${sel.m ? '-' + String(sel.m).padStart(2, '0') : ''}${sel.t ? '-' + sel.t : ''}.csv`, W.toCsv(detailRows(sel.list))); },
+  printSel: () => { const sel = reportSelection(); openPrintDoc('گزارش ' + sel.label, selectionReportHtml(sel), `incidents-${sel.y}${sel.m ? '-' + String(sel.m).padStart(2, '0') : ''}${sel.t ? '-' + sel.t : ''}`); },
+  claimReport: a => { const c = db.claims.find(x => x.id === a.dataset.id); if (c) openPrintDoc('پرونده ' + c.code, claimReportHtml(c), 'claim-' + c.code); },
+  pdPrint: () => window.print(),
+  pdSave: () => {
+    const d = $('#printdoc'); if (!d) return;
+    const html = `<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(d.dataset.title)}</title><style>body{margin:0;background:#fff}${RP_CSS}</style></head><body><div class="rp">${d.querySelector('.rp').innerHTML}</div></body></html>`;
+    download(d.dataset.file + '.html', html, 'text/html;charset=utf-8');
+  },
+  pdClose: () => closePrintDoc(),
+  // بیمه آتش‌سوزی
+  fireOffers: () => fireSheet(),
+  offerNoUrl: () => toast('نشانی خرید این طرح هنوز ثبت نشده است؛ مدیر سامانه آن را در «تنظیمات» وارد می‌کند.', true),
   otpResend: async () => {
     if (!rst) return forgotSheet('id');
     try { await sendOtp(rst.username, rst.mobile); forgotSheet('code'); toast('کد تازه ارسال شد.'); } catch (e) { forgotSheet('code', e.message); }
@@ -1473,8 +1701,13 @@ const FORMS = {
     const s = db.settings; const patch = {};
     if (f.orgName) patch.orgName = f.orgName.value.trim();
     for (const k of Object.keys(s)) {
-      if (k === 'orgName' || k === 'logoDataUrl' || !f[k]) continue;
+      if (k === 'orgName' || k === 'logoDataUrl' || k === 'fireOffers' || !f[k]) continue;
       patch[k] = typeof s[k] === 'number' ? num(f[k].value) : W.normalizeDigits(f[k].value).trim();
+    }
+    if (f.fo0_insurer) {
+      patch.fireOffers = [0, 1, 2].map(i => Object.fromEntries(Object.keys(W.FIRE_OFFER_FIELDS).map(k => [k, f[`fo${i}_${k}`].value.trim()])));
+      const bad = patch.fireOffers.find(o => o.url && !W.safeOfferUrl(o.url));
+      if (bad) return toast(`نشانی خرید «${bad.insurer || bad.plan}» باید با https:// شروع شود.`, true);
     }
     await run(() => B.saveSettings(patch), 'تنظیمات ذخیره شد.'); render();
   },
@@ -1520,6 +1753,7 @@ function wire() {
       if (n === 'profile') return profileSheet();
       if (n === 'messenger') return messengerSheet();
       if (n === 'list') { st.q = ''; return go('list', { f: 'all' }); }
+      if (n === 'reports') return go('reports');
       return go('home');
     }
     const g = e.target.closest('[data-go]');
@@ -1545,13 +1779,14 @@ function wire() {
       if (el.checked && k === 'death' && !c.damage.deceased.length) c.damage.deceased.push({ name: '', nationalId: '', relation: '' });
       saveClaim(c); render(); return;
     }
+    if (el.matches('[data-rep]')) { st.p = { ...st.p, [el.dataset.rep]: +el.value, m: 0 }; sset('gii.view', JSON.stringify({ view: st.view, p: st.p })); return renderKeep(); }
     if (el.matches('[data-bind]')) onBind(el);
   });
   document.addEventListener('input', e => {
     if (e.target.id === 'q') { st.q = e.target.value; const l = $('#claimList'); if (l) l.innerHTML = listHtml(); }
     if (e.target.id === 'uq') { st.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#uq'); n.focus(); n.setSelectionRange(pos, pos); }
   });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#printdoc')) closePrintDoc(); else closeSheet(); } });
 }
 
 // ================= راه‌اندازی =================
@@ -1569,6 +1804,11 @@ async function boot() {
   if (!st.user && location.hash) document.querySelector(location.hash)?.scrollIntoView();
   if (MODE === 'app' && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register(window.GII_WP?.sw || 'sw.js').catch(() => {});
   // در وردپرس دیگران هم پرونده را تغییر می‌دهند؛ هنگام بازگشت به صفحه و هر دقیقه داده تازه می‌شود
+  // داشبورد گزارش هر ۱۵ ثانیه تازه می‌شود (در وردپرس تغییرات کاربران دیگر هم دیده می‌شود)
+  setInterval(() => {
+    if (!st.user || st.view !== 'reports' || document.visibilityState !== 'visible' || $('#sheet') || $('#printdoc') || document.activeElement?.matches('select')) return;
+    sync().then(() => { liveAt = new Date(); if (st.view === 'reports') renderKeep(); }).catch(() => {});
+  }, 15000);
   if (B.kind === 'wp') {
     const idle = () => !$('#sheet') && !document.activeElement?.matches('input, textarea, select');
     const tick = () => { if (st.user && idle() && document.visibilityState === 'visible') sync().then(render).catch(() => {}); };

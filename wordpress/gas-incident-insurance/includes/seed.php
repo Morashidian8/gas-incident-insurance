@@ -1,6 +1,7 @@
 <?php
 /**
- * داده نمایشی؛ همان هفت پرونده نمونه js/store.js (نقص، منتظر تأیید، پیش‌نویس، ارسال‌شده، نزد بیمه‌گر، پرداخت‌شده، حواله صادرشده).
+ * داده نمایشی؛ همان هفت پرونده نمونه js/store.js (نقص، منتظر تأیید، پیش‌نویس، ارسال‌شده، نزد بیمه‌گر، پرداخت‌شده، حواله صادرشده)
+ * و چهل پرونده بایگانی بدون فایل برای گزارش ماهانه و داشبورد وضعیت.
  * فقط در «حالت نمایشی» ساخته یا بازنشانی می‌شود. همه اشخاص و مبالغ ساختگی‌اند.
  */
 defined( 'ABSPATH' ) || exit;
@@ -267,7 +268,97 @@ class GII_Seed {
 		GII_Store::notify( $users[0]->ID, null, "برای پرونده {$c1['code']} نقص اعلام شد. لطفاً اصلاح و دوباره ارسال کنید.", $c1['id'] );
 		GII_Store::notify( $users[1]->ID, null, "مبلغ خسارت پرونده {$c2['code']} تعیین شد. لطفاً بررسی و تأیید کنید.", $c2['id'] );
 		GII_Store::notify( null, 'insurer', "پرونده {$c5['code']} از شرکت گاز دریافت شد.", $c5['id'] );
+		self::archive();
 		GII_SMS::send( '09125556677', 'مشترک گرامی، پرونده خسارت گاز شما تشکیل شد. نام کاربری: 1067891234 — رمز موقت: ۱۲۳۴۵۶' );
 		return $admin;
+	}
+
+	/** پرونده‌های بایگانی؛ همان archiveSpecs در js/store.js */
+	public static function archive_specs() {
+		$first = array( 'امیر', 'نرگس', 'حسین', 'لیلا', 'مهدی', 'سمیرا', 'بهرام', 'الهام', 'کاوه', 'شیما', 'داوود', 'مینا', 'پرویز', 'نازنین' );
+		$last  = array( 'صادقی', 'حیدری', 'رحیمی', 'اکبری', 'قاسمی', 'یزدانی', 'عباسی', 'نظری', 'فرهادی', 'شریفی', 'بهرامی', 'کاظمی' );
+		$areas = array( 'تهران، پونک', 'تهران، سعادت‌آباد', 'کرج، مهرشهر', 'تهران، هفت‌حوض', 'اسلامشهر، خیابان امام', 'تهران، شهرک غرب', 'ورامین، بلوار بسیج', 'تهران، جنت‌آباد' );
+		$types = array( 'fire', 'co', 'explosion', 'fire', 'co', 'fire', 'explosion', 'co', 'leak', 'fire' );
+		$desc  = array(
+			'fire'      => 'آتش‌سوزی ناشی از نشت گاز از اتصالات اجاق یا بخاری',
+			'explosion' => 'انفجار ناشی از تجمع گاز طبیعی در فضای بسته',
+			'co'        => 'مسمومیت با مونوکسید کربن به علت نقص دودکش وسیله گازسوز',
+			'leak'      => 'نشت گاز از لوله‌کشی داخلی و آسیب به تأسیسات',
+		);
+		$step = array(
+			'submit' => array( 1, 'ارسال پرونده به شرکت گاز', 'subscriber' ), 'gas_start' => array( 2, 'شروع بررسی', 'gas' ), 'gas_forward' => array( 4, 'تأیید و ارسال به بیمه‌گر', 'gas' ),
+			'ins_start' => array( 6, 'پذیرش و شروع ارزیابی', 'insurer' ), 'ins_query' => array( 9, 'درخواست مدارک تکمیلی', 'insurer' ), 'ins_assess' => array( 14, 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer' ),
+			'object' => array( 16, 'اعتراض به مبلغ', 'subscriber' ), 'accept' => array( 16, 'قبول مبلغ و درخواست پرداخت', 'subscriber' ), 'ins_reject' => array( 12, 'رد پرونده', 'insurer' ), 'ins_pay' => array( 26, 'ثبت واریز', 'insurer' ),
+		);
+		$base = array( 'submit', 'gas_start', 'gas_forward' );
+		$path = array(
+			'sent_insurer'   => $base,
+			'insurer_review' => array_merge( $base, array( 'ins_start' ) ),
+			'insurer_query'  => array_merge( $base, array( 'ins_start', 'ins_query' ) ),
+			'assessed'       => array_merge( $base, array( 'ins_start', 'ins_assess' ) ),
+			'objection'      => array_merge( $base, array( 'ins_start', 'ins_assess', 'object' ) ),
+			'payment'        => array_merge( $base, array( 'ins_start', 'ins_assess', 'accept' ) ),
+			'paid'           => array_merge( $base, array( 'ins_start', 'ins_assess', 'accept', 'ins_pay' ) ),
+			'rejected'       => array_merge( $base, array( 'ins_start', 'ins_reject' ) ),
+		);
+		$out = array();
+		for ( $i = 0; $i < 40; $i++ ) {
+			$age = 16 + $i * 8;
+			if ( $age > 120 ) $status = 4 === $i % 9 ? 'rejected' : 'paid';
+			elseif ( $age > 75 ) $status = array( 'paid', 'payment', 'paid', 'assessed' )[ $i % 4 ];
+			elseif ( $age > 45 ) $status = array( 'insurer_review', 'payment', 'assessed', 'insurer_query', 'paid' )[ $i % 5 ];
+			else $status = array( 'sent_insurer', 'insurer_review', 'objection', 'sent_insurer' )[ $i % 4 ];
+			$type   = $types[ $i % count( $types ) ];
+			$amount = 60000000 + ( ( $i * 37 ) % 20 ) * 15000000;
+			$name   = $first[ $i % count( $first ) ] . ' ' . $last[ ( $i * 5 ) % count( $last ) ];
+			$damage = 'co' === $type
+				? array( 'kinds' => array( 'medical' ), 'items' => array(), 'injured' => array( array( 'name' => $name, 'nationalId' => '', 'relation' => 'خود مشترک', 'hospital' => 'بیمارستان لقمان', 'amount' => $amount ) ) )
+				: array( 'kinds' => array( 'property' ), 'items' => array( array( 'title' => 'explosion' === $type ? 'در، پنجره و شیشه‌ها' : 'لوازم و تأسیسات آسیب‌دیده', 'qty' => 1, 'amount' => $amount ) ) );
+			$steps = array();
+			foreach ( $path[ $status ] as $a ) {
+				$note    = 'ins_reject' === $a ? 'علت حادثه در گزارش، گاز طبیعی نیست.' : ( 'object' === $a ? 'مبلغ کمتر از برآورد فاکتورهاست.' : '' );
+				$steps[] = array( $a, $step[ $a ][1], $step[ $a ][2], $age - $step[ $a ][0], $note );
+			}
+			$assessed = in_array( 'ins_assess', $path[ $status ], true );
+			$approved = (int) ( round( $amount * ( 0.8 + ( $i % 3 ) * 0.05 ) / 100000 ) * 100000 );
+			$out[]    = array(
+				'age' => $age, 'status' => $status, 'name' => $name, 'pw' => 'arch-' . ( 7300 + $i ) . '-x',
+				'subNo' => (string) ( 1100000000 + $i * 7919 ), 'b9' => substr( (string) ( 110000000 + $i * 104729 ), 0, 9 ), 'mobile' => '0912' . substr( (string) ( 4000000 + $i * 1237 ), 0, 7 ),
+				'address' => $areas[ $i % count( $areas ) ] . '، پلاک ' . ( $i + 3 ),
+				'incident' => array( 'type' => $type, 'description' => $desc[ $type ], 'causeIssuer' => 'co' === $type ? 'expert' : 'fire', 'causeReportNo' => (string) ( 30000 + $i * 211 ), 'causeStatesGas' => true ),
+				'damage' => $damage, 'steps' => $steps,
+				'assessment' => $assessed ? array( 'adjuster' => array( 'مهندس نادر شریفی', 'مهندس پریسا امینی' )[ $i % 2 ], 'note' => '', 'items' => array( array( 'category' => 'co' === $type ? 'medical' : 'property', 'title' => 'co' === $type ? 'هزینه درمان' : $damage['items'][0]['title'], 'claimed' => $amount, 'approved' => $approved ) ) ) : null,
+				'assessAgo' => $age - $step['ins_assess'][0], 'acceptAgo' => $age - $step['accept'][0], 'payAgo' => $age - $step['ins_pay'][0],
+				'ref' => '1404' . ( 10000000 + $i * 7331 ), 'voucher' => 'H-' . ( $age > 220 ? '1404' : '1405' ) . '-' . str_pad( (string) ( 100 + $i ), 6, '0', STR_PAD_LEFT ),
+			);
+		}
+		return $out;
+	}
+
+	private static function archive() {
+		$ins = self::$ins->display_name;
+		foreach ( self::archive_specs() as $a ) {
+			$nid = self::nid( $a['b9'] ) ?: self::nid( substr( $a['b9'], 0, 8 ) . '1' );
+			$u   = self::user( $a['subNo'], $a['pw'], $a['name'], 'gii_subscriber', array( 'gii_national_id' => $nid, 'gii_subscription_no' => $a['subNo'], 'gii_mobile' => $a['mobile'], 'gii_address' => $a['address'] ) );
+			$c   = self::claim( $u, array(
+				'age' => $a['age'], 'status' => $a['status'], 'damage' => $a['damage'], 'steps' => $a['steps'], 'extra' => array( 'submitCount' => 1 ),
+				'incident' => array_merge( $a['incident'], array( 'causeReportDate' => self::jal( $a['age'] + 1 ) ) ),
+			) );
+			if ( $a['assessment'] ) $c['assessment'] = array_merge( $a['assessment'], array( 'at' => self::iso( $a['assessAgo'] ), 'visitDate' => self::jal( $a['assessAgo'] + 3 ) ) );
+			if ( in_array( $a['status'], array( 'payment', 'paid' ), true ) ) $c['acceptedAt'] = self::iso( $a['acceptAgo'] );
+			if ( 'paid' === $a['status'] ) {
+				$amount       = (int) GII_WF::compute_payable( $c['assessment']['items'], GII_Store::settings() )['payable'];
+				$p            = $a['payAgo'];
+				$c['payment'] = array( 'ref' => $a['ref'], 'date' => self::jal( $p ), 'amount' => $amount );
+				$c['finance'] = array(
+					'stage'   => 'bank',
+					'review'  => array( 'reviewer' => 'واحد مالی بیمه‌گر', 'shebaMatch' => true, 'note' => '', 'at' => self::iso( $p + 5 ), 'by' => $ins ),
+					'voucher' => array( 'voucherNo' => $a['voucher'], 'date' => self::jal( $p + 3 ), 'amount' => $amount, 'at' => self::iso( $p + 3 ), 'by' => $ins ),
+					'bank'    => array( 'method' => 'paya', 'ref' => 'P-' . substr( $a['ref'], -8 ), 'date' => self::jal( $p + 1 ), 'at' => self::iso( $p + 1 ), 'by' => $ins ),
+				);
+				$c['paidAt']  = self::iso( $p );
+			}
+			GII_Store::save_claim( $c );
+		}
 	}
 }

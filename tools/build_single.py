@@ -9,12 +9,26 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def module(path, ns, deps=""):
-    src = (ROOT / path).read_text(encoding="utf-8")
-    src = re.sub(r"^import .*?;\n", "", src, flags=re.M)
+# نام هر ماژول در بسته؛ importها از روی همین جدول به متغیرهای بسته تبدیل می‌شوند
+NS = {"./workflow.js": "W", "./store.js": "S", "./icons.js": "I", "./backend-local.js": "LOCAL", "./backend-wp.js": "WPB"}
+
+
+def imports_to_consts(src):
+    def conv(m):
+        what, frm = m.group(1).strip(), m.group(2)
+        if what.startswith("* as "):
+            alias = what[5:].strip()
+            # همان نام بسته است؛ متغیر جدا لازم نیست (const W = W خطا می‌دهد)
+            return "" if alias == NS[frm] else f"const {alias} = {NS[frm]};\n"
+        return f"const {what} = {NS[frm]};\n"
+    return re.sub(r"^import (.*?) from '(.*?)';\n", conv, src, flags=re.M)
+
+
+def module(path, ns):
+    src = imports_to_consts((ROOT / path).read_text(encoding="utf-8"))
     names = re.findall(r"^export (?:async )?(?:function|const|let) (\w+)", src, flags=re.M)
     src = re.sub(r"^export ", "", src, flags=re.M)
-    return f"const {ns} = (() => {{\n{deps}{src}\nreturn {{ {', '.join(names)} }};\n}})();\n"
+    return f"const {ns} = (() => {{\n{src}\nreturn {{ {', '.join(names)} }};\n}})();\n"
 
 
 def logo_data_url(path):
@@ -46,13 +60,12 @@ def bundle_js(logo=None, org=""):
         # لوگو و نام سازمان به‌عنوان پیش‌فرض نسخه ساخته‌شده قرار می‌گیرد
         wf = wf.replace("logoDataUrl: '',", f"logoDataUrl: '{logo_data_url(logo)}',", 1)
         wf = wf.replace("orgName: '',", f"orgName: {org!r},", 1)
-    store = module("js/store.js", "S", "const { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId } = W;\n")
+    store = module("js/store.js", "S")
     icons = module("js/icons.js", "I")
     local = module("js/backend-local.js", "LOCAL")
     wpb = module("js/backend-wp.js", "WPB")
-    app = (ROOT / "js/app.js").read_text(encoding="utf-8")
-    app = re.sub(r"^import .*?;\n", "", app, flags=re.M)
-    return wf + store + icons + local + wpb + "{\nconst { icon, illo, brandMark } = I;\n" + app + "\n}\n"
+    app = imports_to_consts((ROOT / "js/app.js").read_text(encoding="utf-8"))
+    return wf + store + icons + local + wpb + "{\n" + app + "\n}\n"
 
 
 def build(logo=None, org=""):
