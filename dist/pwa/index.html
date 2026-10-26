@@ -849,6 +849,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ctbl td.acts { display: flex; gap: 6px; justify-content: flex-end; }
 .ctbl tbody tr:hover { background: var(--canvas); }
 .tbl-title { font-size: 14.5px; margin: 0; }
+.mtx.one th small { display: block; font-weight: 400; font-size: 10.5px; color: var(--muted); }
+.mtx.one td.num { font-variant-numeric: tabular-nums; }
+.mtx .mname:disabled { color: var(--muted); cursor: default; font-weight: 400; }
 @media (max-width: 760px) {
   .big-kpis, .live-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bk .v { font-size: 25px; }
@@ -3458,6 +3461,25 @@ function liveBlock(cs) {
     ${sel ? claimTable(cs.filter(c => sel.statuses.includes(c.status)), `پرونده‌های «${sel.label}»`) : `<p class="hint-s">${icon('help')} روی هر وضعیت بزنید تا فهرست پرونده‌هایش را ببینید.</p>`}
   </section>`;
 }
+// جدول یک نوع حادثه: هر ماه با تعداد و مبالغ؛ زدن هر ماه فهرست و جزئیات همان ماه را می‌آورد
+function typeRows(cs, y, t) {
+  return W.MONTHS.map((_, i) => {
+    const l = W.filterReport(cs, { year: y, month: i + 1, type: t });
+    return { n: l.length, claimed: l.reduce((a, c) => a + claimedOf(c), 0), paid: l.reduce((a, c) => a + paidOf(c), 0), done: l.filter(c => c.status === 'paid').length };
+  });
+}
+function typeTable(cs, y, m, t) {
+  const rows = typeRows(cs, y, t);
+  const tot = rows.reduce((a, r) => ({ n: a.n + r.n, claimed: a.claimed + r.claimed, paid: a.paid + r.paid, done: a.done + r.done }), { n: 0, claimed: 0, paid: 0, done: 0 });
+  const max = Math.max(1, ...rows.map(r => r.n));
+  const mil = v => (v ? fa((v / 1e7).toLocaleString('en-US', { maximumFractionDigits: 1 })).replace('.', '٫') : '—'); // میلیون تومان
+  return `<div class="tbl-wrap"><table class="mtx one"><thead><tr><th>ماه</th><th>${W.REPORT_TYPES[t]}</th><th>پرداخت‌شده</th><th>ادعا<small>میلیون تومان</small></th><th>پرداختی<small>میلیون تومان</small></th></tr></thead>
+    <tbody>${rows.map((r, i) => `<tr class="${m === i + 1 ? 'on' : ''}"><th><button class="mname" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${W.MONTHS[i]}</button></th>
+      <td><button class="cell ${m === i + 1 ? 'on' : ''}" style="--h:${(r.n / max).toFixed(2)}" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${r.n ? fa(r.n) : '·'}</button></td>
+      <td class="num">${r.n ? fa(r.done) : '·'}</td><td class="num">${mil(r.claimed)}</td><td class="num">${mil(r.paid)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><th><button class="mname" data-act="rep" data-p='{"m":0}'>جمع سال</button></th><td><button class="cell ${!m ? 'on' : ''}" data-act="rep" data-p='{"m":0}'>${fa(tot.n)}</button></td><td class="num">${fa(tot.done)}</td><td class="num">${mil(tot.claimed)}</td><td class="num">${mil(tot.paid)}</td></tr></tfoot></table></div>
+    <p class="hint-s">${icon('help')} روی هر ماه بزنید تا پرونده‌های ${W.REPORT_TYPES[t]} همان ماه با جزئیات و خروجی Excel بیاید.</p>`;
+}
 const MTX_HEAD = { fire: 'آتش‌سوزی', explosion: 'انفجار', co: 'مسمومیت', leak: 'سایر' };
 function monthlyBlock(cs) {
   const nowY = W.toJalali(new Date()).jy;
@@ -3474,10 +3496,10 @@ function monthlyBlock(cs) {
     <div class="rep-head"><div><h2>${icon('chart')} حوادث به تفکیک ماه و نوع</h2><p class="muted-s">بر اساس تاریخ وقوع حادثه</p></div>
       <div class="rep-tools"><label class="sel"><span>سال</span><select data-rep="y">${years.map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${fa(v)}</option>`).join('')}</select></label>
         <button class="btn sm green" data-act="expMonthly" data-y="${y}">${icon('download')} خروجی Excel جدول</button></div></div>
-    <div class="chips">${[['', 'همه انواع'], ...types].map(([k, l]) => `<button class="chip ${t === k ? 'on' : ''}" data-act="rep" data-p='{"t":"${k}"}'>${l} <span class="num">${fa(k ? M.totals[k] : M.all)}</span></button>`).join('')}</div>
-    <div class="tbl-wrap"><table class="mtx"><thead><tr><th>ماه</th>${types.map(([k, l]) => `<th title="${l}">${MTX_HEAD[k]}</th>`).join('')}<th>جمع</th></tr></thead>
+    <div class="chips">${[['', 'همه انواع'], ...types].map(([k, l]) => `<button class="chip ${t === k ? 'on' : ''}" data-act="rep" data-p='{"t":"${k}","m":0}'>${l} <span class="num">${fa(k ? M.totals[k] : M.all)}</span></button>`).join('')}</div>
+    ${t ? typeTable(cs, y, m, t) : `<div class="tbl-wrap"><table class="mtx"><thead><tr><th>ماه</th>${types.map(([k, l]) => `<th title="${l}">${MTX_HEAD[k]}</th>`).join('')}<th>جمع</th></tr></thead>
       <tbody>${M.rows.map((r, i) => `<tr class="${m === i + 1 ? 'on' : ''}"><th><button class="mname" data-act="rep" data-p='{"m":${i + 1},"t":""}'>${W.MONTHS[i]}</button></th>${types.map(([k]) => `<td>${cell(i + 1, k, r[k])}</td>`).join('')}<td class="tot">${cell(i + 1, '', rowSum(r), false)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><th><button class="mname" data-act="rep" data-p='{"m":0,"t":""}'>جمع سال</button></th>${types.map(([k]) => `<td>${cell(0, k, M.totals[k], false)}</td>`).join('')}<td class="tot">${cell(0, '', M.all, false)}</td></tr></tfoot></table></div>
+      <tfoot><tr><th><button class="mname" data-act="rep" data-p='{"m":0,"t":""}'>جمع سال</button></th>${types.map(([k]) => `<td>${cell(0, k, M.totals[k], false)}</td>`).join('')}<td class="tot">${cell(0, '', M.all, false)}</td></tr></tfoot></table></div>`}
     <div class="sel-bar"><div><b>${esc(label)}</b><span class="num">${fa(list.length)} حادثه</span></div>
       <div class="rep-tools"><button class="btn sm green" data-act="expDetail" ${list.length ? '' : 'disabled'}>${icon('download')} خروجی Excel با جزئیات</button><button class="btn sm ghost" data-act="printSel" ${list.length ? '' : 'disabled'}>${icon('print')} گزارش چاپی</button></div></div>
     ${claimTable(list, '')}
@@ -3529,7 +3551,12 @@ function exportLive() {
       W.waitingOn(c) ? W.ROLES[W.waitingOn(c)] : '—', c.statusAt ? W.jalaliString(c.statusAt) : '', c.statusAt ? W.daysBetween(c.statusAt, new Date()) : '', c.forwardedAt ? W.jalaliString(c.forwardedAt) : '', claimedOf(c), paidOf(c)])];
   download(`claims-status-${stamp()}.csv`, W.toCsv(rows));
 }
-function exportMonthly(y) {
+function exportMonthly(y, t = '') {
+  if (t) {
+    const rows = typeRows(visibleClaims(), y, t);
+    return download(`incidents-monthly-${y}-${t}.csv`, W.toCsv([[`${W.REPORT_TYPES[t]} — سال ${y} به تفکیک ماه (بر اساس تاریخ وقوع)`], [], ['ماه', 'تعداد حادثه', 'پرداخت‌شده', 'جمع ادعا (ریال)', 'جمع پرداختی (ریال)'],
+      ...rows.map((r, i) => [W.MONTHS[i], r.n, r.done, r.claimed, r.paid]), ['جمع سال', ...['n', 'done', 'claimed', 'paid'].map(k => rows.reduce((a, r) => a + r[k], 0))]]));
+  }
   const M = W.monthlyMatrix(visibleClaims(), y); const types = Object.entries(W.REPORT_TYPES);
   const rows = [[`حوادث سال ${y} به تفکیک ماه و نوع (بر اساس تاریخ وقوع)`], [], ['ماه', ...types.map(([, l]) => l), 'جمع'],
     ...M.rows.map((r, i) => [W.MONTHS[i], ...types.map(([k]) => r[k]), Object.values(r).reduce((a, n) => a + n, 0)]),
@@ -3733,7 +3760,7 @@ const ACTS = {
   rep: a => { st.p = { ...st.p, ...JSON.parse(a.dataset.p) }; sset('gii.view', JSON.stringify({ view: st.view, p: st.p })); renderKeep(); },
   repRefresh: async () => { await sync().catch(() => {}); liveAt = new Date(); renderKeep(); toast('داده‌ها تازه شد.'); },
   expLive: () => exportLive(),
-  expMonthly: a => exportMonthly(+a.dataset.y),
+  expMonthly: a => exportMonthly(+a.dataset.y, st.p.t || ''),
   expDetail: () => { const sel = reportSelection(); download(`claims-detail-${sel.y}${sel.m ? '-' + String(sel.m).padStart(2, '0') : ''}${sel.t ? '-' + sel.t : ''}.csv`, W.toCsv(detailRows(sel.list))); },
   printSel: () => { const sel = reportSelection(); openPrintDoc('گزارش ' + sel.label, selectionReportHtml(sel), `incidents-${sel.y}${sel.m ? '-' + String(sel.m).padStart(2, '0') : ''}${sel.t ? '-' + sel.t : ''}`); },
   claimReport: a => { const c = db.claims.find(x => x.id === a.dataset.id); if (c) openPrintDoc('پرونده ' + c.code, claimReportHtml(c), 'claim-' + c.code); },

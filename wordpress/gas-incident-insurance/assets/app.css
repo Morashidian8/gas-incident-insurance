@@ -829,6 +829,9 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ctbl td.acts { display: flex; gap: 6px; justify-content: flex-end; }
 .ctbl tbody tr:hover { background: var(--canvas); }
 .tbl-title { font-size: 14.5px; margin: 0; }
+.mtx.one th small { display: block; font-weight: 400; font-size: 10.5px; color: var(--muted); }
+.mtx.one td.num { font-variant-numeric: tabular-nums; }
+.mtx .mname:disabled { color: var(--muted); cursor: default; font-weight: 400; }
 @media (max-width: 760px) {
   .big-kpis, .live-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bk .v { font-size: 25px; }
