@@ -9,6 +9,9 @@
   - روی همه صفحه‌ها واترمارک «نسخه نمایشی محرمانه» (و نام گیرنده) دارد.
   - کد فشرده و درهم (terser) است و هیچ نشانی بیرونی (GitHub، Google Fonts و...) در آن نیست.
 
+روی صفحه بزرگ، «اپ موبایل» داخل قاب گوشی (iframe با عرض موبایل) و در صورت انتخاب، تمام‌صفحه نمایش داده می‌شود؛
+برای ارائه آفلاین از روی فلش مناسب است. عقب بردن ساعت دستگاه برای دور زدن انقضا تشخیص داده می‌شود.
+
 محدودیت: هر چیزی که در مرورگر اجرا شود، پس از ورود رمز روی همان دستگاه قابل استخراج است؛
 این روش سوءاستفاده را سخت و ردپذیر می‌کند، نه غیرممکن.
 
@@ -114,6 +117,7 @@ TEMPLATE = r"""<!doctype html>
   .card button.link { background: none; color: #3a8cc3; padding: 0; font-size: 13px; font-weight: 400; }
   .card button.alt { background: #f26b21; }
   .card button:disabled { opacity: .6; }
+  .fs { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: 13px; color: #5d6d7d; cursor: pointer; }
   .err { color: #d9443a !important; font-weight: 700; min-height: 1.4em; }
   .nojs { background: #fff4e5; border: 1.5px solid #f2a65a; border-radius: 12px; padding: 10px; color: #8a4b0f !important; font-weight: 700; }
   .tag { display: inline-block; background: #fdf0e2; color: #b45a12; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin: 0 auto; }
@@ -149,8 +153,29 @@ TEMPLATE = r"""<!doctype html>
     var s = ''; for (var i = 0; i < a.length; i += 8192) s += String.fromCharCode.apply(null, a.subarray(i, i + 8192));
     return decodeURIComponent(escape(s));
   };
-  document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-  document.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && /^[supSUP]$/.test(e.key)) e.preventDefault(); });
+  // جلوگیری از ذخیره، چاپ، نمایش کد، ابزار توسعه، کشیدن و کپی (در صفحه اصلی و قاب گوشی)
+  function guard(doc) {
+    doc.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    doc.addEventListener('keydown', function (e) {
+      var k = (e.key || '').toLowerCase(), mod = e.ctrlKey || e.metaKey;
+      if (k === 'f12' || (mod && /^[supa]$/.test(k) && !(k === 'a' && e.target.matches && e.target.matches('input, textarea'))) || (mod && e.shiftKey && /^[ijck]$/.test(k)) || (e.metaKey && e.altKey && /^[iju]$/.test(k))) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+    ['copy', 'cut', 'dragstart'].forEach(function (t) { doc.addEventListener(t, function (e) { if (!(e.target.matches && e.target.matches('input, textarea'))) e.preventDefault(); }, true); });
+    var st = doc.createElement('style');
+    st.textContent = 'body{-webkit-user-select:none;user-select:none}input,textarea{-webkit-user-select:text;user-select:text}img{-webkit-user-drag:none}@media print{body *{display:none!important}body::after{content:"چاپ این نسخه مجاز نیست.";display:block;padding:40px}}';
+    (doc.head || doc.documentElement).appendChild(st);
+  }
+  guard(document);
+  // جلوگیری از دور زدن تاریخ انقضا با عقب بردن ساعت دستگاه
+  var SEEN = 'gii.secure.seen.' + ENC.s.slice(0, 8);
+  function clockOk() {
+    var now = Date.now(), seen = 0;
+    try { seen = +localStorage.getItem(SEEN) || 0; } catch (e) {}
+    if (seen && now < seen - 36 * 3600 * 1000) return false;
+    try { localStorage.setItem(SEEN, String(Math.max(seen, now))); } catch (e) {}
+    return true;
+  }
+  setInterval(clockOk, 60000);
 
   // ---- رمزگشایی با WebCrypto ----
   function viaWebCrypto(pw) {
@@ -290,34 +315,65 @@ TEMPLATE = r"""<!doctype html>
       var P; try { P = JSON.parse(dec(plain)); } catch (e) { throw new Error('pw'); }
       if (!P || !P.js) throw new Error('pw');
       if (Date.now() > P.exp) throw new Error('exp');
+      if (!clockOk()) throw new Error('clock');
       choose(P);
     }).catch(function (e) {
-      $('err').textContent = e.message === 'pw' ? 'رمز نادرست است. با «نمایش رمز» آن را با رمزی که گرفته‌اید مقایسه کنید (حروف انگلیسی).' : e.message === 'exp' ? 'اعتبار این نسخه تمام شده است.' : 'باز کردن ممکن نشد. فایل را با مرورگر کروم یا سافاری باز کنید.';
+      $('err').textContent = e.message === 'pw' ? 'رمز نادرست است. با «نمایش رمز» آن را با رمزی که گرفته‌اید مقایسه کنید (حروف انگلیسی).' : e.message === 'exp' ? 'اعتبار این نسخه تمام شده است.' : e.message === 'clock' ? 'تاریخ و ساعت این دستگاه درست نیست. آن را تنظیم کنید و دوباره باز کنید.' : 'باز کردن ممکن نشد. فایل را با مرورگر کروم یا سافاری باز کنید.';
       $('go').disabled = false; $('go').textContent = 'باز کردن';
     });
   }
+  var wide = function () { return window.innerWidth >= 760; };
   function choose(P) {
     $('lock').querySelector('.card').innerHTML = '<span class="tag">نسخه نمایشی محرمانه</span><h1>کدام نسخه نمایش داده شود؟</h1>'
-      + '<button id="m-app">اپ موبایل</button><button class="alt" id="m-site">سایت (کامپیوتر)</button>'
+      + '<button id="m-app">اپ موبایل' + (wide() ? ' (در قاب گوشی)' : '') + '</button><button class="alt" id="m-site">سایت (کامپیوتر)</button>'
+      + '<label class="fs"><input type="checkbox" id="m-fs" ' + (wide() ? 'checked' : '') + '> نمایش تمام‌صفحه برای ارائه (خروج با Esc)</label>'
       + '<p>برای جابه‌جایی بین دو نسخه، صفحه را دوباره باز کنید.</p>';
-    $('m-app').onclick = function () { run(P, 'app'); };
-    $('m-site').onclick = function () { run(P, 'site'); };
+    var go = function (mode) {
+      try { if ($('m-fs').checked && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {}); } catch (e) {}
+      run(P, mode);
+    };
+    $('m-app').onclick = function () { go('app'); };
+    $('m-site').onclick = function () { go('site'); };
   }
-  function watermark(name) {
+  function wmSvg(name) {
     var text = 'نسخه نمایشی محرمانه' + (name ? ' — ' + name : '') + ' — ' + fa(new Date());
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="420" height="240"><text x="210" y="130" text-anchor="middle" font-family="Tahoma" font-size="17" fill="#555" transform="rotate(-24 210 120)">' + text.replace(/[<&]/g, '') + '</text></svg>';
-    var wm = document.createElement('div'); wm.id = 'wm';
-    wm.style.backgroundImage = 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
-    document.body.appendChild(wm);
+    return 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
+  }
+  function watermark(doc, name) {
+    var wm = doc.createElement('div');
+    wm.setAttribute('style', 'position:fixed;inset:0;z-index:2147483000;pointer-events:none;opacity:.11;background-repeat:repeat;background-image:' + wmSvg(name));
+    doc.body.appendChild(wm);
   }
   function run(P, mode) {
-    document.documentElement.dataset.mode = mode;
     $('lock').remove();
-    var st = document.createElement('style'); st.textContent = P.css; document.head.appendChild(st);
     document.body.style.cssText = '';
+    if (mode === 'app' && wide()) return runFramed(P);
+    document.documentElement.dataset.mode = mode;
+    var st = document.createElement('style'); st.textContent = P.css; document.head.appendChild(st);
     var app = document.createElement('div'); app.id = 'app'; app.setAttribute('aria-live', 'polite'); document.body.prepend(app);
     var sc = document.createElement('script'); sc.textContent = P.js; document.body.appendChild(sc);
-    watermark(P.name);
+    watermark(document, P.name);
+  }
+  // اپ موبایل روی صفحه بزرگ: داخل قاب گوشی با viewport واقعی موبایل (iframe هم‌مبدأ)
+  function runFramed(P) {
+    var css = 'html,body{height:100%}body{margin:0;display:grid;place-items:center;background:radial-gradient(circle at 30% 20%,#1d4f7a,#0b2340 60%);overflow:hidden}'
+      + '.phone{position:relative;width:398px;height:min(860px,calc(100vh - 40px));border-radius:48px;background:#0c0f14;padding:12px;box-shadow:0 40px 90px rgba(0,0,0,.55),inset 0 0 0 2px #2a3340}'
+      + '.phone iframe{width:100%;height:100%;border:0;border-radius:38px;background:#f3f6f9;display:block}';
+    var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    var ph = document.createElement('div'); ph.className = 'phone';
+    var fr = document.createElement('iframe'); fr.title = 'اپ بیمه حوادث مشترکین گاز';
+    fr.srcdoc = '<!doctype html><html lang="fa" dir="rtl" data-mode="app"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><div id="app" aria-live="polite"></div></body></html>';
+    fr.onload = function () {
+      var d = fr.contentDocument;
+      guard(d);
+      var s1 = d.createElement('style'); s1.textContent = P.css; d.head.appendChild(s1);
+      var sc = d.createElement('script'); sc.textContent = P.js; d.body.appendChild(sc);
+      watermark(d, P.name);
+      fr.contentWindow.focus();
+    };
+    ph.appendChild(fr); document.body.appendChild(ph);
+    watermark(document, P.name);
   }
   $('go').onclick = unlock;
   $('pw').addEventListener('keydown', function (e) { if (e.key === 'Enter') unlock(); });
