@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#3a8cc3">
+<meta name="theme-color" content="#123A8C">
 <link rel="icon" href="../icons/icon-192.png" type="image/png">
 <title>سامانه بیمه حوادث مشترکین گاز</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -14,68 +14,49 @@
 <body>
 <style>
 /* چیدمان: نوار آبی بالا + چاهک روشن با کارت‌های خطی + کاشی‌های تصویری دوتایی + نوار پایین شناور + برگه‌های کشویی */
+/* سیستم بصری: سرمه‌ای عمیق روی کاغذی گرم؛ نارنجی شعله فقط برای حادثه و گزارش علت (docs/VISUAL.md) */
 :root {
-  --blue: #3a8cc3;
-  --blue-deep: #2b6f9e;
-  --blue-tint: #e7f1f9;
-  --green: #1f9d57;
-  --green-tint: #e4f5ec;
-  --orange: #f28a26;
-  --orange-tint: #fdf0e2;
-  --red: #d9443a;
-  --red-tint: #fbe9e7;
-  --amber: #b7791f;
-  --amber-tint: #fdf4e1;
-  --violet: #6d5bd0;
-  --violet-tint: #efedfb;
+  --bg: #F3F1EC; --sf: #FFFFFF; --sf2: #F7F5F1; --ink: #18202E; --ink2: #5C6474; --ln: #E3E0D8;
+  --br: #1747A6; --brs: #E5ECFA; --bar: #123A8C; --fl: #C4520F; --fls: #FDEEE2;
+  --ok: #1C8556; --oks: #E0F2E8; --wr: #A85F07; --wrs: #FCF0DA; --ac: #6A3CBD; --acs: #EEE7FA; --er: #BE3328; --ers: #FBE6E3;
+  --on: #FFFFFF; /* متن روی زمینه‌های پررنگ */
+  --sh: 0 1px 2px rgba(20, 28, 45, .06), 0 4px 14px rgba(20, 28, 45, .06);
+  --scrim: rgba(10, 14, 22, .5);
+  --illo-ink: #123A8C; --illo-paper: #FFFFFF; --illo-line: #E3E0D8;
 
-  --canvas: #f3f6f9;
-  --well: #e5edf4;
-  --card: #ffffff;
-  --line: #a6c8e0;
-  --hair: #e3eaf0;
-  --ink: #1c2733;
-  --muted: #6a7b8c;
-  --field: #f7fafc;
-  --scrim: rgba(17, 28, 40, .45);
-  --shadow: 0 10px 30px rgba(30, 60, 90, .12);
-
-  --illo-ink: #22303d;
-  --illo-paper: #ffffff;
-  --illo-line: #cad8e4;
+  /* نام‌های قدیمی؛ همه به توکن‌های بالا اشاره می‌کنند */
+  --blue: var(--br); --blue-deep: var(--br); --blue-tint: var(--brs);
+  --green: var(--ok); --green-tint: var(--oks);
+  --orange: var(--fl); --orange-tint: var(--fls);
+  --red: var(--er); --red-tint: var(--ers);
+  --amber: var(--wr); --amber-tint: var(--wrs);
+  --violet: var(--ac); --violet-tint: var(--acs);
+  --canvas: var(--bg); --well: var(--sf2); --card: var(--sf); --line: var(--ln); --hair: var(--ln);
+  --muted: var(--ink2); --field: var(--sf2);
+  --shadow: var(--sh);
 
   --f-body: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif;
   --f-display: 'Lalezar', 'Vazirmatn', Tahoma, sans-serif;
-  --r-lg: 22px;
+  --r-lg: 20px;
   --r-md: 14px;
   --r-sm: 10px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --blue: #4a9bd3; --blue-deep: #2f74a6; --blue-tint: #1a2d3d;
-    --green: #3cc07a; --green-tint: #17302a;
-    --orange: #f59a45; --orange-tint: #352718;
-    --red: #f06a5f; --red-tint: #3a1f1e;
-    --amber: #e0a94a; --amber-tint: #33291a;
-    --violet: #9d8ff0; --violet-tint: #26233f;
-    --canvas: #0e151d; --well: #151f2a; --card: #1a2531; --line: #2f4d66; --hair: #26333f;
-    --ink: #e5edf4; --muted: #93a5b6; --field: #121b25; --scrim: rgba(0, 0, 0, .6);
-    --shadow: 0 10px 30px rgba(0, 0, 0, .4);
-    --illo-ink: #d7e5f1; --illo-paper: #22303e; --illo-line: #3b5165;
+    --bg: #0E131C; --sf: #161D29; --sf2: #1D2534; --ink: #E7EBF2; --ink2: #9CA6B7; --ln: #2A3447;
+    --br: #6B97FF; --brs: #1B2A4A; --bar: #13213F; --fl: #F28B4C; --fls: #3A2417;
+    --ok: #45C08A; --oks: #12301F; --wr: #E9A847; --wrs: #33270F; --ac: #AE90F3; --acs: #2A2143; --er: #F2766A; --ers: #3A1B19;
+    --on: #0E131C; --sh: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25); --scrim: rgba(0, 0, 0, .6);
+    --illo-ink: #9DB8FF; --illo-paper: #1D2534; --illo-line: #2A3447;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --blue: #4a9bd3; --blue-deep: #2f74a6; --blue-tint: #1a2d3d;
-  --green: #3cc07a; --green-tint: #17302a;
-  --orange: #f59a45; --orange-tint: #352718;
-  --red: #f06a5f; --red-tint: #3a1f1e;
-  --amber: #e0a94a; --amber-tint: #33291a;
-  --violet: #9d8ff0; --violet-tint: #26233f;
-  --canvas: #0e151d; --well: #151f2a; --card: #1a2531; --line: #2f4d66; --hair: #26333f;
-  --ink: #e5edf4; --muted: #93a5b6; --field: #121b25; --scrim: rgba(0, 0, 0, .6);
-  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
-  --illo-ink: #d7e5f1; --illo-paper: #22303e; --illo-line: #3b5165;
+  --bg: #0E131C; --sf: #161D29; --sf2: #1D2534; --ink: #E7EBF2; --ink2: #9CA6B7; --ln: #2A3447;
+  --br: #6B97FF; --brs: #1B2A4A; --bar: #13213F; --fl: #F28B4C; --fls: #3A2417;
+  --ok: #45C08A; --oks: #12301F; --wr: #E9A847; --wrs: #33270F; --ac: #AE90F3; --acs: #2A2143; --er: #F2766A; --ers: #3A1B19;
+  --on: #0E131C; --sh: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 14px rgba(0, 0, 0, .25); --scrim: rgba(0, 0, 0, .6);
+  --illo-ink: #9DB8FF; --illo-paper: #1D2534; --illo-line: #2A3447;
   color-scheme: dark;
 }
 
@@ -220,7 +201,6 @@ button.row:hover { background: color-mix(in srgb, var(--blue-tint) 60%, transpar
 .badge.accent { background: var(--violet-tint); color: var(--violet); }
 .badge.ok { background: var(--green-tint); color: var(--green); }
 .badge.bad { background: var(--red-tint); color: var(--red); }
-:root[data-theme="dark"] .badge.info, :root:not([data-theme="light"]) .badge.info { color: var(--blue); }
 .badge.sla { background: var(--well); color: var(--muted); font-weight: 600; }
 .badge.sla.over { background: var(--red-tint); color: var(--red); }
 
@@ -514,12 +494,12 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
    چیدمان: سرصفحه سرمه‌ای چسبان؛ قهرمان تیره با درخشش شعله آبی گاز و نارنجی اخگر؛
    نوار روشن «مسیر پرونده» با موشن‌گرافی؛ کاشی‌های مدارک رنگی؛ پرسش‌ها دوستونه؛ پاصفحه سرمه‌ای. */
 :root {
-  --navy: #0b2340;
-  --navy-2: #123a63;
-  --ember: #f26b21;
-  --ember-2: #ff8f3f;
-  --sky: #5fb3ec;
-  --site-ink-light: #e8f1fa;
+  --navy: var(--bar);
+  --navy-2: var(--bar);
+  --ember: var(--fl);
+  --ember-2: #F7A26B;
+  --sky: #9DB8FF;
+  --site-ink-light: #E7EBF2;
 }
 .wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 :root[data-mode="site"] body::before { background: var(--navy); }
@@ -864,6 +844,329 @@ body.has-printdoc { overflow: hidden; }
   body.has-printdoc #printdoc { position: static; overflow: visible; }
   #printdoc .pd-bar { display: none; }
 }
+
+/* ===================================================================
+   سیستم بصری — کامپوننت‌ها (طبق سند زبان بصری)
+   رسمی، آرام، کم‌شلوغ؛ بدون گرادیان تزئینی؛ فقط کارت اصلی سایه دارد.
+   =================================================================== */
+body { background: var(--bg); color: var(--ink); line-height: 1.7; }
+body::before, :root[data-mode="site"] body::before { background: var(--bar); }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--br) 45%, transparent); outline-offset: 2px; }
+
+/* نوار بالای اپ */
+.topbar { background: var(--bar); }
+.topbar-in { padding-block: 10px; }
+.sq-btn { width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, .1); color: #fff; box-shadow: none; }
+.sq-btn:hover { background: rgba(255, 255, 255, .18); }
+.sq-btn .ic { width: 21px; height: 21px; }
+.sq-btn .dot { background: var(--er); color: #fff; top: -4px; left: -4px; min-width: 19px; height: 19px; line-height: 15px; font-size: 11px; border: 2px solid var(--bar); }
+.brand b { font-family: var(--f-body); font-weight: 700; font-size: 17px; line-height: 1.35; }
+.brand small { font-size: 11.5px; opacity: .78; }
+.topbar .brand > div { display: flex; flex-direction: column-reverse; }
+.org-logo { border-radius: 12px; box-shadow: none; }
+.login-hero .org-logo, .foot-brand .org-logo { border-radius: 20px; }
+
+/* بدنه و کارت‌ها */
+.page { gap: 14px; padding-block-end: 104px; }
+.well { background: none; padding: 0; border-radius: 0; gap: 14px; }
+.well > .ocard:first-child { box-shadow: var(--sh); }
+.page-title h1 { font-size: 19px; font-weight: 800; }
+.page-title .back { width: 40px; height: 40px; border: 1px solid var(--ln); color: var(--br); background: var(--sf); }
+.section-label { font-size: 12.5px; color: var(--ink2); font-weight: 700; }
+.ocard { background: var(--sf); border: 1px solid var(--ln); border-radius: 20px; padding: 4px 16px; }
+.ocard-head .ic { color: var(--br); }
+.ocard-head .k { color: var(--ink2); font-weight: 600; }
+.ocard-head .v { font-size: 15.5px; }
+.ocard-head .chev { color: var(--ink2); }
+.ocard-body { border-top: 1px dashed var(--ln); }
+.kv { border-bottom: 1px dashed var(--ln); padding: 9px 0; font-size: 14px; }
+.kv .k { color: var(--ink2); }
+
+/* نوار مبلغ/وضعیت: زمینه پررنگ لحن + متن سفید */
+.pill-bar { border-radius: 16px; padding: 12px 18px; background: var(--br); color: var(--on); }
+.pill-bar .amt { font-family: var(--f-body); font-weight: 800; font-size: 21px; }
+.pill-bar.green { background: var(--ok); } .pill-bar.orange { background: var(--wr); } .pill-bar.red { background: var(--er); }
+:root[data-mode="site"] .pill-bar:not(.green):not(.orange):not(.red) { background: var(--br); }
+
+/* کاشی‌ها: آیکون در مربع لحن، عدد بزرگ، عنوان پایین؛ اولین کاشی = اقدام اصلی (پررنگ) */
+.tile {
+  --c: var(--br); --t: var(--brs);
+  display: flex; flex-direction: column; gap: 3px; min-height: 132px; padding: 14px; text-align: right;
+  background: var(--sf); border: 1px solid var(--ln); border-radius: 20px; overflow: visible; color: var(--ink);
+}
+.tile.green { --c: var(--ok); --t: var(--oks); border-color: var(--ln); }
+.tile.orange { --c: var(--fl); --t: var(--fls); border-color: var(--ln); }
+.tile.violet { --c: var(--ac); --t: var(--acs); border-color: var(--ln); }
+.tile.red { --c: var(--er); --t: var(--ers); border-color: var(--ln); }
+.tile:hover { border-color: var(--c); }
+.tile:active, .btn:active, .row:active, .claim-row:active { transform: scale(.98); }
+.tile-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: auto; }
+.tile-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--t); color: var(--c); display: grid; place-items: center; flex: none; }
+.tile-ic .ic { width: 24px; height: 24px; }
+.tile-n { font-size: 26px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile-title { font-family: var(--f-body); font-size: 15.5px; font-weight: 700; color: var(--ink); line-height: 1.5; margin-top: 12px; }
+.tile-sub { font-size: 12.5px; color: var(--ink2); opacity: 1; min-height: 0; line-height: 1.6; }
+.tile-go { display: inline-flex; align-items: center; gap: 2px; margin-top: 4px; font-size: 12.5px; font-weight: 700; color: var(--c); }
+.tile-go .ic { width: 16px; height: 16px; }
+.tiles > .tile:first-child { background: var(--br); border-color: var(--br); color: var(--on); }
+.tiles > .tile:first-child .tile-ic { background: rgba(255, 255, 255, .16); color: var(--on); }
+.tiles > .tile:first-child .tile-title, .tiles > .tile:first-child .tile-go, .tiles > .tile:first-child .tile-n { color: var(--on); }
+.tiles > .tile:first-child .tile-sub { color: var(--on); opacity: .82; }
+@media (min-width: 760px) { .tiles:has(> .tile:nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ردیف‌ها */
+.rows { border: 1px solid var(--ln); border-radius: 16px; background: var(--sf); }
+.row { padding: 12px 14px; border-bottom: 1px solid var(--ln); gap: 12px; }
+.row > .ic:first-child { width: 36px; height: 36px; padding: 8px; border-radius: 10px; background: var(--brs); color: var(--br); }
+.row.danger > .ic:first-child { background: var(--ers); color: var(--er); }
+.row .t { font-weight: 700; font-size: 14.5px; }
+.row .s { font-size: 12.5px; color: var(--ink2); }
+.row .chev { color: var(--ink2); }
+button.row:hover { background: var(--sf2); }
+
+/* نشان‌ها */
+.badge { border-radius: 7px; padding: 2px 9px; font-size: 11.5px; font-weight: 700; }
+.badge.neutral, .badge.sla { background: var(--sf2); color: var(--ink2); }
+.badge.info { background: var(--brs); color: var(--br); }
+.badge.warn { background: var(--wrs); color: var(--wr); }
+.badge.accent { background: var(--acs); color: var(--ac); }
+.badge.ok { background: var(--oks); color: var(--ok); }
+.badge.bad, .badge.sla.over { background: var(--ers); color: var(--er); }
+
+/* نوار پیشرفت ۵ مرحله‌ای */
+.step { font-size: 10.5px; gap: 5px; color: var(--ink2); }
+.step .b { width: 26px; height: 26px; background: var(--sf); border: 2px solid var(--ln); color: var(--ink2); font-size: 12px; }
+.step::before { top: 12px; height: 2px; background: var(--ln); }
+.step.done .b { background: var(--ok); border-color: var(--ok); color: var(--on); }
+.step.done::before, .step.cur::before { background: var(--ok); }
+.step.cur .b { background: var(--br); border-color: var(--br); color: var(--on); box-shadow: 0 0 0 4px var(--brs); }
+.step .b .ic { width: 14px; height: 14px; }
+
+/* یادداشت‌ها */
+.note { border-radius: 14px; font-size: 13.5px; line-height: 1.85; }
+
+/* فرم‌ها */
+.form { border: 1px solid var(--ln); border-radius: 20px; padding: 16px; background: var(--sf); }
+.fld > span { font-size: 13px; font-weight: 600; }
+.fld > span i, .cause-head i { color: var(--er); }
+.fld small { color: var(--ink2); font-size: 12px; }
+input[type=text], input[type=password], input[type=tel], input[type=number], input[type=search], input[type=url], select, textarea {
+  min-height: 46px; background: var(--sf2); border: 1.5px solid var(--ln); border-radius: 12px; padding: 10px 13px; color: var(--ink);
+}
+input:focus, select:focus, textarea:focus { border-color: var(--br); background: var(--sf); box-shadow: 0 0 0 3px var(--brs); }
+input:disabled, select:disabled, textarea:disabled { opacity: .7; }
+
+/* انتخاب تکی (شبکه دکمه‌های هم‌اندازه) و کنترل دوگزینه‌ای */
+.seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
+.seg label { position: relative; min-height: 46px; display: grid; place-items: center; text-align: center; padding: 8px 10px; line-height: 1.5;
+  border: 1.5px solid var(--ln); border-radius: 12px; background: var(--sf); font-weight: 600; font-size: 13.5px; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.seg label.on { border-color: var(--br); background: var(--brs); color: var(--br); font-weight: 700; }
+.seg label:focus-within { outline: 3px solid color-mix(in srgb, var(--br) 45%, transparent); outline-offset: 2px; }
+.seg.dis label { cursor: default; opacity: .75; }
+.seg.two { display: flex; gap: 4px; padding: 4px; background: var(--sf); border: 1px solid var(--ln); border-radius: 14px; }
+.seg.two label { flex: 1; border: 0; min-height: 40px; border-radius: 10px; background: none; }
+.seg.two label.on { background: var(--br); color: var(--on); }
+
+/* چیپ‌ها: انتخاب‌شده = زمینه جوهری */
+.chip { border: 1px solid var(--ln); background: var(--sf); color: var(--ink); }
+.chip.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+/* تیک سفارشی ۲۲px */
+.check input[type=checkbox] { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--ln); background: var(--sf);
+  display: grid; place-items: center; margin-top: 2px; cursor: pointer; }
+.check input[type=checkbox]:checked { background: var(--chk, var(--br)); border-color: var(--chk, var(--br)); }
+.check input[type=checkbox]:checked::after { content: ""; width: 6px; height: 11px; border: solid var(--on); border-width: 0 2.5px 2.5px 0; transform: translateY(-1px) rotate(45deg); }
+
+/* دکمه‌ها */
+.btn { min-height: 52px; border-radius: 14px; padding: 12px 18px; font-size: 15px; background: var(--br); border: 1.5px solid var(--br); color: var(--on); transition: transform .08s; }
+.btn.ghost { background: var(--sf); color: var(--br); border-color: var(--ln); }
+.btn.green { background: var(--ok); border-color: var(--ok); color: var(--on); }
+.btn.orange { background: var(--sf); border-color: var(--wr); color: var(--wr); }
+.btn.red { background: var(--er); border-color: var(--er); color: var(--on); }
+.btn.red.ghost { background: var(--sf); border-color: var(--ln); color: var(--er); }
+.btn.ember { background: var(--fl); border-color: var(--fl); color: var(--on); box-shadow: none; }
+.btn.ember:hover { background: var(--fl); filter: brightness(1.05); }
+.btn:disabled, .btn:disabled:hover { background: var(--sf2); border-color: var(--ln); color: var(--ink2); opacity: 1; filter: none; }
+.btn.sm { min-height: 38px; padding: 6px 12px; border-radius: 12px; font-size: 13px; }
+.link { color: var(--br); }
+.icon-btn { border: 1px solid var(--ln); background: var(--sf); color: var(--er); }
+
+/* دکمه «بخش بعد» چسبان پایین فرم */
+.next-bar { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 5; }
+.next-bar .btn { width: 100%; box-shadow: var(--sh); }
+:root[data-mode="site"] .next-bar { bottom: 12px; }
+
+/* جدول‌ها و جمع‌ها */
+.tbl th { background: var(--sf2); color: var(--ink2); }
+.tbl td.n, .ctbl td.num { text-align: left; }
+.sumline { border-bottom: 1px dashed var(--ln); font-size: 14px; }
+.sumline.total { background: var(--br); color: var(--on); border-radius: 12px; padding: 12px 14px; margin-top: 4px; font-size: 14.5px; align-items: center; }
+.sumline.total b { font-size: 20px; font-weight: 800; }
+
+/* فایل‌ها */
+.thumb { border-radius: 12px; border: 1px solid var(--ln); background: var(--sf2); }
+.thumb:not(:has(img)) .pdf { background: repeating-linear-gradient(135deg, var(--sf2) 0 8px, var(--sf) 8px 16px); }
+.add-file { border-radius: 12px; border: 1.5px dashed var(--ln); background: var(--sf2); color: var(--br); }
+.doc-card { border: 1px solid var(--ln); border-radius: 16px; }
+.doc-card.flag { border-color: var(--wr); }
+
+/* نقص، گفتگو، تاریخچه */
+.defect { background: var(--wrs); border-radius: 14px; }
+.defect .reply { background: var(--sf); }
+.msg { border-radius: 16px; background: var(--sf); border: 1px solid var(--ln); }
+.msg.me { background: var(--br); border-color: var(--br); color: var(--on); }
+.msg.internal { background: var(--acs); border: 1.5px dashed var(--ac); color: var(--ink); }
+.tl li::after { background: var(--br); border-color: var(--sf); }
+.tl .n { background: var(--sf2); }
+
+/* تب‌ها: ریل با تب فعال سفید */
+.tabs { background: var(--sf2); border: 1px solid var(--ln); border-radius: 14px; padding: 4px; gap: 4px; scrollbar-width: none; }
+.tab { background: none; color: var(--ink2); border-radius: 10px; padding: 7px 12px; font-size: 13.5px; }
+.tab.on { background: var(--sf); color: var(--ink); box-shadow: var(--sh); }
+
+/* فهرست پرونده و آمار */
+.claim-row { border: 1px solid var(--ln); border-radius: 16px; }
+.claim-row .av { width: 38px; height: 38px; border-radius: 10px; background: var(--brs); color: var(--br); }
+.claim-row .av.fire { background: var(--fls); color: var(--fl); }
+.claim-row .av .ic { width: 22px; height: 22px; }
+.kpi { border: 1px solid var(--ln); }
+.kpi .v, :root[data-theme="dark"] .kpi .v { font-family: var(--f-body); font-weight: 800; color: var(--ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kpi .v { color: var(--ink); } }
+.sbar .fill { background: var(--br); }
+.cred { background: var(--oks); }
+.cred .line { background: var(--sf); }
+
+/* نوار ناوبری پایین: آیکون فعال داخل قرص */
+.bottomnav { border-radius: 0; box-shadow: none; border-top: 1px solid var(--ln); background: var(--sf); padding-block: 6px calc(6px + env(safe-area-inset-bottom, 0px)); }
+.bottomnav-in { gap: 2px; }
+.nav-btn, .nav-btn.on { flex-direction: column; gap: 2px; padding: 2px 4px; min-width: 60px; border-radius: 0; background: none; color: var(--ink2); font-size: 11.5px; font-weight: 600; }
+.nav-btn .ic { width: 56px; height: 30px; padding: 4px 16px; border-radius: 15px; }
+.nav-btn.on { color: var(--br); font-weight: 700; }
+.nav-btn.on .ic { background: var(--brs); }
+.nav-btn .dot { top: -2px; right: calc(50% - 26px); background: var(--er); min-width: 18px; height: 18px; line-height: 18px; font-size: 11px; }
+@media (max-width: 420px) { .nav-btn { padding: 2px; font-size: 11px; } .nav-btn:not(.on) .lbl { font-size: 11px; } }
+
+/* برگه کشویی */
+.sheet-scrim { background: var(--scrim); }
+.sheet { background: var(--sf); border-radius: 26px 26px 0 0; animation: sheetIn .28s cubic-bezier(.2, .8, .2, 1); }
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: none; } }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--ln); }
+.sheet h2 { font-size: 18px; font-weight: 800; }
+/* دسکتاپ: برگه‌ها پنجره میانی */
+@media (min-width: 900px) {
+  .sheet, :root[data-mode="site"] .sheet {
+    left: 50%; right: auto; top: 50%; bottom: auto; width: min(600px, calc(100vw - 48px)); max-height: 86vh;
+    transform: translate(-50%, -50%); border-radius: 26px; padding-block: 20px; animation: dlgIn .22s cubic-bezier(.2, .8, .2, 1);
+  }
+  .sheet .grab { display: none; }
+}
+@keyframes dlgIn { from { opacity: 0; transform: translate(-50%, -46%); } to { opacity: 1; transform: translate(-50%, -50%); } }
+.radio-card { border: 1px solid var(--ln); }
+.radio-card.on { border-color: var(--br); }
+.support .av { background: var(--br); color: var(--on); box-shadow: 0 0 0 7px var(--brs); }
+.switch.on { background: var(--br); }
+
+/* Toast: بالای صفحه، تمام‌عرض، سبز یا قرمز */
+.toast, :root[data-mode="site"] .toast {
+  top: calc(10px + env(safe-area-inset-top, 0px)); bottom: auto; left: 16px; right: 16px; transform: none; max-width: 620px; margin: 0 auto;
+  background: var(--ok); color: var(--on); border-radius: 14px; padding: 12px 16px; font-weight: 600; text-align: center; box-shadow: var(--sh); animation: toastDrop .22s ease-out;
+}
+.toast.bad { background: var(--er); color: var(--on); }
+@keyframes toastDrop { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+
+/* ورود */
+.login-hero { background: var(--bar); border-radius: 0 0 28px 28px; }
+.login-hero h1 { font-size: 34px; }
+.flow div { border: 1px solid var(--ln); background: var(--sf); }
+.flow .ic { color: var(--br); }
+
+/* کادر «گزارش علت حادثه» — امضای بصری محصول */
+.cause-box { --chk: var(--fl); background: var(--fls); border: 2px solid var(--fl); border-radius: 18px; }
+.cause-box.review { border-width: 2px; }
+.cause-head { color: var(--ink); gap: 10px; }
+.cause-head .ic { width: 32px; height: 32px; padding: 6px; border-radius: 9px; background: var(--fl); color: var(--on); }
+.cause-box .check { background: var(--sf); border: 1px solid color-mix(in srgb, var(--fl) 35%, transparent); }
+.doc-hint { background: var(--fls); }
+.doc-hint .ic { color: var(--fl); }
+#act-cause { --chk: var(--fl); }
+
+/* مالی */
+.fin-sum > div, .fin-kv { background: var(--sf2); }
+.fin-dot { width: 26px; height: 26px; font-size: 12px; background: var(--sf); border: 2px solid var(--ln); color: var(--ink2); }
+.fin-steps li::before { right: 12px; top: 28px; background: var(--ln); }
+.fin-steps li.done .fin-dot { background: var(--ok); border-color: var(--ok); color: var(--on); }
+.fin-steps li.on .fin-dot { background: var(--br); border-color: var(--br); color: var(--on); animation: none; box-shadow: 0 0 0 4px var(--brs); }
+.fin-head h2 .ic { color: var(--br); }
+
+/* گزارش‌ها */
+.rep-card { border: 1px solid var(--ln); border-radius: 20px; }
+.rep-head h2 { font-weight: 800; }
+.bk { --c: var(--br); }
+.bk.violet { --c: var(--ac); } .bk.warn { --c: var(--wr); } .bk.ok { --c: var(--ok); }
+.bk .v, .lg .n { font-family: var(--f-body); font-weight: 800; }
+.bk .v { font-size: 26px; }
+.rep-sum { background: var(--sf2); }
+.t-neutral { --c: var(--ink2); } .t-info { --c: var(--br); } .t-violet { --c: var(--ac); } .t-warn { --c: var(--wr); }
+.t-accent { --c: var(--fl); } .t-accent2 { --c: #0F8C87; } .t-ok { --c: var(--ok); } .t-bad { --c: var(--er); }
+.stack { height: 12px; gap: 2px; border-radius: 6px; background: var(--sf2); }
+.lg { border: 1px solid var(--ln); }
+.live-dot { width: 8px; height: 8px; animation-duration: 1.4s; }
+.cell { background: color-mix(in srgb, var(--br) calc(var(--h) * 85%), var(--sf2)); }
+.cell.hot { color: var(--on); }
+.cell:not(:disabled):hover { border-color: var(--br); }
+.cell.on { border-color: var(--fl); box-shadow: 0 0 0 2px var(--fl); }
+.mtx thead th, .ctbl thead th { background: var(--sf2); }
+.mtx tr.on { background: var(--brs); }
+.sel-bar { background: var(--brs); }
+.dash-link { background: var(--sf); border: 1px solid var(--ln); }
+.dash-link .dl-ic { background: var(--brs); color: var(--br); }
+
+/* بیمه آتش‌سوزی */
+.fire-cta { background: var(--fl); color: var(--on); box-shadow: none; border-radius: 16px; }
+.fire-cta .fc-ic { background: rgba(255, 255, 255, .18); }
+.offer { --c: var(--br); border: 1.5px solid var(--ln); border-radius: 18px; }
+.offer.t1 { --c: var(--fl); } .offer.t2 { --c: var(--ok); }
+.offer .of-tier, .offer .of-go { color: var(--on); }
+.offer .of-price { font-family: var(--f-body); font-weight: 800; }
+
+/* صفحه بررسی پرونده: دسکتاپ دوستونه */
+.review-grid { display: flex; flex-direction: column; gap: 14px; }
+.review-aside, .review-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+@media (min-width: 1100px) {
+  .review-grid { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; }
+  .review-aside { position: sticky; top: 84px; }
+  .review-aside .btns { flex-direction: column; }
+  .review-aside .btns .btn { flex: none; }
+}
+@media (min-width: 900px) { :root:not([data-mode="site"]) .page:not(.narrow) { max-width: 1200px; } :root[data-mode="site"] .page:not(.narrow) { max-width: 1200px; } }
+
+/* سایت: بدون گرادیان و درخشش تزئینی */
+.site-head, .hero, .faq-aside, .site-foot { background: var(--bar); }
+.hero::before, .hero-glow, .faq-aside::after, .glass::before { display: none; }
+.glass { box-shadow: var(--sh); border-radius: 24px; }
+.band { background: var(--sf); border-bottom: 1px solid var(--ln); }
+.brand b, .foot-brand b, .sec-head h2, .j-head h2, .faq-aside h2 { font-family: var(--f-body); font-weight: 800; }
+.site-head .brand b { font-size: 18px; }
+.hero-facts b, .sos .num, .foot-big { font-family: var(--f-body); font-weight: 800; }
+.hero-copy h1 em::after { display: none; }
+.doc-tile { border: 1px solid var(--ln); box-shadow: none; border-radius: 20px; }
+.doc-tile:hover { transform: none; box-shadow: none; border-color: var(--c); }
+.doc-tile.ember { --c: var(--fl); } .doc-tile.violet { --c: var(--ac); } .doc-tile.green { --c: var(--ok); }
+.doc-ic { box-shadow: none; border-radius: 12px; color: var(--on); }
+.faq-list { border: 1px solid var(--ln); }
+.sos > span { background: var(--fl); }
+.j-fill { background: var(--ok); }
+.j-token { background: var(--fl); box-shadow: none; }
+.j-st.on .j-dot { border-color: var(--br); background: var(--br); color: var(--on); box-shadow: 0 0 0 6px var(--brs); }
+.j-card { border: 1px solid var(--ln); box-shadow: var(--sh); }
+.j-art { background: var(--sf2); }
+.j-txt h3 .num { background: var(--bar); }
+.j-who { background: var(--brs); color: var(--br); }
+.j-when { color: var(--fl); }
+.j-loop { background: var(--wrs); color: var(--wr); }
+.warn-line { color: var(--wr); }
+.site-link.on::after { background: var(--fl); }
 
 </style>
 <div id="app" aria-live="polite"></div>
@@ -2422,7 +2725,7 @@ function topbar() {
   const n = unreadNotifs().length;
   return `<header class="topbar"><div class="topbar-in">
     <button class="sq-btn" data-act="help" aria-label="راهنما و پرسش‌های متداول">${icon('help')}</button>
-    <div class="brand">${logoHtml(42)}<div><b>بیمه حوادث گاز</b><small>${esc(W.ROLES[st.user?.role] || 'سامانه پرونده خسارت')}</small></div></div>
+    <div class="brand">${logoHtml(40)}<div><b>بیمه حوادث گاز</b><small>${esc(W.ROLES[st.user?.role] || 'سامانه پرونده خسارت')}</small></div></div>
     <button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>
   </div></header>`;
 }
@@ -2451,12 +2754,14 @@ function pageTitle(title, sub = '', back = 'home', backP = {}) {
     <div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
 }
 
-function tile({ go: g, p = {}, act, color = '', art, a, b, title, sub, btn = 'شروع', count, compact }) {
+// آیکون خطی هر کاشی (در مربع رنگ لحن)
+const TILE_IC = { folderUp: 'upload', trackRial: 'money', userPlus: 'userPlus', inbox: 'inbox', alertDoc: 'alert', camera: 'camera', sendShield: 'send',
+  payment: 'receipt', docsCheck: 'checkC', timeline: 'history', people: 'people', gear: 'settings', chart: 'chart', sms: 'sms' };
+function tile({ go: g, p = {}, act, color = '', art, title, sub, btn = 'شروع', count }) {
   const attrs = act ? `data-act="${act}"` : `data-go="${g}" data-p='${esc(JSON.stringify(p))}'`;
-  return `<button class="tile ${color} ${compact ? 'compact' : ''}" ${attrs}>
-    ${count ? `<span class="count">${fa(count)}</span>` : ''}
-    <div class="tile-art">${illo(art, a, b)}</div>
-    <div class="tile-body"><span class="tile-title">${title}</span><span class="tile-sub">${sub}</span><span class="tile-btn">${btn}</span></div>
+  return `<button class="tile ${color}" ${attrs}>
+    <span class="tile-top"><span class="tile-ic">${icon(TILE_IC[art] || 'doc')}</span>${count != null ? `<span class="tile-n">${fa(count)}</span>` : ''}</span>
+    <span class="tile-title">${title}</span><span class="tile-sub">${sub}</span><span class="tile-go">${btn}${icon('chevL')}</span>
   </button>`;
 }
 
@@ -2482,7 +2787,7 @@ function toast(msg, bad = false) {
   const t = document.createElement('div');
   t.className = 'toast' + (bad ? ' bad' : ''); t.textContent = msg; t.setAttribute('role', 'status');
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3200);
+  setTimeout(() => t.remove(), bad ? 3200 : 2200);
 }
 
 // ================= برگه کشویی =================
@@ -2609,12 +2914,12 @@ function demoRows() {
 function journeySteps() {
   const s = db.settings;
   return [
-    { art: 'houseFire', a: '#f26b21', b: '#3a8cc3', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری را بگیرید که در آن علت حادثه «گاز» قید شده باشد؛ سپس با کارت ملی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
-    { art: 'sms', a: '#3a8cc3', b: '#1f9d57', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
-    { art: 'folderUp', a: '#1f9d57', b: '#3a8cc3', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
-    { art: 'docsCheck', a: '#f2a024', b: '#3a8cc3', who: 'شرکت گاز', t: 'بررسی مدارک در شرکت گاز', d: 'کارشناس گاز مدارک را بررسی می‌کند؛ به‌ویژه اینکه در گزارش آتش‌نشانی یا کارشناس رسمی دادگستری، علت حادثه «گاز» قید شده باشد. سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
-    { art: 'trackRial', a: '#6d5bd0', b: '#3a8cc3', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
-    { art: 'payment', a: '#1f9d57', b: '#f26b21', who: 'مشترک و بیمه‌گر', t: 'تأیید مبلغ و واریز', d: 'مبلغ را می‌پذیرید یا با دلیل اعتراض می‌کنید. پس از تأیید، خسارت به شبای شما واریز و شماره پیگیری پیامک می‌شود.', when: 'پس از تأیید شما' },
+    { art: 'houseFire', a: '#C4520F', b: '#1747A6', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری را بگیرید که در آن علت حادثه «گاز» قید شده باشد؛ سپس با کارت ملی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
+    { art: 'sms', a: '#1747A6', b: '#1C8556', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
+    { art: 'folderUp', a: '#1C8556', b: '#1747A6', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
+    { art: 'docsCheck', a: '#A85F07', b: '#1747A6', who: 'شرکت گاز', t: 'بررسی مدارک در شرکت گاز', d: 'کارشناس گاز مدارک را بررسی می‌کند؛ به‌ویژه اینکه در گزارش آتش‌نشانی یا کارشناس رسمی دادگستری، علت حادثه «گاز» قید شده باشد. سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
+    { art: 'trackRial', a: '#6A3CBD', b: '#1747A6', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
+    { art: 'payment', a: '#1C8556', b: '#C4520F', who: 'مشترک و بیمه‌گر', t: 'تأیید مبلغ و واریز', d: 'مبلغ را می‌پذیرید یا با دلیل اعتراض می‌کنید. پس از تأیید، خسارت به شبای شما واریز و شماره پیگیری پیامک می‌شود.', when: 'پس از تأیید شما' },
   ];
 }
 function journeyHtml(compact = false) {
@@ -2806,10 +3111,14 @@ function defectsBlock(c, target) {
   return `<div class="note warn" style="flex-direction:column">${list.map(d => defectBox(c, d, can)).join('')}</div>`;
 }
 
-function field(label, bind, val, { type = 'text', req = false, ltr = false, ph = '', hint = '', area = false, opts = null, dis = false } = {}) {
+function field(label, bind, val, { type = 'text', req = false, ltr = false, ph = '', hint = '', area = false, opts = null, seg = '', dis = false } = {}) {
   const id = 'f-' + bind.replace(/\W/g, '-');
   const a = `id="${id}" data-bind="${bind}" ${dis ? 'disabled' : ''} ${ph ? `placeholder="${esc(ph)}"` : ''}`;
   let ctrl;
+  // انتخاب تکی به‌صورت دکمه‌های هم‌اندازه (seg) یا کنترل دوگزینه‌ای (seg: 'two')
+  if (opts && seg) {
+    return `<div class="fld" role="radiogroup" aria-labelledby="${id}-l"><span id="${id}-l">${label}${req ? ' <i>*</i>' : ''}</span><div class="seg ${seg === 'two' ? 'two' : ''} ${dis ? 'dis' : ''}" id="${id}">${Object.entries(opts).map(([k, v]) => `<label class="${val === k ? 'on' : ''}"><input type="radio" name="${id}" value="${k}" data-bind="${bind}" ${val === k ? 'checked' : ''} ${dis ? 'disabled' : ''}>${esc(v)}</label>`).join('')}</div>${hint ? `<small>${hint}</small>` : ''}</div>`;
+  }
   if (opts) ctrl = `<select ${a}><option value="">انتخاب کنید</option>${Object.entries(opts).map(([k, v]) => `<option value="${k}" ${val === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
   else if (area) ctrl = `<textarea ${a}>${esc(val || '')}</textarea>`;
   else ctrl = `<input ${a} type="${type}" class="${ltr ? 'ltr' : ''}" value="${esc(val || '')}">`;
@@ -2825,7 +3134,7 @@ function subSection() {
   const lockNote = dis && st.user.role === 'subscriber' ? `<div class="note info">${icon('lock')}<div>پرونده در حال بررسی است و تا زمان اعلام نقص قابل ویرایش نیست.</div></div>` : '';
   const nextBtn = idx => {
     const nx = SECTIONS[idx + 1];
-    return nx && !dis ? `<button class="btn" data-go="sec" data-p='{"s":"${nx.id}"}'>ذخیره و مرحله بعد: ${nx.title}</button>` : '';
+    return nx && !dis ? `<div class="next-bar"><button class="btn" data-go="sec" data-p='{"s":"${nx.id}"}'>ذخیره و مرحله بعد: ${nx.title}</button></div>` : '';
   };
   const idx = SECTIONS.indexOf(meta);
   const inc = c.incident;
@@ -2833,9 +3142,9 @@ function subSection() {
       <div class="grid2">
         ${field('تاریخ حادثه', 'incident.date', fa(inc.date), { req: true, ph: '۱۴۰۵/۰۷/۲۸', hint: 'به شمسی: سال/ماه/روز', dis, ltr: true })}
         ${field('ساعت تقریبی', 'incident.time', fa(inc.time), { ph: '۲۱:۳۰', dis, ltr: true })}
-        ${field('نوع حادثه', 'incident.type', inc.type, { req: true, opts: W.INCIDENT_TYPES, dis })}
-        ${field('کاربری محل', 'incident.placeType', inc.placeType, { req: true, opts: W.PLACE_TYPES, dis })}
-      </div>
+        </div>
+      ${field('نوع حادثه', 'incident.type', inc.type, { req: true, opts: W.INCIDENT_TYPES, seg: 'grid', dis })}
+      ${field('کاربری محل', 'incident.placeType', inc.placeType, { req: true, opts: W.PLACE_TYPES, seg: 'grid', dis })}
       ${field('نشانی کامل محل حادثه', 'incident.address', inc.address, { req: true, area: true, dis })}
       <div class="grid2">
         ${field('کد پستی', 'incident.postalCode', fa(inc.postalCode), { ltr: true, ph: '۱۰ رقم', dis })}
@@ -2916,15 +3225,15 @@ function subSection() {
 function causeBox(c, dis) {
   const inc = c.incident;
   return `<div class="cause-box">
-    <div class="cause-head">${icon('flame')}<b>گزارش علت حادثه <i>*</i></b></div>
+    <div class="cause-head">${icon('alert')}<b>گزارش علت حادثه <i>*</i></b></div>
     <p>گزارش <b>آتش‌نشانی</b> یا <b>کارشناس رسمی دادگستری</b> که در آن علت حادثه به‌صراحت «گاز» نوشته شده باشد. این مهم‌ترین مدرک پرونده است و بدون آن خسارت پرداخت نمی‌شود.</p>
     <ul>
       <li>علت باید روشن نوشته شده باشد؛ مثلاً «نشت گاز»، «انفجار ناشی از تجمع گاز» یا «آتش‌سوزی ناشی از گاز».</li>
       <li>گزارشی که علت را «نامعلوم» یا چیزی غیر از گاز (مثلاً اتصالی برق) نوشته باشد پذیرفته نمی‌شود.</li>
       <li>گزارش باید مهر و امضا، تاریخ و نشانی محل حادثه را داشته باشد.</li>
     </ul>
+    ${field('صادرکننده گزارش', 'incident.causeIssuer', inc.causeIssuer, { req: true, opts: W.CAUSE_ISSUERS, seg: 'two', dis })}
     <div class="grid2">
-      ${field('صادرکننده گزارش', 'incident.causeIssuer', inc.causeIssuer, { req: true, opts: W.CAUSE_ISSUERS, dis })}
       ${field('شماره گزارش', 'incident.causeReportNo', fa(inc.causeReportNo), { req: true, dis })}
       ${field('تاریخ گزارش', 'incident.causeReportDate', fa(inc.causeReportDate), { req: true, ph: '۱۴۰۵/۰۷/۲۸', ltr: true, dis })}
     </div>
@@ -3223,15 +3532,15 @@ function viewReview() {
   if (tab === 'assess') body = reviewAssess(c);
   if (tab === 'chat') { markRead(c); body = threadHtml(c); }
   if (tab === 'history') body = `<div class="ocard" style="padding:16px 18px">${timelineBlock(c)}</div>`;
-  return pageTitle(`<span dir="ltr" class="num">${esc(c.code)}</span>`, `${esc(u?.name || '')} — اشتراک ${fa(u?.subscriptionNo || '')}`, 'list', { f: 'all' }) + `
-    <div class="ocard"><div style="padding:12px 0;display:flex;flex-direction:column;gap:6px">
+  return pageTitle(`<span dir="ltr" class="num">${esc(c.code)}</span>`, `${esc(u?.name || '')} — اشتراک ${fa(u?.subscriptionNo || '')}`, 'list', { f: 'all' }) + `<div class="review-grid"><aside class="review-aside">
+    <div class="ocard" style="box-shadow:var(--sh)"><div style="padding:12px 0;display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${badge(c)} ${slaBadge(c)} ${c.submitCount > 1 ? `<span class="badge neutral">ارسال ${fa(c.submitCount)}م</span>` : ''}</div>
       <b>${esc(W.STATUS[c.status].label)}</b>
       ${stepper(c)}
     </div></div>
-    ${actBtns ? `<div class="btns">${actBtns}</div>` : ''}
-    <div class="tabs" role="tablist">${tabs.map(([id, l, ic]) => `<button class="tab ${tab === id ? 'on' : ''}" role="tab" aria-selected="${tab === id}" data-go="review" data-p='{"id":"${c.id}","tab":"${id}"}'>${icon(ic)}${l}</button>`).join('')}</div>
-    ${body}`;
+    ${actBtns ? `<div class="btns">${actBtns}</div>` : ''}</aside>
+    <div class="review-main"><div class="tabs" role="tablist">${tabs.map(([id, l, ic]) => `<button class="tab ${tab === id ? 'on' : ''}" role="tab" aria-selected="${tab === id}" data-go="review" data-p='{"id":"${c.id}","tab":"${id}"}'>${icon(ic)}${l}</button>`).join('')}</div>
+    ${body}</div></div>`;
 }
 
 function flagBtn(c, target, title) {
@@ -3276,7 +3585,7 @@ function causeReview(c) {
   const files = c.docs.cause_report || [];
   const flags = c.deficiencies.filter(d => d.status === 'open' && d.target === 'doc:cause_report');
   return `<div class="cause-box review">
-    <div class="cause-head">${icon('flame')}<b style="flex:1">گزارش علت حادثه</b>${canFlag(c) ? `<button class="btn sm ghost" data-act="flag" data-target="doc:cause_report" data-title="گزارش علت حادثه">${icon('alert')} اعلام نقص</button>` : ''}</div>
+    <div class="cause-head">${icon('alert')}<b style="flex:1">گزارش علت حادثه</b>${canFlag(c) ? `<button class="btn sm ghost" data-act="flag" data-target="doc:cause_report" data-title="گزارش علت حادثه">${icon('alert')} اعلام نقص</button>` : ''}</div>
     <div class="kv-row">${kv('صادرکننده', esc(W.CAUSE_ISSUERS[i.causeIssuer] || '—'))}${kv('شماره', fa(i.causeReportNo || '—'))}${kv('تاریخ', fa(i.causeReportDate || '—'))}</div>
     ${kv('اظهار مشترک', i.causeStatesGas ? '<span class="badge ok">در گزارش علت گاز قید شده</span>' : '<span class="badge bad">تأیید نشده</span>')}
     ${c.causeCheck ? kv('بررسی شرکت گاز', `<span class="badge ok">${icon('check')} علت گاز تأیید شد</span> ${esc(c.causeCheck.by)} · ${fdate(c.causeCheck.at)}`) : ''}
@@ -3470,7 +3779,7 @@ function typeTable(cs, y, m, t) {
   const mil = v => (v ? fa((v / 1e7).toLocaleString('en-US', { maximumFractionDigits: 1 })).replace('.', '٫') : '—'); // میلیون تومان
   return `<div class="tbl-wrap"><table class="mtx one"><thead><tr><th>ماه</th><th>${W.REPORT_TYPES[t]}</th><th>پرداخت‌شده</th><th>ادعا<small>میلیون تومان</small></th><th>پرداختی<small>میلیون تومان</small></th></tr></thead>
     <tbody>${rows.map((r, i) => `<tr class="${m === i + 1 ? 'on' : ''}"><th><button class="mname" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${W.MONTHS[i]}</button></th>
-      <td><button class="cell ${m === i + 1 ? 'on' : ''}" style="--h:${(r.n / max).toFixed(2)}" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${r.n ? fa(r.n) : '·'}</button></td>
+      <td><button class="cell ${m === i + 1 ? 'on' : ''} ${r.n / max >= 0.55 ? 'hot' : ''}" style="--h:${(r.n / max).toFixed(2)}" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${r.n ? fa(r.n) : '·'}</button></td>
       <td class="num">${r.n ? fa(r.done) : '·'}</td><td class="num">${mil(r.claimed)}</td><td class="num">${mil(r.paid)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><th><button class="mname" data-act="rep" data-p='{"m":0}'>جمع سال</button></th><td><button class="cell ${!m ? 'on' : ''}" data-act="rep" data-p='{"m":0}'>${fa(tot.n)}</button></td><td class="num">${fa(tot.done)}</td><td class="num">${mil(tot.claimed)}</td><td class="num">${mil(tot.paid)}</td></tr></tfoot></table></div>
     <p class="hint-s">${icon('help')} روی هر ماه بزنید تا پرونده‌های ${W.REPORT_TYPES[t]} همان ماه با جزئیات و خروجی Excel بیاید.</p>`;
@@ -3484,7 +3793,7 @@ function monthlyBlock(cs) {
   const types = Object.entries(W.REPORT_TYPES);
   const rowSum = r => Object.values(r).reduce((a, n) => a + n, 0);
   const max = Math.max(1, ...M.rows.flatMap(r => Object.values(r)));
-  const cell = (mi, tk, n, heat = true) => `<button class="cell ${m === mi && t === tk ? 'on' : ''}" ${heat ? `style="--h:${(n / max).toFixed(2)}"` : ''} data-act="rep" data-p='{"m":${mi},"t":"${tk}"}' ${n ? '' : 'disabled'} aria-label="${mi ? W.MONTHS[mi - 1] : 'کل سال'} ${tk ? W.REPORT_TYPES[tk] : 'همه انواع'}: ${n}">${n ? fa(n) : '·'}</button>`;
+  const cell = (mi, tk, n, heat = true) => `<button class="cell ${m === mi && t === tk ? 'on' : ''} ${heat && n / max >= 0.55 ? 'hot' : ''}" ${heat ? `style="--h:${(n / max).toFixed(2)}"` : ''} data-act="rep" data-p='{"m":${mi},"t":"${tk}"}' ${n ? '' : 'disabled'} aria-label="${mi ? W.MONTHS[mi - 1] : 'کل سال'} ${tk ? W.REPORT_TYPES[tk] : 'همه انواع'}: ${n}">${n ? fa(n) : '·'}</button>`;
   const list = W.filterReport(cs, { year: y, month: m || null, type: t || null });
   const label = `${t ? W.REPORT_TYPES[t] : 'همه حوادث'} — ${m ? W.MONTHS[m - 1] + ' ' : 'سال '}${fa(y)}`;
   return `<section class="rep-card" id="rep-month">
@@ -3583,8 +3892,8 @@ function detailRows(list) {
 // ---------- گزارش چاپی ----------
 // صفحه‌ای جدا روی همه برنامه؛ «چاپ» آن را به PDF یا کاغذ می‌برد و «دانلود» یک فایل HTML مستقل می‌دهد
 const RP_CSS = `.rp{font-family:Vazirmatn,Tahoma,sans-serif;color:#1c2733;direction:rtl;line-height:1.8;max-width:900px;margin:0 auto;padding:24px 18px}
-.rp h1{font-size:21px;margin:0}.rp h2{font-size:16px;margin:22px 0 8px;padding:6px 10px;background:#e7f1f9;border-radius:8px;color:#2b6f9e}
-.rp .hd{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:3px solid #3a8cc3;padding-bottom:10px}
+.rp h1{font-size:21px;margin:0}.rp h2{font-size:16px;margin:22px 0 8px;padding:6px 10px;background:#E5ECFA;border-radius:8px;color:#1747A6}
+.rp .hd{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:3px solid #123A8C;padding-bottom:10px}
 .rp .hd small{color:#6a7b8c}.rp table{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0}
 .rp th,.rp td{border:1px solid #cad8e4;padding:5px 8px;text-align:right;vertical-align:top}.rp th{background:#f3f6f9;font-weight:700;white-space:nowrap}
 .rp .kvt th{width:34%}.rp .ok{color:#1f9d57;font-weight:700}.rp .bad{color:#d9443a;font-weight:700}.rp .foot{margin-top:24px;color:#6a7b8c;font-size:12px;border-top:1px solid #cad8e4;padding-top:8px}
@@ -3725,7 +4034,7 @@ function actionSheet(id) {
   openSheet(`<h2>${esc(a.label)}</h2><p class="lead"><span dir="ltr" class="num">${esc(c.code)}</span></p>
     ${err ? `<div class="note warn">${icon('alert')}<div>${esc(err)}</div></div>` : ''}
     <form class="form" data-form="action" data-action="${id}" style="border:0;padding:0">
-      ${id === 'gas_forward' ? `<div class="cause-box review"><div class="cause-head">${icon('flame')}<b>گزارش علت حادثه</b></div>
+      ${id === 'gas_forward' ? `<div class="cause-box review"><div class="cause-head">${icon('alert')}<b>گزارش علت حادثه</b></div>
         <div class="thumbs">${(c.docs.cause_report || []).map(fid => thumb(c, fid, false)).join('')}</div>
         <label class="check"><input type="checkbox" name="causeConfirmed" id="act-cause" required>
           <span>گزارش ${esc(W.CAUSE_ISSUERS[c.incident.causeIssuer] || 'علت حادثه')} را باز کردم و در آن <b>صریحاً «گاز» به‌عنوان علت حادثه قید شده است.</b></span></label></div>` : ''}

@@ -106,7 +106,7 @@ class GII_Plugin {
 			echo wp_json_encode( array(
 				'id' => self::page_url( 'app' ), 'name' => 'بیمه حوادث مشترکین گاز', 'short_name' => 'حوادث گاز', 'lang' => 'fa', 'dir' => 'rtl',
 				'start_url' => self::page_url( 'app' ), 'scope' => home_url( '/' ), 'display' => 'standalone', 'orientation' => 'portrait',
-				'background_color' => '#3a8cc3', 'theme_color' => '#3a8cc3',
+				'background_color' => '#123A8C', 'theme_color' => '#123A8C',
 				'icons' => array(
 					array( 'src' => GII_URL . 'assets/icons/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any' ),
 					array( 'src' => GII_URL . 'assets/icons/icon-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any' ),

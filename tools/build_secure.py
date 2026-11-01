@@ -105,22 +105,22 @@ TEMPLATE = r"""<!doctype html>
 <style>
   :root { color-scheme: light; }
   html, body { margin: 0; min-height: 100%; }
-  body { background: #0b2340; color: #e8f1fa; font-family: Tahoma, 'Segoe UI', sans-serif; direction: rtl; }
+  body { background: #123A8C; color: #E7EBF2; font-family: Tahoma, 'Segoe UI', sans-serif; direction: rtl; }
   #lock { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; box-sizing: border-box; }
   .card { box-sizing: border-box; width: min(380px, 100%); background: #fff; color: #1c2733; border-radius: 22px; padding: 26px 22px; box-shadow: 0 30px 70px rgba(0,0,0,.4); display: flex; flex-direction: column; gap: 12px; text-align: center; }
   .card img { width: 76px; height: 76px; object-fit: contain; margin: 0 auto; }
   .card h1 { font-size: 19px; margin: 0; }
   .card p { margin: 0; font-size: 13.5px; color: #5d6d7d; line-height: 1.9; }
   .card input { font: inherit; font-size: 16px; padding: 12px; border-radius: 12px; border: 1.5px solid #d5dee7; text-align: center; direction: ltr; }
-  .card input:focus { outline: none; border-color: #3a8cc3; }
-  .card button { font: inherit; font-weight: 700; font-size: 15px; padding: 12px; border-radius: 14px; border: 0; background: #3a8cc3; color: #fff; cursor: pointer; }
-  .card button.link { background: none; color: #3a8cc3; padding: 0; font-size: 13px; font-weight: 400; }
-  .card button.alt { background: #f26b21; }
+  .card input:focus { outline: none; border-color: #1747A6; }
+  .card button { font: inherit; font-weight: 700; font-size: 15px; padding: 12px; border-radius: 14px; border: 0; background: #1747A6; color: #fff; cursor: pointer; }
+  .card button.link { background: none; color: #1747A6; padding: 0; font-size: 13px; font-weight: 400; }
+  .card button.alt { background: #C4520F; }
   .card button:disabled { opacity: .6; }
   .fs { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: 13px; color: #5d6d7d; cursor: pointer; }
   .err { color: #d9443a !important; font-weight: 700; min-height: 1.4em; }
   .nojs { background: #fff4e5; border: 1.5px solid #f2a65a; border-radius: 12px; padding: 10px; color: #8a4b0f !important; font-weight: 700; }
-  .tag { display: inline-block; background: #fdf0e2; color: #b45a12; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin: 0 auto; }
+  .tag { display: inline-block; background: #FDEEE2; color: #C4520F; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 700; margin: 0 auto; }
   #wm { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; opacity: .11; background-repeat: repeat; }
   @media print { body * { display: none !important; } body::after { content: "چاپ این نسخه مجاز نیست."; display: block; padding: 40px; color: #000; } }
 </style>
@@ -357,7 +357,7 @@ TEMPLATE = r"""<!doctype html>
   }
   // اپ موبایل روی صفحه بزرگ: داخل قاب گوشی با viewport واقعی موبایل (iframe هم‌مبدأ)
   function runFramed(P) {
-    var css = 'html,body{height:100%}body{margin:0;display:grid;place-items:center;background:radial-gradient(circle at 30% 20%,#1d4f7a,#0b2340 60%);overflow:hidden}'
+    var css = 'html,body{height:100%}body{margin:0;display:grid;place-items:center;background:#123A8C;overflow:hidden}'
       + '.phone{position:relative;width:398px;height:min(860px,calc(100vh - 40px));border-radius:48px;background:#0c0f14;padding:12px;box-shadow:0 40px 90px rgba(0,0,0,.55),inset 0 0 0 2px #2a3340}'
       + '.phone iframe{width:100%;height:100%;border:0;border-radius:38px;background:#f3f6f9;display:block}';
     var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);

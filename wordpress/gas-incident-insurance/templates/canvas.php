@@ -19,7 +19,7 @@ nocache_headers();
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?php echo esc_html( 'site' === $gii_mode ? 'سامانه بیمه حوادث مشترکین گاز' : 'بیمه حوادث مشترکین گاز' ); ?></title>
-<meta name="theme-color" content="<?php echo 'site' === $gii_mode ? '#0b2340' : '#3a8cc3'; ?>">
+<meta name="theme-color" content="<?php echo 'site' === $gii_mode ? '#123A8C' : '#123A8C'; ?>">
 <meta name="robots" content="noindex">
 <?php if ( 'app' === $gii_mode ) : ?>
 <link rel="manifest" href="<?php echo esc_url( add_query_arg( 'gii-manifest', '1', home_url( '/' ) ) ); ?>">

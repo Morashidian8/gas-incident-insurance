@@ -149,7 +149,7 @@ function topbar() {
   const n = unreadNotifs().length;
   return `<header class="topbar"><div class="topbar-in">
     <button class="sq-btn" data-act="help" aria-label="راهنما و پرسش‌های متداول">${icon('help')}</button>
-    <div class="brand">${logoHtml(42)}<div><b>بیمه حوادث گاز</b><small>${esc(W.ROLES[st.user?.role] || 'سامانه پرونده خسارت')}</small></div></div>
+    <div class="brand">${logoHtml(40)}<div><b>بیمه حوادث گاز</b><small>${esc(W.ROLES[st.user?.role] || 'سامانه پرونده خسارت')}</small></div></div>
     <button class="sq-btn" data-act="notifs" aria-label="اعلان‌ها">${icon('bell')}${n ? `<span class="dot">${fa(n)}</span>` : ''}</button>
   </div></header>`;
 }
@@ -178,12 +178,14 @@ function pageTitle(title, sub = '', back = 'home', backP = {}) {
     <div><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ''}</div></div>`;
 }
 
-function tile({ go: g, p = {}, act, color = '', art, a, b, title, sub, btn = 'شروع', count, compact }) {
+// آیکون خطی هر کاشی (در مربع رنگ لحن)
+const TILE_IC = { folderUp: 'upload', trackRial: 'money', userPlus: 'userPlus', inbox: 'inbox', alertDoc: 'alert', camera: 'camera', sendShield: 'send',
+  payment: 'receipt', docsCheck: 'checkC', timeline: 'history', people: 'people', gear: 'settings', chart: 'chart', sms: 'sms' };
+function tile({ go: g, p = {}, act, color = '', art, title, sub, btn = 'شروع', count }) {
   const attrs = act ? `data-act="${act}"` : `data-go="${g}" data-p='${esc(JSON.stringify(p))}'`;
-  return `<button class="tile ${color} ${compact ? 'compact' : ''}" ${attrs}>
-    ${count ? `<span class="count">${fa(count)}</span>` : ''}
-    <div class="tile-art">${illo(art, a, b)}</div>
-    <div class="tile-body"><span class="tile-title">${title}</span><span class="tile-sub">${sub}</span><span class="tile-btn">${btn}</span></div>
+  return `<button class="tile ${color}" ${attrs}>
+    <span class="tile-top"><span class="tile-ic">${icon(TILE_IC[art] || 'doc')}</span>${count != null ? `<span class="tile-n">${fa(count)}</span>` : ''}</span>
+    <span class="tile-title">${title}</span><span class="tile-sub">${sub}</span><span class="tile-go">${btn}${icon('chevL')}</span>
   </button>`;
 }
 
@@ -209,7 +211,7 @@ function toast(msg, bad = false) {
   const t = document.createElement('div');
   t.className = 'toast' + (bad ? ' bad' : ''); t.textContent = msg; t.setAttribute('role', 'status');
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3200);
+  setTimeout(() => t.remove(), bad ? 3200 : 2200);
 }
 
 // ================= برگه کشویی =================
@@ -336,12 +338,12 @@ function demoRows() {
 function journeySteps() {
   const s = db.settings;
   return [
-    { art: 'houseFire', a: '#f26b21', b: '#3a8cc3', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری را بگیرید که در آن علت حادثه «گاز» قید شده باشد؛ سپس با کارت ملی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
-    { art: 'sms', a: '#3a8cc3', b: '#1f9d57', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
-    { art: 'folderUp', a: '#1f9d57', b: '#3a8cc3', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
-    { art: 'docsCheck', a: '#f2a024', b: '#3a8cc3', who: 'شرکت گاز', t: 'بررسی مدارک در شرکت گاز', d: 'کارشناس گاز مدارک را بررسی می‌کند؛ به‌ویژه اینکه در گزارش آتش‌نشانی یا کارشناس رسمی دادگستری، علت حادثه «گاز» قید شده باشد. سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
-    { art: 'trackRial', a: '#6d5bd0', b: '#3a8cc3', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
-    { art: 'payment', a: '#1f9d57', b: '#f26b21', who: 'مشترک و بیمه‌گر', t: 'تأیید مبلغ و واریز', d: 'مبلغ را می‌پذیرید یا با دلیل اعتراض می‌کنید. پس از تأیید، خسارت به شبای شما واریز و شماره پیگیری پیامک می‌شود.', when: 'پس از تأیید شما' },
+    { art: 'houseFire', a: '#C4520F', b: '#1747A6', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری را بگیرید که در آن علت حادثه «گاز» قید شده باشد؛ سپس با کارت ملی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
+    { art: 'sms', a: '#1747A6', b: '#1C8556', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
+    { art: 'folderUp', a: '#1C8556', b: '#1747A6', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
+    { art: 'docsCheck', a: '#A85F07', b: '#1747A6', who: 'شرکت گاز', t: 'بررسی مدارک در شرکت گاز', d: 'کارشناس گاز مدارک را بررسی می‌کند؛ به‌ویژه اینکه در گزارش آتش‌نشانی یا کارشناس رسمی دادگستری، علت حادثه «گاز» قید شده باشد. سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
+    { art: 'trackRial', a: '#6A3CBD', b: '#1747A6', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
+    { art: 'payment', a: '#1C8556', b: '#C4520F', who: 'مشترک و بیمه‌گر', t: 'تأیید مبلغ و واریز', d: 'مبلغ را می‌پذیرید یا با دلیل اعتراض می‌کنید. پس از تأیید، خسارت به شبای شما واریز و شماره پیگیری پیامک می‌شود.', when: 'پس از تأیید شما' },
   ];
 }
 function journeyHtml(compact = false) {
@@ -533,10 +535,14 @@ function defectsBlock(c, target) {
   return `<div class="note warn" style="flex-direction:column">${list.map(d => defectBox(c, d, can)).join('')}</div>`;
 }
 
-function field(label, bind, val, { type = 'text', req = false, ltr = false, ph = '', hint = '', area = false, opts = null, dis = false } = {}) {
+function field(label, bind, val, { type = 'text', req = false, ltr = false, ph = '', hint = '', area = false, opts = null, seg = '', dis = false } = {}) {
   const id = 'f-' + bind.replace(/\W/g, '-');
   const a = `id="${id}" data-bind="${bind}" ${dis ? 'disabled' : ''} ${ph ? `placeholder="${esc(ph)}"` : ''}`;
   let ctrl;
+  // انتخاب تکی به‌صورت دکمه‌های هم‌اندازه (seg) یا کنترل دوگزینه‌ای (seg: 'two')
+  if (opts && seg) {
+    return `<div class="fld" role="radiogroup" aria-labelledby="${id}-l"><span id="${id}-l">${label}${req ? ' <i>*</i>' : ''}</span><div class="seg ${seg === 'two' ? 'two' : ''} ${dis ? 'dis' : ''}" id="${id}">${Object.entries(opts).map(([k, v]) => `<label class="${val === k ? 'on' : ''}"><input type="radio" name="${id}" value="${k}" data-bind="${bind}" ${val === k ? 'checked' : ''} ${dis ? 'disabled' : ''}>${esc(v)}</label>`).join('')}</div>${hint ? `<small>${hint}</small>` : ''}</div>`;
+  }
   if (opts) ctrl = `<select ${a}><option value="">انتخاب کنید</option>${Object.entries(opts).map(([k, v]) => `<option value="${k}" ${val === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
   else if (area) ctrl = `<textarea ${a}>${esc(val || '')}</textarea>`;
   else ctrl = `<input ${a} type="${type}" class="${ltr ? 'ltr' : ''}" value="${esc(val || '')}">`;
@@ -552,7 +558,7 @@ function subSection() {
   const lockNote = dis && st.user.role === 'subscriber' ? `<div class="note info">${icon('lock')}<div>پرونده در حال بررسی است و تا زمان اعلام نقص قابل ویرایش نیست.</div></div>` : '';
   const nextBtn = idx => {
     const nx = SECTIONS[idx + 1];
-    return nx && !dis ? `<button class="btn" data-go="sec" data-p='{"s":"${nx.id}"}'>ذخیره و مرحله بعد: ${nx.title}</button>` : '';
+    return nx && !dis ? `<div class="next-bar"><button class="btn" data-go="sec" data-p='{"s":"${nx.id}"}'>ذخیره و مرحله بعد: ${nx.title}</button></div>` : '';
   };
   const idx = SECTIONS.indexOf(meta);
   const inc = c.incident;
@@ -560,9 +566,9 @@ function subSection() {
       <div class="grid2">
         ${field('تاریخ حادثه', 'incident.date', fa(inc.date), { req: true, ph: '۱۴۰۵/۰۷/۲۸', hint: 'به شمسی: سال/ماه/روز', dis, ltr: true })}
         ${field('ساعت تقریبی', 'incident.time', fa(inc.time), { ph: '۲۱:۳۰', dis, ltr: true })}
-        ${field('نوع حادثه', 'incident.type', inc.type, { req: true, opts: W.INCIDENT_TYPES, dis })}
-        ${field('کاربری محل', 'incident.placeType', inc.placeType, { req: true, opts: W.PLACE_TYPES, dis })}
-      </div>
+        </div>
+      ${field('نوع حادثه', 'incident.type', inc.type, { req: true, opts: W.INCIDENT_TYPES, seg: 'grid', dis })}
+      ${field('کاربری محل', 'incident.placeType', inc.placeType, { req: true, opts: W.PLACE_TYPES, seg: 'grid', dis })}
       ${field('نشانی کامل محل حادثه', 'incident.address', inc.address, { req: true, area: true, dis })}
       <div class="grid2">
         ${field('کد پستی', 'incident.postalCode', fa(inc.postalCode), { ltr: true, ph: '۱۰ رقم', dis })}
@@ -643,15 +649,15 @@ function subSection() {
 function causeBox(c, dis) {
   const inc = c.incident;
   return `<div class="cause-box">
-    <div class="cause-head">${icon('flame')}<b>گزارش علت حادثه <i>*</i></b></div>
+    <div class="cause-head">${icon('alert')}<b>گزارش علت حادثه <i>*</i></b></div>
     <p>گزارش <b>آتش‌نشانی</b> یا <b>کارشناس رسمی دادگستری</b> که در آن علت حادثه به‌صراحت «گاز» نوشته شده باشد. این مهم‌ترین مدرک پرونده است و بدون آن خسارت پرداخت نمی‌شود.</p>
     <ul>
       <li>علت باید روشن نوشته شده باشد؛ مثلاً «نشت گاز»، «انفجار ناشی از تجمع گاز» یا «آتش‌سوزی ناشی از گاز».</li>
       <li>گزارشی که علت را «نامعلوم» یا چیزی غیر از گاز (مثلاً اتصالی برق) نوشته باشد پذیرفته نمی‌شود.</li>
       <li>گزارش باید مهر و امضا، تاریخ و نشانی محل حادثه را داشته باشد.</li>
     </ul>
+    ${field('صادرکننده گزارش', 'incident.causeIssuer', inc.causeIssuer, { req: true, opts: W.CAUSE_ISSUERS, seg: 'two', dis })}
     <div class="grid2">
-      ${field('صادرکننده گزارش', 'incident.causeIssuer', inc.causeIssuer, { req: true, opts: W.CAUSE_ISSUERS, dis })}
       ${field('شماره گزارش', 'incident.causeReportNo', fa(inc.causeReportNo), { req: true, dis })}
       ${field('تاریخ گزارش', 'incident.causeReportDate', fa(inc.causeReportDate), { req: true, ph: '۱۴۰۵/۰۷/۲۸', ltr: true, dis })}
     </div>
@@ -950,15 +956,15 @@ function viewReview() {
   if (tab === 'assess') body = reviewAssess(c);
   if (tab === 'chat') { markRead(c); body = threadHtml(c); }
   if (tab === 'history') body = `<div class="ocard" style="padding:16px 18px">${timelineBlock(c)}</div>`;
-  return pageTitle(`<span dir="ltr" class="num">${esc(c.code)}</span>`, `${esc(u?.name || '')} — اشتراک ${fa(u?.subscriptionNo || '')}`, 'list', { f: 'all' }) + `
-    <div class="ocard"><div style="padding:12px 0;display:flex;flex-direction:column;gap:6px">
+  return pageTitle(`<span dir="ltr" class="num">${esc(c.code)}</span>`, `${esc(u?.name || '')} — اشتراک ${fa(u?.subscriptionNo || '')}`, 'list', { f: 'all' }) + `<div class="review-grid"><aside class="review-aside">
+    <div class="ocard" style="box-shadow:var(--sh)"><div style="padding:12px 0;display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${badge(c)} ${slaBadge(c)} ${c.submitCount > 1 ? `<span class="badge neutral">ارسال ${fa(c.submitCount)}م</span>` : ''}</div>
       <b>${esc(W.STATUS[c.status].label)}</b>
       ${stepper(c)}
     </div></div>
-    ${actBtns ? `<div class="btns">${actBtns}</div>` : ''}
-    <div class="tabs" role="tablist">${tabs.map(([id, l, ic]) => `<button class="tab ${tab === id ? 'on' : ''}" role="tab" aria-selected="${tab === id}" data-go="review" data-p='{"id":"${c.id}","tab":"${id}"}'>${icon(ic)}${l}</button>`).join('')}</div>
-    ${body}`;
+    ${actBtns ? `<div class="btns">${actBtns}</div>` : ''}</aside>
+    <div class="review-main"><div class="tabs" role="tablist">${tabs.map(([id, l, ic]) => `<button class="tab ${tab === id ? 'on' : ''}" role="tab" aria-selected="${tab === id}" data-go="review" data-p='{"id":"${c.id}","tab":"${id}"}'>${icon(ic)}${l}</button>`).join('')}</div>
+    ${body}</div></div>`;
 }
 
 function flagBtn(c, target, title) {
@@ -1003,7 +1009,7 @@ function causeReview(c) {
   const files = c.docs.cause_report || [];
   const flags = c.deficiencies.filter(d => d.status === 'open' && d.target === 'doc:cause_report');
   return `<div class="cause-box review">
-    <div class="cause-head">${icon('flame')}<b style="flex:1">گزارش علت حادثه</b>${canFlag(c) ? `<button class="btn sm ghost" data-act="flag" data-target="doc:cause_report" data-title="گزارش علت حادثه">${icon('alert')} اعلام نقص</button>` : ''}</div>
+    <div class="cause-head">${icon('alert')}<b style="flex:1">گزارش علت حادثه</b>${canFlag(c) ? `<button class="btn sm ghost" data-act="flag" data-target="doc:cause_report" data-title="گزارش علت حادثه">${icon('alert')} اعلام نقص</button>` : ''}</div>
     <div class="kv-row">${kv('صادرکننده', esc(W.CAUSE_ISSUERS[i.causeIssuer] || '—'))}${kv('شماره', fa(i.causeReportNo || '—'))}${kv('تاریخ', fa(i.causeReportDate || '—'))}</div>
     ${kv('اظهار مشترک', i.causeStatesGas ? '<span class="badge ok">در گزارش علت گاز قید شده</span>' : '<span class="badge bad">تأیید نشده</span>')}
     ${c.causeCheck ? kv('بررسی شرکت گاز', `<span class="badge ok">${icon('check')} علت گاز تأیید شد</span> ${esc(c.causeCheck.by)} · ${fdate(c.causeCheck.at)}`) : ''}
@@ -1197,7 +1203,7 @@ function typeTable(cs, y, m, t) {
   const mil = v => (v ? fa((v / 1e7).toLocaleString('en-US', { maximumFractionDigits: 1 })).replace('.', '٫') : '—'); // میلیون تومان
   return `<div class="tbl-wrap"><table class="mtx one"><thead><tr><th>ماه</th><th>${W.REPORT_TYPES[t]}</th><th>پرداخت‌شده</th><th>ادعا<small>میلیون تومان</small></th><th>پرداختی<small>میلیون تومان</small></th></tr></thead>
     <tbody>${rows.map((r, i) => `<tr class="${m === i + 1 ? 'on' : ''}"><th><button class="mname" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${W.MONTHS[i]}</button></th>
-      <td><button class="cell ${m === i + 1 ? 'on' : ''}" style="--h:${(r.n / max).toFixed(2)}" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${r.n ? fa(r.n) : '·'}</button></td>
+      <td><button class="cell ${m === i + 1 ? 'on' : ''} ${r.n / max >= 0.55 ? 'hot' : ''}" style="--h:${(r.n / max).toFixed(2)}" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${r.n ? fa(r.n) : '·'}</button></td>
       <td class="num">${r.n ? fa(r.done) : '·'}</td><td class="num">${mil(r.claimed)}</td><td class="num">${mil(r.paid)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><th><button class="mname" data-act="rep" data-p='{"m":0}'>جمع سال</button></th><td><button class="cell ${!m ? 'on' : ''}" data-act="rep" data-p='{"m":0}'>${fa(tot.n)}</button></td><td class="num">${fa(tot.done)}</td><td class="num">${mil(tot.claimed)}</td><td class="num">${mil(tot.paid)}</td></tr></tfoot></table></div>
     <p class="hint-s">${icon('help')} روی هر ماه بزنید تا پرونده‌های ${W.REPORT_TYPES[t]} همان ماه با جزئیات و خروجی Excel بیاید.</p>`;
@@ -1211,7 +1217,7 @@ function monthlyBlock(cs) {
   const types = Object.entries(W.REPORT_TYPES);
   const rowSum = r => Object.values(r).reduce((a, n) => a + n, 0);
   const max = Math.max(1, ...M.rows.flatMap(r => Object.values(r)));
-  const cell = (mi, tk, n, heat = true) => `<button class="cell ${m === mi && t === tk ? 'on' : ''}" ${heat ? `style="--h:${(n / max).toFixed(2)}"` : ''} data-act="rep" data-p='{"m":${mi},"t":"${tk}"}' ${n ? '' : 'disabled'} aria-label="${mi ? W.MONTHS[mi - 1] : 'کل سال'} ${tk ? W.REPORT_TYPES[tk] : 'همه انواع'}: ${n}">${n ? fa(n) : '·'}</button>`;
+  const cell = (mi, tk, n, heat = true) => `<button class="cell ${m === mi && t === tk ? 'on' : ''} ${heat && n / max >= 0.55 ? 'hot' : ''}" ${heat ? `style="--h:${(n / max).toFixed(2)}"` : ''} data-act="rep" data-p='{"m":${mi},"t":"${tk}"}' ${n ? '' : 'disabled'} aria-label="${mi ? W.MONTHS[mi - 1] : 'کل سال'} ${tk ? W.REPORT_TYPES[tk] : 'همه انواع'}: ${n}">${n ? fa(n) : '·'}</button>`;
   const list = W.filterReport(cs, { year: y, month: m || null, type: t || null });
   const label = `${t ? W.REPORT_TYPES[t] : 'همه حوادث'} — ${m ? W.MONTHS[m - 1] + ' ' : 'سال '}${fa(y)}`;
   return `<section class="rep-card" id="rep-month">
@@ -1310,8 +1316,8 @@ function detailRows(list) {
 // ---------- گزارش چاپی ----------
 // صفحه‌ای جدا روی همه برنامه؛ «چاپ» آن را به PDF یا کاغذ می‌برد و «دانلود» یک فایل HTML مستقل می‌دهد
 const RP_CSS = `.rp{font-family:Vazirmatn,Tahoma,sans-serif;color:#1c2733;direction:rtl;line-height:1.8;max-width:900px;margin:0 auto;padding:24px 18px}
-.rp h1{font-size:21px;margin:0}.rp h2{font-size:16px;margin:22px 0 8px;padding:6px 10px;background:#e7f1f9;border-radius:8px;color:#2b6f9e}
-.rp .hd{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:3px solid #3a8cc3;padding-bottom:10px}
+.rp h1{font-size:21px;margin:0}.rp h2{font-size:16px;margin:22px 0 8px;padding:6px 10px;background:#E5ECFA;border-radius:8px;color:#1747A6}
+.rp .hd{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;border-bottom:3px solid #123A8C;padding-bottom:10px}
 .rp .hd small{color:#6a7b8c}.rp table{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0}
 .rp th,.rp td{border:1px solid #cad8e4;padding:5px 8px;text-align:right;vertical-align:top}.rp th{background:#f3f6f9;font-weight:700;white-space:nowrap}
 .rp .kvt th{width:34%}.rp .ok{color:#1f9d57;font-weight:700}.rp .bad{color:#d9443a;font-weight:700}.rp .foot{margin-top:24px;color:#6a7b8c;font-size:12px;border-top:1px solid #cad8e4;padding-top:8px}
@@ -1452,7 +1458,7 @@ function actionSheet(id) {
   openSheet(`<h2>${esc(a.label)}</h2><p class="lead"><span dir="ltr" class="num">${esc(c.code)}</span></p>
     ${err ? `<div class="note warn">${icon('alert')}<div>${esc(err)}</div></div>` : ''}
     <form class="form" data-form="action" data-action="${id}" style="border:0;padding:0">
-      ${id === 'gas_forward' ? `<div class="cause-box review"><div class="cause-head">${icon('flame')}<b>گزارش علت حادثه</b></div>
+      ${id === 'gas_forward' ? `<div class="cause-box review"><div class="cause-head">${icon('alert')}<b>گزارش علت حادثه</b></div>
         <div class="thumbs">${(c.docs.cause_report || []).map(fid => thumb(c, fid, false)).join('')}</div>
         <label class="check"><input type="checkbox" name="causeConfirmed" id="act-cause" required>
           <span>گزارش ${esc(W.CAUSE_ISSUERS[c.incident.causeIssuer] || 'علت حادثه')} را باز کردم و در آن <b>صریحاً «گاز» به‌عنوان علت حادثه قید شده است.</b></span></label></div>` : ''}

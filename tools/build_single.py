@@ -82,7 +82,7 @@ def build(logo=None, org=""):
 """
     body = f'<style>\n{css}\n</style>\n<div id="app" aria-live="polite"></div>\n<script>\n{js}</script>\n'
     body_full = body.replace(js, js_full)
-    pwa = """<meta name="theme-color" content="#3a8cc3">
+    pwa = """<meta name="theme-color" content="#123A8C">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="حوادث گاز">
@@ -102,7 +102,7 @@ def build(logo=None, org=""):
                 + "</head>\n<body>\n" + (body_full if mode == "app" else body) + "</body>\n</html>\n")
 
     app_html = page("app", "site/", pwa, "بیمه حوادث مشترکین گاز")
-    site_html = page("site", "../", '<meta name="theme-color" content="#3a8cc3">\n<link rel="icon" href="../icons/icon-192.png" type="image/png">\n',
+    site_html = page("site", "../", '<meta name="theme-color" content="#123A8C">\n<link rel="icon" href="../icons/icon-192.png" type="image/png">\n',
                      "سامانه بیمه حوادث مشترکین گاز")
     # فایل‌های تکی برای باز کردن مستقیم روی دستگاه
     (out / "gas-incident-insurance.html").write_text(app_html, encoding="utf-8")
