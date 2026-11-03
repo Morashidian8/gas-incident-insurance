@@ -2,7 +2,7 @@ import * as W from './workflow.js';
 import * as S from './store.js';
 import * as LOCAL from './backend-local.js';
 import * as WPB from './backend-wp.js';
-import { icon, illo, brandMark } from './icons.js';
+import { icon, illo, brandMark, duo } from './icons.js';
 
 // داخل وردپرس (افزونه) داده‌ها روی سرور است؛ در غیر این صورت همین مرورگر.
 const B = window.GII_WP ? WPB : LOCAL;
@@ -93,6 +93,7 @@ function markRead(c) { B.markRead(c); }
 
 // ================= ناوبری و رندر =================
 function go(view, p = {}) {
+  st.enter = st.enter || view !== st.view || p.id !== st.p.id || p.s !== st.p.s || p.tab !== st.p.tab;
   st.view = view; st.p = p;
   if (p.id) st.claimId = p.id;
   sset('gii.view', JSON.stringify({ view, p }));
@@ -109,8 +110,32 @@ function render() {
   const main = `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>`;
   app.innerHTML = site ? siteHeader() + main + siteFooter() : topbar() + main + bottomNav();
   hydrateFiles(app);
+  // ورود نرم صفحه و شمارش اعداد فقط هنگام رفتن به صفحه دیگر (نه در ذخیره خودکار و تازه‌سازی)
+  if (st.enter) { st.enter = false; $('main', app)?.classList.add('enter'); countUp(app); }
   const tab = $('.tab.on');
   if (tab) { const y = window.scrollY; tab.scrollIntoView({ block: 'nearest', inline: 'center' }); window.scrollTo({ top: y }); }
+}
+
+// اعداد داشبورد و کاشی‌ها از صفر تا مقدار شمرده می‌شوند (حداکثر ۶۰۰ میلی‌ثانیه)
+function countUp(root) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  root.querySelectorAll('.bk .v, .tile-n, .lg .n').forEach(el => {
+    const target = +W.normalizeDigits(el.textContent).replace(/\D/g, '');
+    if (!target || target > 100000) return;
+    const t0 = performance.now();
+    const step = t => { const k = Math.min(1, (t - t0) / 600); el.textContent = fa(Math.round(target * (1 - (1 - k) ** 3))); if (k < 1) requestAnimationFrame(step); };
+    el.textContent = fa(0); requestAnimationFrame(step);
+  });
+}
+// انیمیشن کوتاه موفقیت پس از اقدام‌های مهم
+const CELEBRATE = { submit: 'پرونده ارسال شد', gas_forward: 'به بیمه‌گر ارجاع شد', accept: 'مبلغ تأیید شد', ins_assess: 'مبلغ به مشترک اعلام شد', ins_pay: 'واریز ثبت شد' };
+function celebrate(title, sub = '') {
+  const d = document.createElement('div');
+  d.className = 'celebrate'; d.setAttribute('role', 'status');
+  d.innerHTML = `<div class="cel-card"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23"/><path d="m15 27 7.5 7.5L37.5 19"/></svg><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+  document.body.appendChild(d);
+  setTimeout(() => d.classList.add('out'), 1500);
+  setTimeout(() => d.remove(), 1850);
 }
 
 // بازسازی صفحه بدون پرش به بالا (فیلترهای گزارش، تازه‌سازی خودکار)
@@ -160,7 +185,7 @@ function navItems() {
   const homeViews = ['home', 'sections', 'sec', 'track', 'register', 'registered', 'review', 'users', 'settings', 'sms'];
   return [
     { id: 'home', label: 'خانه', ic: 'home', on: homeViews.includes(st.view) },
-    ...(r !== 'subscriber' ? [{ id: 'list', label: 'پرونده‌ها', ic: 'inbox', on: st.view === 'list', hideSm: true }, { id: 'reports', label: 'گزارش', ic: 'chart', on: st.view === 'reports' }] : []),
+    ...(r !== 'subscriber' ? [{ id: 'list', label: 'پرونده‌ها', ic: 'inbox', on: st.view === 'list' }, { id: 'reports', label: 'گزارش', ic: 'chart', on: st.view === 'reports' }] : []),
     { id: 'messenger', label: 'پیام‌رسان', ic: 'send', on: ['inbox', 'thread'].includes(st.view), dot: unread },
     { id: 'profile', label: 'پروفایل', ic: 'user', on: false },
   ];
@@ -184,7 +209,7 @@ const TILE_IC = { folderUp: 'upload', trackRial: 'money', userPlus: 'userPlus', 
 function tile({ go: g, p = {}, act, color = '', art, title, sub, btn = 'شروع', count }) {
   const attrs = act ? `data-act="${act}"` : `data-go="${g}" data-p='${esc(JSON.stringify(p))}'`;
   return `<button class="tile ${color}" ${attrs}>
-    <span class="tile-top"><span class="tile-ic">${icon(TILE_IC[art] || 'doc')}</span>${count != null ? `<span class="tile-n">${fa(count)}</span>` : ''}</span>
+    <span class="tile-top"><span class="tile-ic">${duo(TILE_IC[art] || 'checkC')}</span>${count != null ? `<span class="tile-n">${fa(count)}</span>` : ''}</span>
     <span class="tile-title">${title}</span><span class="tile-sub">${sub}</span><span class="tile-go">${btn}${icon('chevL')}</span>
   </button>`;
 }
@@ -308,9 +333,9 @@ function viewLogin() {
       ${loginForm()}
       ${fireCta()}
       <div class="flow">
-        <div>${icon('upload')}<b>مشترک</b>بارگذاری مدارک</div>
-        <div>${icon('flame')}<b>شرکت گاز</b>بررسی و تأیید</div>
-        <div>${icon('money')}<b>بیمه‌گر</b>ارزیابی و پرداخت</div>
+        <div>${duo('upload')}<b>مشترک</b>بارگذاری مدارک</div>
+        <div>${duo('flame')}<b>شرکت گاز</b>بررسی و تأیید</div>
+        <div>${duo('money')}<b>بیمه‌گر</b>ارزیابی و پرداخت</div>
       </div>
       ${demoRows()}
       ${OTHER_URL ? `<a class="alt-link" href="${esc(OTHER_URL)}">${icon('eye')} اپ باز نمی‌شود؟ از طریق سایت وارد شوید</a>` : ''}
@@ -399,6 +424,45 @@ function startJourney() {
 }
 
 // صفحه نخست سایت: معرفی و ورود، مسیر پرونده، مدارک، پرسش‌ها
+// نوار واقعیت‌ها زیر Hero؛ مهلت‌ها از تنظیمات بیمه‌نامه
+function factsStrip() {
+  const s = db.settings;
+  const f = [['clock', fa(s.gasSlaDays) + ' روز', 'حداکثر بررسی شرکت گاز'], ['shield', fa(s.insurerSlaDays) + ' روز', 'حداکثر ارزیابی بیمه‌گر'],
+    ['sms', '۶ مرحله', 'با پیامک در هر مرحله'], ['phone', '۲۴ ساعته', 'از گوشی یا کامپیوتر']];
+  return `<section class="facts"><div class="wrap facts-in">${f.map(([ic, v, l]) => `<div class="fact">${duo(ic)}<div><b>${v}</b><span>${l}</span></div></div>`).join('')}</div></section>`;
+}
+// تصویرسازی: خانه‌ای که بیمه از آن محافظت می‌کند، گوشی با پرونده تأییدشده و گزارش علت حادثه
+function heroScene() {
+  return `<svg class="scene" viewBox="0 0 360 300" role="img" aria-label="خانه زیر چتر بیمه، پرونده روی گوشی و گزارش علت حادثه">
+    <circle cx="180" cy="160" r="128" fill="var(--brs)"/>
+    <path d="M40 262h280" stroke="var(--ln)" stroke-width="3" stroke-linecap="round"/>
+    <rect x="108" y="138" width="148" height="124" rx="6" fill="var(--sf)" stroke="var(--bar)" stroke-width="3"/>
+    <path d="M92 144 182 76l90 68" fill="none" stroke="var(--bar)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="166" y="206" width="32" height="56" rx="4" fill="var(--bar)"/>
+    <rect x="124" y="166" width="32" height="28" rx="4" fill="var(--brs)" stroke="var(--bar)" stroke-width="2.5"/>
+    <rect x="208" y="166" width="32" height="28" rx="4" fill="var(--brs)" stroke="var(--bar)" stroke-width="2.5"/>
+    <rect x="226" y="84" width="16" height="36" rx="3" fill="var(--sf)" stroke="var(--bar)" stroke-width="3"/>
+    <g transform="translate(244 176)"><path d="M38 0 76 14v28c0 24-16 42-38 50C16 84 0 66 0 42V14z" fill="var(--br)"/><path d="m22 44 11 11 22-23" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g transform="translate(36 150)"><rect width="62" height="108" rx="12" fill="var(--sf)" stroke="var(--bar)" stroke-width="3"/><rect x="10" y="16" width="42" height="8" rx="4" fill="var(--brs)"/><rect x="10" y="30" width="30" height="6" rx="3" fill="var(--ln)"/><rect x="10" y="42" width="36" height="6" rx="3" fill="var(--ln)"/>
+      <circle cx="31" cy="76" r="14" fill="var(--oks)"/><path d="m24 76 5 5 9-9" fill="none" stroke="var(--ok)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g transform="translate(46 54) rotate(-8)"><rect width="74" height="90" rx="8" fill="var(--sf)" stroke="var(--fl)" stroke-width="3"/><rect x="0" y="0" width="74" height="20" rx="8" fill="var(--fl)"/><rect x="10" y="32" width="54" height="6" rx="3" fill="var(--fls)"/><rect x="10" y="46" width="40" height="6" rx="3" fill="var(--ln)"/><rect x="10" y="60" width="48" height="6" rx="3" fill="var(--ln)"/>
+      <path d="M37 4c-4 0-6 2.5-6 5.4 0 2.6 1.6 3.8 2.6 6.6 2-1.2 2.8-2.8 2.7-4.3.8.5 1.3 1.3 1.5 2.3 1.6-1.3 2.9-2.9 2.9-4.9C40.7 6.4 39.2 4 37 4z" fill="#fff"/></g>
+  </svg>`;
+}
+// «چرا این سامانه»
+function whySection() {
+  const items = [
+    ['upload', 'بدون رفت‌وآمد', 'مدارک، عکس‌ها و شماره شبا را از گوشی بارگذاری کنید؛ فقط برای تشکیل پرونده یک‌بار به شرکت گاز مراجعه می‌کنید.'],
+    ['alert', 'نقص‌ها دقیق و یکجا', 'اگر مدرکی کم باشد، دقیقاً همان مورد اعلام می‌شود و با پاسخ شما پرونده دوباره جریان می‌گیرد.'],
+    ['history', 'همیشه می‌دانید کجاست', 'وضعیت، مهلت هر مرحله و اینکه اقدام بعدی با کیست را لحظه‌به‌لحظه می‌بینید.'],
+    ['receipt', 'شفافیت مالی تا واریز', 'جزئیات ارزیابی، فرانشیز، حواله، دستور پرداخت و رسید واریز همه جلوی چشم شماست.'],
+  ];
+  return `<section class="wrap sec why"><div class="why-art">${heroScene()}</div>
+    <div class="why-copy"><div class="sec-head"><span class="eyebrow">چرا این سامانه</span><h2>پرونده خسارت گاز، ساده و شفاف</h2>
+      <p>از روز حادثه تا روز واریز، شما، شرکت گاز و بیمه‌گر روی یک پرونده مشترک کار می‌کنید.</p></div>
+      <div class="why-grid">${items.map(([ic, t, d]) => `<article class="why-item"><span class="why-ic">${duo(ic)}</span><h3>${t}</h3><p>${d}</p></article>`).join('')}</div></div>
+  </section>`;
+}
 function viewLanding() {
   const docs = [
     ['flame', 'ember', 'مهم‌ترین مدرک', ['گزارش آتش‌نشانی یا کارشناس رسمی دادگستری', 'در گزارش باید صریحاً نوشته شده باشد که علت حادثه «گاز» بوده است', 'گزارش با علت نامعلوم یا غیر از گاز پذیرفته نمی‌شود']],
@@ -411,19 +475,16 @@ function viewLanding() {
         ${brandSetting('orgName') ? `<span class="eyebrow light">${esc(brandSetting('orgName'))}</span>` : ''}
         <h1>خسارت حادثه گاز را <em>بی‌رفت‌وآمد</em> پیگیری کنید</h1>
         <p>پس از آتش‌سوزی، انفجار یا گازگرفتگی، مدارک را آنلاین بفرستید و ببینید پرونده‌تان در شرکت گاز و نزد بیمه‌گر به کجا رسیده است.</p>
-        <ul class="hero-facts">
-          <li><b class="num">۶</b><span>ایستگاه شفاف تا واریز</span></li>
-          <li><b>${icon('sms')}</b><span>پیامک در هر مرحله</span></li>
-          <li><b>${icon('alert')}</b><span>اعلام دقیق هر نقص</span></li>
-        </ul>
         <div class="hero-cta"><a class="btn ember" href="#journey">${icon('history')} مسیر پرونده را ببینید</a>${OTHER_URL ? `<a class="btn ghost-light" href="${esc(OTHER_URL)}">${icon('sms')} اپ موبایل</a>` : ''}</div>
       </div>
       <div class="hero-login"><div class="glass"><h2>ورود به سامانه</h2>${loginForm()}</div>${fireCta()}</div>
     </div></section>
+    ${factsStrip()}
     <div class="band">${journeyHtml()}</div>
+    ${whySection()}
     <section id="docs" class="wrap sec">
       <div class="sec-head"><span class="eyebrow">پیش از شروع</span><h2>مدارک لازم</h2><p>سامانه فهرست دقیق را بر اساس نوع حادثه و خسارت شما می‌سازد؛ این خلاصه برای آمادگی است.</p></div>
-      <div class="doc-grid">${docs.map(([ic, tone, t, list]) => `<article class="doc-tile ${tone}"><span class="doc-ic">${icon(ic)}</span><h3>${t}</h3><ul>${list.map(x => `<li>${icon('check')}${x}</li>`).join('')}</ul></article>`).join('')}</div>
+      <div class="doc-grid">${docs.map(([ic, tone, t, list]) => `<article class="doc-tile ${tone}"><span class="doc-ic">${duo(ic === 'doc' ? 'checkC' : ic)}</span><h3>${t}</h3><ul>${list.map(x => `<li>${icon('check')}${x}</li>`).join('')}</ul></article>`).join('')}</div>
       <p class="warn-line">${icon('alert')} تا عکاسی از محل و صدور گزارش آتش‌نشانی یا کارشناس رسمی، محل حادثه را تعمیر یا پاک‌سازی نکنید.</p>
     </section>
     <section id="faq" class="wrap sec faq-split">
@@ -436,7 +497,7 @@ function viewLanding() {
 
 async function doLogin(username, password) {
   if (!await run(() => B.login(username, password))) return;
-  st.claimId = null;
+  st.claimId = null; st.enter = true;
   go('home');
 }
 
@@ -640,7 +701,7 @@ function subSection() {
     ${W.openDeficiencies(c).length ? `<div class="fld"><span>پاسخ به موارد نقص</span>${W.openDeficiencies(c).map(d => defectBox(c, d, editable(c))).join('')}</div>` : ''}
     <label class="check"><input type="checkbox" id="f-declare" data-bind="declaration" ${c.declaration ? 'checked' : ''} ${dis ? 'disabled' : ''}>
       <span>اینجانب <b>${esc(st.user.name)}</b> تأیید می‌کنم اطلاعات و مدارک ارسالی صحیح و کامل است و هرگونه اظهار خلاف واقع موجب رد پرونده و پیگرد قانونی خواهد بود.</span></label>
-    ${missing.length && !dis ? `<div class="note warn">${icon('alert')}<div><b>پیش از ارسال تکمیل کنید:</b><ul>${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div></div>` : ''}
+    ${missing.length && !dis ? `<div class="note warn">${icon('alert')}<div><b>پیش از ارسال تکمیل کنید:</b><ul>${missing.map(m => `<li>${esc(fa(m))}</li>`).join('')}</ul></div></div>` : ''}
     ${!dis ? `<button class="btn green" data-act="doAction" data-action="submit" ${missing.length ? 'disabled' : ''}>${icon('send')} ${c.submitCount ? 'ارسال مجدد پرونده به شرکت گاز' : 'ارسال پرونده به شرکت گاز'}</button>` : ''}
   </div>`;
 }
@@ -886,7 +947,7 @@ function viewList() {
 function dashLink() {
   const L = W.liveStatus(visibleClaims());
   const paid = L.groups.find(g => g.id === 'paid').count;
-  return `<button class="dash-link" data-go="reports"><span class="dl-ic">${icon('chart')}</span><span class="dl-t"><b>گزارش‌ها و داشبورد لحظه‌ای</b><small>${fa(L.total)} پرونده · ${fa(L.referred)} ارجاع به بیمه · ${fa(paid)} پرداخت‌شده — گزارش ماهانه و خروجی Excel</small></span>${icon('chevL', 'chev')}</button>`;
+  return `<button class="dash-link" data-go="reports"><span class="dl-ic">${duo('chart')}</span><span class="dl-t"><b>گزارش‌ها و داشبورد لحظه‌ای</b><small>${fa(L.total)} پرونده · ${fa(L.referred)} ارجاع به بیمه · ${fa(paid)} پرداخت‌شده — گزارش ماهانه و خروجی Excel</small></span>${icon('chevL', 'chev')}</button>`;
 }
 function gasHome() {
   const n = s => db.claims.filter(c => s.includes(c.status)).length;
@@ -1200,7 +1261,6 @@ function typeTable(cs, y, m, t) {
   const rows = typeRows(cs, y, t);
   const tot = rows.reduce((a, r) => ({ n: a.n + r.n, claimed: a.claimed + r.claimed, paid: a.paid + r.paid, done: a.done + r.done }), { n: 0, claimed: 0, paid: 0, done: 0 });
   const max = Math.max(1, ...rows.map(r => r.n));
-  const mil = v => (v ? fa((v / 1e7).toLocaleString('en-US', { maximumFractionDigits: 1 })).replace('.', '٫') : '—'); // میلیون تومان
   return `<div class="tbl-wrap"><table class="mtx one"><thead><tr><th>ماه</th><th>${W.REPORT_TYPES[t]}</th><th>پرداخت‌شده</th><th>ادعا<small>میلیون تومان</small></th><th>پرداختی<small>میلیون تومان</small></th></tr></thead>
     <tbody>${rows.map((r, i) => `<tr class="${m === i + 1 ? 'on' : ''}"><th><button class="mname" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${W.MONTHS[i]}</button></th>
       <td><button class="cell ${m === i + 1 ? 'on' : ''} ${r.n / max >= 0.55 ? 'hot' : ''}" style="--h:${(r.n / max).toFixed(2)}" data-act="rep" data-p='{"m":${i + 1}}' ${r.n ? '' : 'disabled'}>${r.n ? fa(r.n) : '·'}</button></td>
@@ -1225,6 +1285,7 @@ function monthlyBlock(cs) {
       <div class="rep-tools"><label class="sel"><span>سال</span><select data-rep="y">${years.map(v => `<option value="${v}" ${v === y ? 'selected' : ''}>${fa(v)}</option>`).join('')}</select></label>
         <button class="btn sm green" data-act="expMonthly" data-y="${y}">${icon('download')} خروجی Excel جدول</button></div></div>
     <div class="chips">${[['', 'همه انواع'], ...types].map(([k, l]) => `<button class="chip ${t === k ? 'on' : ''}" data-act="rep" data-p='{"t":"${k}","m":0}'>${l} <span class="num">${fa(k ? M.totals[k] : M.all)}</span></button>`).join('')}</div>
+    ${trendChart(cs, y, t)}
     ${t ? typeTable(cs, y, m, t) : `<div class="tbl-wrap"><table class="mtx"><thead><tr><th>ماه</th>${types.map(([k, l]) => `<th title="${l}">${MTX_HEAD[k]}</th>`).join('')}<th>جمع</th></tr></thead>
       <tbody>${M.rows.map((r, i) => `<tr class="${m === i + 1 ? 'on' : ''}"><th><button class="mname" data-act="rep" data-p='{"m":${i + 1},"t":""}'>${W.MONTHS[i]}</button></th>${types.map(([k]) => `<td>${cell(i + 1, k, r[k])}</td>`).join('')}<td class="tot">${cell(i + 1, '', rowSum(r), false)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><th><button class="mname" data-act="rep" data-p='{"m":0,"t":""}'>جمع سال</button></th>${types.map(([k]) => `<td>${cell(0, k, M.totals[k], false)}</td>`).join('')}<td class="tot">${cell(0, '', M.all, false)}</td></tr></tfoot></table></div>`}
@@ -1257,8 +1318,98 @@ function perfBlock(cs) {
       <div class="kpi"><div class="l">جمع ادعا</div><div class="v" style="font-size:17px">${money(cs.reduce((a, c) => a + claimedOf(c), 0))}</div></div>
       <div class="kpi"><div class="l">جمع پرداخت</div><div class="v" style="font-size:17px">${money(paid.reduce((a, c) => a + paidOf(c), 0))}</div></div>
     </div>
+    ${moneyChart(cs, +st.p.y || W.toJalali(new Date()).jy)}
     <div class="stat-bars">${counts.map(([k, n]) => `<div class="sbar"><span>${W.STATUS[k].short}</span><span class="track"><span class="fill" style="width:${(n / max) * 100}%;display:block"></span></span><b class="num">${fa(n)}</b></div>`).join('')}</div></section>`;
 }
+
+// ---------- نمودارها ----------
+// HTML + SVG با preserveAspectRatio=none تا متن‌ها در هر عرضی خوانا بمانند؛ ماه اول سمت راست (راست‌به‌چپ).
+// رنگ هر نوع حادثه ثابت است (پالت اعتبارسنجی‌شده --s1..--s4) و با فیلتر عوض نمی‌شود.
+const SERIES_C = { co: 'var(--s1)', fire: 'var(--s2)', leak: 'var(--s3)', explosion: 'var(--s4)' };
+const SERIES_ORDER = ['fire', 'explosion', 'co', 'leak'];
+const CHART_TIPS = new Map();
+let chartSeq = 0;
+const niceMax = v => { if (v <= 4) return 4; const p = 10 ** Math.floor(Math.log10(v)); const n = v / p; return (n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; };
+const mil = v => (v ? fa((v / 1e7).toLocaleString('en-US', { maximumFractionDigits: 1 })).replace('.', '٫') : '۰');
+function chartFrame({ title, legend = [], max, fmtTick, plot, labels, tips, cls = '' }) {
+  const id = 'ch' + (++chartSeq);
+  CHART_TIPS.set(id, tips);
+  const n = labels.length;
+  const ticks = [0, max / 2, max];
+  return `<figure class="ch ${cls}" data-id="${id}"><figcaption class="ch-head"><b>${title}</b>
+      ${legend.length > 1 ? `<span class="ch-leg">${legend.map(l => `<span><i style="background:${l.c}"></i>${l.label}</span>`).join('')}</span>` : ''}</figcaption>
+    <div class="ch-plot">${ticks.map(t => `<div class="ch-g" style="top:${100 - (t / max) * 100}%"><span>${fmtTick(t)}</span></div>`).join('')}
+      ${plot}
+      <div class="ch-x"></div><div class="ch-tip" role="status"></div>
+      ${labels.map((_, i) => `<span class="ch-hit" tabindex="0" data-i="${i}" style="right:${(i / n) * 100}%;width:${100 / n}%" aria-label="${esc(labels[i])}"></span>`).join('')}
+    </div>
+    <div class="ch-xl" style="--n:${n}">${labels.map(l => `<span>${l}</span>`).join('')}</div></figure>`;
+}
+// نمودار خطی: series = [{ key, label, values (null = هنوز نرسیده) }]
+function lineChart(title, labels, series) {
+  const n = labels.length;
+  const max = niceMax(Math.max(1, ...series.flatMap(s => s.values.filter(v => v != null))));
+  const xp = i => 100 - ((i + 0.5) / n) * 100;
+  const yp = v => 100 - (v / max) * 100;
+  const lines = series.map(s => {
+    const pts = s.values.map((v, i) => (v == null ? null : `${xp(i) * 10},${yp(v)}`)).filter(Boolean).join(' ');
+    return `<polyline points="${pts}" fill="none" stroke="${SERIES_C[s.key]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
+  }).join('');
+  const dots = series.map(s => s.values.map((v, i) => (v == null ? '' : `<span class="ch-dot" data-i="${i}" style="right:calc(${100 - xp(i)}% - 5px);top:calc(${yp(v)}% - 5px);background:${SERIES_C[s.key]}"></span>`)).join('')).join('');
+  // برچسب مستقیم در آخرین نقطه هر خط (≤ ۴ سری)؛ برچسب‌های هم‌ارتفاع از هم فاصله می‌گیرند
+  const endPts = series.length > 1 ? series.map(s => { const last = s.values.map((v, i) => [v, i]).filter(([v]) => v != null).pop(); return last && { s, i: last[1], y: yp(last[0]) }; }).filter(Boolean).sort((a, b) => a.y - b.y) : [];
+  endPts.forEach((e, k) => { if (k && e.y - endPts[k - 1].y < 10) e.y = endPts[k - 1].y + 10; });
+  const shift = Math.max(0, (endPts.at(-1)?.y || 0) - 100);
+  const ends = endPts.map(e => {
+    const y = e.y - shift;
+    // برچسب به سمتی می‌رود که جا دارد (نقطه نزدیک لبه چپ ← برچسب سمت راستش)
+    const side = xp(e.i) < 22 ? `left:calc(${xp(e.i)}% + 8px)` : `right:calc(${100 - xp(e.i)}% + 8px)`;
+    return `<span class="ch-end" style="${side};top:${y}%"><i style="background:${SERIES_C[e.s.key]}"></i>${esc(e.s.short || e.s.label)}</span>`;
+  }).join('');
+  const tips = labels.map((l, i) => `<b>${l}</b>${series.map(s => [s, s.values[i]]).filter(([, v]) => v != null).sort((a, b) => b[1] - a[1]).map(([s, v]) => `<span><i style="background:${SERIES_C[s.key]}"></i>${esc(s.label)}<em>${fa(v)}</em></span>`).join('') || '<span>—</span>'}`);
+  return chartFrame({ title, max, fmtTick: t => fa(Math.round(t)), labels, tips, legend: series.map(s => ({ label: s.label, c: SERIES_C[s.key] })),
+    plot: `<svg class="ch-svg" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${dots}${ends}` });
+}
+// نمودار ستونی گروهی دو سری (یک محور: میلیون تومان)
+function barChart(title, labels, a, b) {
+  const n = labels.length;
+  const max = niceMax(Math.max(1, ...a.values, ...b.values) / 1e7) * 1e7;
+  const cols = labels.map((_, i) => `<div class="ch-col" style="right:${(i / n) * 100}%;width:${100 / n}%">
+    <span class="ch-bar" style="height:${(a.values[i] / max) * 100}%;background:${a.c}"></span><span class="ch-bar" style="height:${(b.values[i] / max) * 100}%;background:${b.c}"></span></div>`).join('');
+  const tips = labels.map((l, i) => `<b>${l}</b><span><i style="background:${a.c}"></i>${a.label}<em>${mil(a.values[i])}</em></span><span><i style="background:${b.c}"></i>${b.label}<em>${mil(b.values[i])}</em></span><small>میلیون تومان</small>`);
+  return chartFrame({ title, max, fmtTick: t => mil(t), labels, tips, cls: 'bars', legend: [{ label: a.label, c: a.c }, { label: b.label, c: b.c }], plot: cols });
+}
+const MONTH_SHORT = ['فرو', 'ارد', 'خرد', 'تیر', 'مرد', 'شهر', 'مهر', 'آبا', 'آذر', 'دی', 'بهم', 'اسف'];
+// ماه‌های آینده سال جاری روی نمودار کشیده نمی‌شوند
+function monthsSoFar(y) { const j = W.toJalali(new Date()); return y < j.jy ? 12 : y > j.jy ? 0 : j.jm; }
+function trendChart(cs, y, t) {
+  const upto = monthsSoFar(y);
+  const keys = t ? [t] : SERIES_ORDER;
+  const series = keys.map(k => ({ key: k, label: W.REPORT_TYPES[k], short: MTX_HEAD[k],
+    values: W.MONTHS.map((_, i) => (i < upto ? W.filterReport(cs, { year: y, month: i + 1, type: k }).length : null)) }));
+  return lineChart(t ? `روند ماهانه ${W.REPORT_TYPES[t]} — ${fa(y)}` : `روند ماهانه حوادث — ${fa(y)}`, W.MONTHS, series);
+}
+function moneyChart(cs, y) {
+  const upto = monthsSoFar(y);
+  const per = W.MONTHS.map((_, i) => (i < upto ? W.filterReport(cs, { year: y, month: i + 1 }) : []));
+  return barChart(`ادعا و پرداخت به تفکیک ماه حادثه — ${fa(y)} (میلیون تومان)`, W.MONTHS,
+    { label: 'جمع ادعا', c: 'var(--s1)', values: per.map(l => l.reduce((x, c) => x + claimedOf(c), 0)) },
+    { label: 'جمع پرداختی', c: 'var(--s3)', values: per.map(l => l.reduce((x, c) => x + paidOf(c), 0)) });
+}
+function showChartTip(h) {
+  const ch = h.closest('.ch'); if (!ch) return;
+  const i = +h.dataset.i; const plot = ch.querySelector('.ch-plot');
+  const tip = ch.querySelector('.ch-tip'); const x = ch.querySelector('.ch-x');
+  tip.innerHTML = (CHART_TIPS.get(ch.dataset.id) || [])[i] || '';
+  const cx = h.offsetLeft + h.offsetWidth / 2;
+  x.style.left = cx + 'px'; x.classList.add('on');
+  tip.classList.add('on');
+  const w = tip.offsetWidth; const pw = plot.clientWidth;
+  tip.style.left = Math.max(0, Math.min(pw - w, cx - w / 2)) + 'px';
+  ch.querySelectorAll('.ch-dot').forEach(d => d.classList.toggle('on', +d.dataset.i === i));
+  ch.querySelectorAll('.ch-col').forEach((d, k) => d.classList.toggle('on', k === i));
+}
+function hideChartTips(ch) { ch.querySelectorAll('.ch-tip, .ch-x, .ch-dot, .ch-col').forEach(e => e.classList.remove('on')); }
 
 // ---------- خروجی‌ها ----------
 // CSV با BOM تا اکسل حروف فارسی را درست نشان دهد؛ نام فایل لاتین، چون برخی مرورگرها نام فارسی را به «download» تبدیل می‌کنند
@@ -1372,7 +1523,7 @@ const fireOffers = () => (Array.isArray(db.settings.fireOffers) ? db.settings.fi
 function fireCta() {
   const n = fireOffers().length;
   if (!n) return '';
-  return `<button class="fire-cta" type="button" data-act="fireOffers"><span class="fc-ic">${icon('flame')}</span>
+  return `<button class="fire-cta" type="button" data-act="fireOffers"><span class="fc-ic">${duo('flame')}</span>
     <span class="fc-t"><b>خرید بیمه آتش‌سوزی منزل</b><small>مقایسه ${fa(n)} طرح با نرخ‌های مختلف و خرید آنلاین</small></span>${icon('chevL', 'chev')}</button>`;
 }
 function fireSheet() {
@@ -1470,7 +1621,8 @@ async function runAction(id, note, opts = {}) {
   const c = currentClaim();
   if (!await run(() => B.action(c, id, note, opts))) return;
   closeSheet();
-  toast(W.STATUS[claimById(c.id).status].label);
+  if (CELEBRATE[id]) celebrate(CELEBRATE[id], W.STATUS[claimById(c.id).status].label);
+  else toast(W.STATUS[claimById(c.id).status].label);
   if (st.user.role === 'subscriber') go('track'); else render();
 }
 
@@ -1816,6 +1968,11 @@ function wire() {
     if (e.target.id === 'q') { st.q = e.target.value; const l = $('#claimList'); if (l) l.innerHTML = listHtml(); }
     if (e.target.id === 'uq') { st.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('#uq'); n.focus(); n.setSelectionRange(pos, pos); }
   });
+  // راهنمای شناور نمودارها (اشاره‌گر، لمس و صفحه‌کلید)
+  document.addEventListener('pointerover', e => { const h = e.target.closest('.ch-hit'); if (h) showChartTip(h); });
+  document.addEventListener('focusin', e => { const h = e.target.closest('.ch-hit'); if (h) showChartTip(h); });
+  document.addEventListener('pointerout', e => { const p = e.target.closest('.ch-plot'); if (p && !p.contains(e.relatedTarget)) hideChartTips(p.closest('.ch')); });
+  document.addEventListener('focusout', e => { const h = e.target.closest('.ch-hit'); if (h && !h.parentElement.contains(e.relatedTarget)) hideChartTips(h.closest('.ch')); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { if ($('#printdoc')) closePrintDoc(); else closeSheet(); } });
 }
 

@@ -54,7 +54,38 @@ const P = {
 };
 
 export function icon(name, cls = '') {
-  return `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
+  return `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
+}
+
+// ----- آیکون‌های دورنگ (کاشی‌ها و کارت‌های برجسته) -----
+// لایه پشت: همان رنگ با شفافیت کم؛ لایه جلو: جزئیات پررنگ. رنگ از currentColor.
+const BK = d => `<path d="${d}" fill="currentColor" opacity=".24"/>`;
+const ST = d => `<path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+const FL = d => `<path d="${d}" fill="currentColor"/>`;
+const DOC = 'M6.5 3H14l5 5v11.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5v-15A1.5 1.5 0 0 1 6.5 3z';
+const D = {
+  upload: BK('M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2 2h7.4A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z') + ST('M12 17v-6M9.3 13.4 12 10.7l2.7 2.7'),
+  money: BK('M5.5 6h13A2.5 2.5 0 0 1 21 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 15.5v-7A2.5 2.5 0 0 1 5.5 6z') + '<circle cx="12" cy="12" r="3.2" fill="currentColor"/>' + ST('M6.5 9.5h.01M17.5 14.5h.01'),
+  userPlus: '<circle cx="10" cy="8" r="4" fill="currentColor" opacity=".24"/>' + BK('M2.5 20c0-3.9 3.2-6.5 7.5-6.5s7.5 2.6 7.5 6.5z') + ST('M19 7.5v6M16 10.5h6'),
+  inbox: BK('M4 13 6.2 6.4A2 2 0 0 1 8.1 5h7.8a2 2 0 0 1 1.9 1.4L20 13v4.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z') + FL('M4 13h4.6l1.5 2.4h3.8l1.5-2.4H20v4.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z'),
+  alert: BK(DOC) + ST('M12 9v5') + '<circle cx="12" cy="17.2" r="1.3" fill="currentColor"/>',
+  camera: BK('M3 9a2 2 0 0 1 2-2h2.4l1.4-2h6.4l1.4 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z') + '<circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="2.2"/>',
+  send: BK('M12 2.8 19.5 6v5.5c0 4.6-3.2 8.3-7.5 9.7-4.3-1.4-7.5-5.1-7.5-9.7V6z') + ST('M15.5 12h-7M11 9.4 8.4 12l2.6 2.6'),
+  receipt: BK('M6 3h12v18l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3z') + ST('m8.8 12 2.2 2.2 4.2-4.4'),
+  checkC: BK(DOC) + ST('m8.6 13.4 2.3 2.3 4.5-4.7'),
+  history: '<circle cx="12" cy="12" r="9" fill="currentColor" opacity=".24"/>' + ST('M12 7v5.2l3.2 2'),
+  people: '<circle cx="16.5" cy="8.5" r="3" fill="currentColor" opacity=".24"/>' + BK('M12.5 19.5c0-3 1.7-5 4.3-5s4.7 2 4.7 5z') + '<circle cx="9" cy="8.5" r="3.5" fill="currentColor"/>' + FL('M2.5 20c0-3.6 2.7-6 6.5-6s6.5 2.4 6.5 6z'),
+  settings: BK('M6 4h12a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z') + ST('M7 9h4M15.5 9H17M7 15h1.5M12.5 15H17') + '<circle cx="13.3" cy="9" r="2" fill="currentColor"/><circle cx="10.5" cy="15" r="2" fill="currentColor"/>',
+  chart: BK('M6 3h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3z') + '<rect x="6.8" y="11" width="2.8" height="6.5" rx="1.4" fill="currentColor"/><rect x="10.6" y="6.5" width="2.8" height="11" rx="1.4" fill="currentColor"/><rect x="14.4" y="13" width="2.8" height="4.5" rx="1.4" fill="currentColor"/>',
+  sms: BK('M6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 3.5V17A2.5 2.5 0 0 1 4 14.5v-8A2.5 2.5 0 0 1 6.5 4z') + ST('M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01').replace('stroke-width="2"', 'stroke-width="2.8"'),
+  flame: BK('M12 21.5c-4 0-7-2.8-7-6.6 0-3.6 2.6-5.6 3.6-9.4 2.6 1.6 3.8 3.7 3.6 5.6 1.1-.7 1.8-1.8 2-3.2 2.5 2 4.8 4.6 4.8 7.3 0 3.6-3 6.3-7 6.3z') + FL('M12 21.5c-1.9 0-3.2-1.2-3.2-2.9 0-1.8 1.4-2.7 3.2-5 1.8 2.3 3.2 3.2 3.2 5 0 1.7-1.3 2.9-3.2 2.9z'),
+  shield: BK('M12 2.8 19.5 6v5.5c0 4.6-3.2 8.3-7.5 9.7-4.3-1.4-7.5-5.1-7.5-9.7V6z') + ST('m8.8 12 2.2 2.2 4.2-4.4'),
+  clock: '<circle cx="12" cy="12" r="9" fill="currentColor" opacity=".24"/>' + ST('M12 7v5.2l3.2 2'),
+  phone: BK('M8 2.5h8A2.5 2.5 0 0 1 18.5 5v14a2.5 2.5 0 0 1-2.5 2.5H8A2.5 2.5 0 0 1 5.5 19V5A2.5 2.5 0 0 1 8 2.5z') + ST('M10.5 18.5h3'),
+  lock: BK('M6.5 10h11A1.5 1.5 0 0 1 19 11.5v8a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5v-8A1.5 1.5 0 0 1 6.5 10z') + ST('M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10M12 14.5v2.5'),
+};
+export function duo(name, cls = '') {
+  return `<svg class="ic duo ${cls}" viewBox="0 0 24 24" aria-hidden="true">${D[name] || D.checkC}</svg>`;
 }
 
 // ----- تصویرسازی کاشی‌ها -----

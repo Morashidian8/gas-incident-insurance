@@ -80,7 +80,7 @@ def build(logo=None, org=""):
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lalezar&family=Vazirmatn:wght@400;500;700;800&display=swap">
 """
-    body = f'<style>\n{css}\n</style>\n<div id="app" aria-live="polite"></div>\n<script>\n{js}</script>\n'
+    body = f'<style>\n{css}\n</style>\n<div id="app" aria-live="polite"><div class="boot-sk" aria-hidden="true"><div class="sk-top"></div><div class="sk-body"><div class="sk sk-card"></div><div class="sk sk-pill"></div><div class="sk-grid"><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div></div></div></div>\n<script>\n{js}</script>\n'
     body_full = body.replace(js, js_full)
     pwa = """<meta name="theme-color" content="#123A8C">
 <meta name="mobile-web-app-capable" content="yes">

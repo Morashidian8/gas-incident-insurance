@@ -34,7 +34,7 @@ nocache_headers();
 <script>window.GII_WP = <?php echo wp_json_encode( $gii_cfg, JSON_UNESCAPED_SLASHES ); ?>;</script>
 </head>
 <body>
-<div id="app" aria-live="polite"></div>
+<div id="app" aria-live="polite"><div class="boot-sk" aria-hidden="true"><div class="sk-top"></div><div class="sk-body"><div class="sk sk-card"></div><div class="sk sk-pill"></div><div class="sk-grid"><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div><div class="sk sk-tile"></div></div></div></div></div>
 <noscript>برای استفاده از سامانه، جاوااسکریپت مرورگر را فعال کنید.</noscript>
 <script src="<?php echo esc_url( GII_URL . 'assets/app.js?ver=' . $gii_ver ); ?>"></script>
 </body>
