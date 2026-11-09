@@ -94,7 +94,7 @@ export async function regFile(uid, fid) { return req('GET', `regs/${uid}/files/$
 const edits = new WeakMap();
 const timers = new Map();
 const inflight = new Map();
-const EDITABLE = ['incident', 'damage', 'bank', 'declaration', 'assessment', 'payment'];
+const EDITABLE = ['incident', 'damage', 'bank', 'declaration', 'assessment', 'payment', 'release'];
 function sendClaim(c) {
   timers.delete(c.id);
   const v = edits.get(c);

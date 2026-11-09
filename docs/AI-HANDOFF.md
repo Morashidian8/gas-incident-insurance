@@ -19,7 +19,7 @@ Four roles share one claim:
 | Insurer expert (کارشناس بیمه‌گر) | `insurer` | Assesses (deductible, caps), queries gas co., runs finance stages (review → voucher → bank → paid) |
 | Admin (مدیر سامانه) | `admin` | Staff users, policy settings, logo, fire-insurance offers on login page, reports, SMS log |
 
-Flow: incident → subscriber **self-registers online** (subscription no. + Shahkar + SMS code + national card / gas bill photos; gas expert approves → account active + draft claim with those documents) — or gas co. registers them in person → subscriber submits → gas reviews / returns with deficiencies → resubmit → gas forwards to insurer (cause-report confirmation required) → insurer assesses → subscriber accepts/objects → finance stages → paid.
+Flow: incident → subscriber **self-registers online** (subscription no. + Shahkar + SMS code + national card / gas bill photos; gas expert approves → account active + draft claim with those documents) — or gas co. registers them in person → subscriber submits → gas reviews / returns with deficiencies → resubmit → gas forwards to insurer (cause-report confirmation required) → insurer assesses → subscriber accepts/objects → **notarized release deed** (subscriber registers it at a notary, uploads the image; insurer approves; original must be received before payment) → finance stages → paid.
 
 **The single most important document** is the fire-department or official court expert report that explicitly states the cause was gas (`cause_report`). There is **no gas-company site visit** — do not reintroduce one.
 
@@ -129,7 +129,7 @@ CI: `.github/workflows/pages.yml` runs tests + PHP lint, builds, deploys `dist/p
   objection, acceptedAt, finance:{ stage, review, voucher, bank }, payment:{ amount, ref, date }, paidAt }
 ```
 
-Statuses: draft, returned, submitted, gas_review, sent_insurer, insurer_review, insurer_query, assessed, objection, payment, paid, rejected (see `STATUS` and `ACTIONS` in workflow.js).
+Statuses: draft, returned, submitted, gas_review, sent_insurer, insurer_review, insurer_query, assessed, objection, release_pending, release_review, payment, paid, rejected. Release data lives in `claim.release` (+ `docs.release_deed`); `release_original` is recorded through the finance endpoint; `ins_pay` requires `release.originalReceived` (see `STATUS` and `ACTIONS` in workflow.js).
 
 ## 7. Demo accounts (demo mode only)
 

@@ -101,9 +101,17 @@ $c['assessment'] = array( 'adjuster' => 'ارزیاب', 'items' => array( array(
 $c = GII_WF::apply_action( $c, 'ins_assess', $ins );
 check( 'objection needs note', throws( function () use ( $c, $sub ) { GII_WF::apply_action( $c, 'object', $sub, '' ); }, '/توضیح/u' ) );
 $c = GII_WF::apply_action( $c, 'accept', $sub );
+check( 'accept -> release pending', 'release_pending' === $c['status'] && 'accepted' === GII_WF::fin_stage( $c ) );
+check( 'finance blocked before release', throws( function () use ( $c, $ins ) { GII_WF::apply_finance( $c, 'fin_review', array( 'reviewer' => 'x', 'shebaMatch' => true ), $ins ); }, '/ترتیب/u' ) );
+check( 'release needs notary data', (bool) preg_match( '/شماره دفترخانه/u', (string) GII_WF::can_do( $c, 'subscriber', 'release_submit' ) ) );
+$c['release'] = array_merge( $c['release'], array( 'notaryNo' => '۱۲۳', 'notaryCity' => 'تهران', 'regNo' => '140585123456', 'date' => GII_WF::jalali_string( time() ), 'confirmed' => true ) );
+$c['docs']['release_deed'] = array( 'f-rel' );
+$c = GII_WF::apply_action( $c, 'release_submit', $sub );
+check( 'release return needs note', throws( function () use ( $c, $ins ) { GII_WF::apply_action( $c, 'release_return', $ins, '' ); }, '/توضیح/u' ) );
+$c = GII_WF::apply_action( $c, 'release_accept', $ins );
+check( 'release accepted -> payment', 'payment' === $c['status'] && 'release' === GII_WF::fin_stage( $c ) );
 $c['payment'] = array( 'ref' => '998877', 'date' => '1405/08/10' );
 check( 'pay blocked before voucher', (bool) preg_match( '/حواله/u', (string) GII_WF::can_do( $c, 'insurer', 'ins_pay' ) ) );
-check( 'fin stage accepted', 'accepted' === GII_WF::fin_stage( $c ) );
 check( 'finance out of order', throws( function () use ( $c, $ins ) { GII_WF::apply_finance( $c, 'fin_voucher', array( 'voucherNo' => '1', 'date' => '1405/08/01', 'amount' => 1 ), $ins ); }, '/ترتیب/u' ) );
 check( 'finance needs sheba match', throws( function () use ( $c, $ins ) { GII_WF::apply_finance( $c, 'fin_review', array( 'reviewer' => 'مالی' ), $ins ); }, '/شبا/u' ) );
 check( 'finance only insurer', throws( function () use ( $c, $gas ) { GII_WF::apply_finance( $c, 'fin_review', array( 'reviewer' => 'x', 'shebaMatch' => true ), $gas ); }, '/بیمه‌گر/u' ) );
@@ -112,9 +120,11 @@ $c = GII_WF::apply_finance( $c, 'fin_voucher', array( 'voucherNo' => 'H-1405-77'
 check( 'voucher sets amount', 205000000 === $c['payment']['amount'] );
 $c = GII_WF::apply_finance( $c, 'fin_bank', array( 'method' => 'paya', 'ref' => 'P-5566', 'date' => '1405/08/06' ), $ins );
 check( 'fin stage bank', 'bank' === GII_WF::fin_stage( $c ) );
+check( 'pay blocked without original', (bool) preg_match( '/اصل اقرارنامه/u', (string) GII_WF::can_do( $c, 'insurer', 'ins_pay' ) ) );
+$c = GII_WF::apply_finance( $c, 'release_original', array( 'note' => 'رسید ۷۷' ), $ins );
 $c = GII_WF::apply_action( $c, 'ins_pay', $ins );
 check( 'paid', 'paid' === $c['status'] && 'paid' === GII_WF::fin_stage( $c ) );
-check( 'timeline length 15', 15 === count( $c['timeline'] ) );
+check( 'timeline length 18', 18 === count( $c['timeline'] ) );
 
 // فرانشیز و سقف
 $st = array_merge( GII_WF::DEFAULT_SETTINGS, array( 'deductiblePercent' => 10, 'propertyCapRial' => 100, 'medicalCapRial' => 50 ) );

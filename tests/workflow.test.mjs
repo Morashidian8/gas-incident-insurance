@@ -93,9 +93,26 @@ test('چرخه کامل: نقص، اصلاح، ارسال به بیمه‌گر،
   c = W.applyAction(c, 'ins_assess', ins);
   assert.throws(() => W.applyAction(c, 'object', sub, ''), /توضیح/);
   c = W.applyAction(c, 'accept', sub);
+  // اقرارنامه رسمی دفترخانه پیش از هر گام مالی
+  assert.equal(c.status, 'release_pending');
+  assert.equal(W.waitingOn(c), 'subscriber');
+  assert.throws(() => W.applyFinance(c, 'fin_review', { reviewer: 'مالی', shebaMatch: true }, ins), /ترتیب/, 'مالی پیش از اقرارنامه ممنوع');
+  assert.match(W.canDo(c, 'subscriber', 'release_submit'), /شماره دفترخانه/);
+  Object.assign(c.release, { notaryNo: '۱۲۳', notaryCity: 'تهران', regNo: '140585123456', date: W.jalaliString(new Date()), confirmed: true });
+  c.docs.release_deed = ['f-rel'];
+  c = W.applyAction(c, 'release_submit', sub);
+  assert.equal(c.status, 'release_review');
+  assert.equal(W.canDo(c, 'insurer', 'release_return'), null);
+  assert.throws(() => W.applyAction(c, 'release_return', ins, ''), /توضیح/);
+  c = W.applyAction(c, 'release_return', ins, 'شماره ثبت خوانا نیست');
+  assert.equal(c.status, 'release_pending'); assert.equal(c.release.confirmed, false);
+  c.release.confirmed = true;
+  c = W.applyAction(c, 'release_submit', sub);
+  c = W.applyAction(c, 'release_accept', ins);
+  assert.equal(c.status, 'payment');
   c.payment = { ref: '998877', date: '1405/08/10' };
   assert.match(W.canDo(c, 'insurer', 'ins_pay'), /حواله/);
-  assert.equal(W.finStage(c), 'accepted');
+  assert.equal(W.finStage(c), 'release');
   assert.throws(() => W.applyFinance(c, 'fin_voucher', { voucherNo: '1', date: '1405/08/01', amount: 1 }, ins), /ترتیب/);
   assert.throws(() => W.applyFinance(c, 'fin_review', { reviewer: 'مالی' }, ins), /شبا/);
   c = W.applyFinance(c, 'fin_review', { reviewer: 'واحد مالی', shebaMatch: true }, ins);
@@ -103,9 +120,13 @@ test('چرخه کامل: نقص، اصلاح، ارسال به بیمه‌گر،
   assert.equal(c.payment.amount, 205000000);
   c = W.applyFinance(c, 'fin_bank', { method: 'paya', ref: 'P-5566', date: '1405/08/06' }, ins);
   assert.equal(W.finStage(c), 'bank');
+  assert.match(W.canDo(c, 'insurer', 'ins_pay'), /اصل اقرارنامه/, 'بدون اصل اقرارنامه واریز ممنوع');
+  assert.throws(() => W.applyFinance(c, 'release_original', {}, sub), /بیمه‌گر/);
+  c = W.applyFinance(c, 'release_original', { note: 'رسید ۷۷' }, ins);
+  assert.equal(c.release.originalReceived, true);
   c = W.applyAction(c, 'ins_pay', ins);
   assert.equal(c.status, 'paid');
-  assert.equal(c.timeline.length, 15);
+  assert.equal(c.timeline.length, 20);
   assert.equal(W.finStage(c), 'paid');
 });
 

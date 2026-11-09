@@ -247,7 +247,7 @@ export async function seed() {
     age: 70, status: 'paid', fill: true,
     incident: { description: 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', causeReportNo: '۴۴۰۹۸' },
     damage: { items: [{ title: 'آبگرمکن و لوله‌کشی', qty: 1, amount: 140000000 }, { title: 'بازسازی دیوار پارکینگ', qty: 1, amount: 90000000 }] },
-    steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 66], ['gas_start', 'شروع بررسی', 'gas', 65], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 62], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 60], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 50], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 49], ['ins_pay', 'ثبت پرداخت', 'insurer', 41, 'واریز به حساب شبای مشترک']],
+    steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 66], ['gas_start', 'شروع بررسی', 'gas', 65], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 62], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 60], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 50], ['accept', 'قبول مبلغ خسارت', 'subscriber', 49], ['ins_pay', 'ثبت پرداخت', 'insurer', 41, 'واریز به حساب شبای مشترک']],
     extra: { submitCount: 1 },
   });
   c6.assessment = { adjuster: 'مهندس نادر شریفی', visitDate: jalaliString(daysAgo(55)), note: '', at: daysAgo(50).toISOString(),
@@ -264,13 +264,22 @@ export async function seed() {
     { at: daysAgo(47, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_review', label: 'بررسی مالی و استعلام شبا انجام شد', note: '' },
     { at: daysAgo(45, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_voucher', label: 'حواله پرداخت صادر شد', note: 'حواله H-1405-000006' },
     { at: daysAgo(42, 11).toISOString(), by: ins.name, role: 'insurer', action: 'fin_bank', label: 'دستور پرداخت به بانک ارسال شد', note: 'پایا — پیگیری P-77810452' });
+  // اقرارنامه رسمی دفترخانه (پیش از مراحل مالی) و دریافت اصل آن
+  c6.release = { status: 'accepted', notaryNo: '۱۸۷', notaryCity: 'تهران', regNo: '140585000611', date: jalaliString(daysAgo(48)), confirmed: true, submittedAt: daysAgo(48, 11).toISOString(),
+    reviewedBy: ins.name, reviewedAt: daysAgo(48, 15).toISOString(), originalReceived: true, originalAt: daysAgo(44, 11).toISOString(), originalBy: ins.name, originalNote: 'رسید ۴۴۱۲' };
+  c6.docs.release_deed = [await fileMeta(c6, sampleDoc('اقرارنامه رسمی دفترخانه'), 'release_deed.svg', 'subscriber')];
+  c6.timeline.splice(c6.timeline.findIndex(t => t.action === 'fin_review'), 0,
+    { at: daysAgo(48, 11).toISOString(), by: users[5].name, role: 'subscriber', action: 'release_submit', label: 'ارسال اقرارنامه رسمی ثبت‌شده', note: '' },
+    { at: daysAgo(48, 15).toISOString(), by: ins.name, role: 'insurer', action: 'release_accept', label: 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت', note: '' });
+  c6.timeline.splice(c6.timeline.findIndex(t => t.action === 'fin_bank'), 0,
+    { at: daysAgo(44, 11).toISOString(), by: ins.name, role: 'insurer', action: 'release_original', label: 'اصل اقرارنامه رسمی دریافت شد', note: 'رسید ۴۴۱۲' });
 
   // ۷) قبول مبلغ و حواله صادر شده — نمایش مراحل مالی برای مشترک
   const c7 = await claim(users[6], {
     age: 40, status: 'payment', fill: true,
     incident: { description: 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', causeReportNo: '۴۷۲۲۵' },
     damage: { items: [{ title: 'پکیج و لوله‌کشی', qty: 1, amount: 210000000 }, { title: 'کابینت و سقف کاذب', qty: 1, amount: 260000000 }] },
-    steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36], ['gas_start', 'شروع بررسی', 'gas', 35], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12], ['accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 9], ['fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6], ['fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007']],
+    steps: [['submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36], ['gas_start', 'شروع بررسی', 'gas', 35], ['gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31], ['ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29], ['ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12], ['accept', 'قبول مبلغ خسارت', 'subscriber', 9], ['release_submit', 'ارسال اقرارنامه رسمی ثبت‌شده', 'subscriber', 8], ['release_accept', 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت', 'insurer', 7], ['fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6], ['fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007']],
     extra: { submitCount: 1, acceptedAt: daysAgo(9).toISOString() },
   });
   c7.assessment = { adjuster: 'مهندس نادر شریفی', visitDate: jalaliString(daysAgo(25)), note: 'سقف کاذب با استهلاک ۱۵٪ محاسبه شد.', at: daysAgo(12).toISOString(),
@@ -281,6 +290,10 @@ export async function seed() {
     voucher: { voucherNo: 'H-1405-000007', date: jalaliString(daysAgo(2)), amount: 374400000, at: daysAgo(2).toISOString(), by: ins.name },
   };
   c7.payment = { amount: 374400000 };
+  // اقرارنامه تأیید شده ولی اصل آن هنوز به بیمه‌گر نرسیده؛ واریز تا دریافت اصل ممکن نیست
+  c7.release = { status: 'accepted', notaryNo: '۲۳۵', notaryCity: 'تهران', regNo: '140585000712', date: jalaliString(daysAgo(8)), confirmed: true, submittedAt: daysAgo(8, 12).toISOString(),
+    reviewedBy: ins.name, reviewedAt: daysAgo(7, 12).toISOString(), originalReceived: false };
+  c7.docs.release_deed = [await fileMeta(c7, sampleDoc('اقرارنامه رسمی دفترخانه'), 'release_deed.svg', 'subscriber')];
   notify({ toUser: users[6].id, text: `حواله پرداخت خسارت پرونده ${c7.code} به شماره H-1405-000007 صادر شد.`, claimId: c7.id });
 
   notify({ toRole: 'gas', text: `پرونده ${db.claims[3].code} از سوی مشترک ارسال شد.`, claimId: db.claims[3].id });
@@ -312,7 +325,14 @@ export async function seed() {
       const u = await mk({ role: 'subscriber', username: a.subNo, name: a.name, nationalId: nid(a.b9) || nid(a.b9.slice(0, 8) + '1'), subscriptionNo: a.subNo, mobile: a.mobile, address: a.address }, a.pw);
       const c = await claim(u, { age: a.age, status: a.status, incident: { ...a.incident, causeReportDate: jalaliString(daysAgo(a.age + 1)) }, damage: a.damage, steps: a.steps, extra: { submitCount: 1 } });
       if (a.assessment) c.assessment = { ...a.assessment, at: daysAgo(a.assessAgo).toISOString(), visitDate: jalaliString(daysAgo(a.assessAgo + 3)) };
-      if (a.status === 'payment' || a.status === 'paid') c.acceptedAt = daysAgo(a.acceptAgo).toISOString();
+      if (['release_review', 'payment', 'paid'].includes(a.status)) {
+        c.acceptedAt = daysAgo(a.acceptAgo).toISOString();
+        const rel = a.release;
+        c.release = { status: a.status === 'release_review' ? 'submitted' : 'accepted', notaryNo: rel.notaryNo, notaryCity: rel.notaryCity, regNo: rel.regNo, date: jalaliString(daysAgo(rel.ago)), confirmed: true,
+          submittedAt: daysAgo(rel.ago).toISOString(), originalReceived: a.status === 'paid' };
+        if (a.status !== 'release_review') Object.assign(c.release, { reviewedBy: ins.name, reviewedAt: daysAgo(rel.ago - 2).toISOString() });
+        if (a.status === 'paid') Object.assign(c.release, { originalAt: daysAgo(a.payAgo + 2).toISOString(), originalBy: ins.name, originalNote: '' });
+      }
       if (a.status === 'paid') {
         const amount = computePayable(c.assessment.items, db.settings).payable;
         c.payment = { ref: a.ref, date: jalaliString(daysAgo(a.payAgo)), amount };
@@ -343,15 +363,17 @@ export function archiveSpecs() {
   // روزهای پس از تشکیل پرونده برای هر مرحله
   const STEP = { submit: [1, 'ارسال پرونده به شرکت گاز', 'subscriber'], gas_start: [2, 'شروع بررسی', 'gas'], gas_forward: [4, 'تأیید و ارسال به بیمه‌گر', 'gas'],
     ins_start: [6, 'پذیرش و شروع ارزیابی', 'insurer'], ins_query: [9, 'درخواست مدارک تکمیلی', 'insurer'], ins_assess: [14, 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer'],
-    object: [16, 'اعتراض به مبلغ', 'subscriber'], accept: [16, 'قبول مبلغ و درخواست پرداخت', 'subscriber'], ins_reject: [12, 'رد پرونده', 'insurer'], ins_pay: [26, 'ثبت واریز', 'insurer'] };
+    object: [16, 'اعتراض به مبلغ', 'subscriber'], accept: [16, 'قبول مبلغ خسارت', 'subscriber'], ins_reject: [12, 'رد پرونده', 'insurer'], ins_pay: [26, 'ثبت واریز', 'insurer'],
+    release_submit: [20, 'ارسال اقرارنامه رسمی ثبت‌شده', 'subscriber'], release_accept: [22, 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت', 'insurer'] };
   const PATH = {
     sent_insurer: ['submit', 'gas_start', 'gas_forward'],
     insurer_review: ['submit', 'gas_start', 'gas_forward', 'ins_start'],
     insurer_query: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_query'],
     assessed: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess'],
     objection: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'object'],
-    payment: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'accept'],
-    paid: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'accept', 'ins_pay'],
+    release_review: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'accept', 'release_submit'],
+    payment: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'accept', 'release_submit', 'release_accept'],
+    paid: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_assess', 'accept', 'release_submit', 'release_accept', 'ins_pay'],
     rejected: ['submit', 'gas_start', 'gas_forward', 'ins_start', 'ins_reject'],
   };
   const out = [];
@@ -359,7 +381,7 @@ export function archiveSpecs() {
     const age = 16 + i * 8;
     const status = age > 120 ? (i % 9 === 4 ? 'rejected' : 'paid')
       : age > 75 ? ['paid', 'payment', 'paid', 'assessed'][i % 4]
-      : age > 45 ? ['insurer_review', 'payment', 'assessed', 'insurer_query', 'paid'][i % 5]
+      : age > 45 ? ['insurer_review', 'release_review', 'assessed', 'insurer_query', 'paid'][i % 5]
       : ['sent_insurer', 'insurer_review', 'objection', 'sent_insurer'][i % 4];
     const type = TYPES[i % TYPES.length];
     const amount = 60000000 + ((i * 37) % 20) * 15000000;
@@ -378,7 +400,8 @@ export function archiveSpecs() {
       damage, steps,
       assessment: assessed ? { adjuster: ['مهندس نادر شریفی', 'مهندس پریسا امینی'][i % 2], note: '', items: [{ category: type === 'co' ? 'medical' : 'property', title: type === 'co' ? 'هزینه درمان' : damage.items[0].title, claimed: amount, approved }] } : null,
       assessAgo: age - STEP.ins_assess[0], acceptAgo: age - STEP.accept[0], payAgo: age - STEP.ins_pay[0],
-      ref: '1404' + String(10000000 + i * 7331), voucher: 'H-' + (age > 220 ? '1404' : '1405') + '-' + String(100 + i).padStart(6, '0'),
+      ref: '1404' + String(10000000 + i * 7331),
+      release: { notaryNo: String(20 + ((i * 7) % 180)), notaryCity: AREAS[i % AREAS.length].split('،')[0], regNo: '1405' + String(85000000 + i * 911), ago: age - STEP.release_submit[0] }, voucher: 'H-' + (age > 220 ? '1404' : '1405') + '-' + String(100 + i).padStart(6, '0'),
     });
   }
   return out;

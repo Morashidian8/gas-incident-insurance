@@ -19,6 +19,8 @@ export const STATUS = {
   insurer_query:  { label: 'درخواست مدارک تکمیلی از سوی بیمه‌گر', short: 'استعلام بیمه‌گر', tone: 'warn', step: 3, owner: 'gas' },
   assessed:       { label: 'خسارت تعیین شد؛ منتظر تأیید مشترک', short: 'منتظر تأیید',  tone: 'accent', step: 4, owner: 'subscriber' },
   objection:      { label: 'اعتراض مشترک به مبلغ خسارت', short: 'اعتراض',         tone: 'warn',    step: 4, owner: 'insurer' },
+  release_pending:{ label: 'در انتظار ثبت اقرارنامه رسمی توسط مشترک', short: 'منتظر اقرارنامه', tone: 'accent', step: 5, owner: 'subscriber' },
+  release_review: { label: 'بررسی اقرارنامه رسمی توسط بیمه‌گر', short: 'بررسی اقرارنامه', tone: 'info',  step: 5, owner: 'insurer' },
   payment:        { label: 'تأیید شد؛ در انتظار پرداخت', short: 'در انتظار پرداخت', tone: 'accent', step: 5, owner: 'insurer' },
   paid:           { label: 'خسارت پرداخت شد',            short: 'پرداخت‌شده',      tone: 'ok',      step: 5, owner: null },
   rejected:       { label: 'پرونده مشمول پوشش نیست (رد شد)', short: 'رد شده',      tone: 'bad',     step: 0, owner: null },
@@ -59,6 +61,8 @@ export const DOC_TYPES = [
   { id: 'death_cert',   title: 'گواهی فوت',                                uploader: 'subscriber', need: c => hasKind(c, 'death') },
   { id: 'inheritance',  title: 'گواهی انحصار وراثت و مدارک وراث',          uploader: 'subscriber', need: c => hasKind(c, 'death') },
   { id: 'sheba_cert',   title: 'گواهی شماره شبا به نام ذی‌نفع',             uploader: 'subscriber', need: () => true },
+  // پس از قبول مبلغ: اقرارنامه رسمی ثبت‌شده در دفترخانه (اصل آن هم به بیمه‌گر تحویل می‌شود)
+  { id: 'release_deed', title: 'تصویر اقرارنامه رسمی ثبت‌شده در دفترخانه',      uploader: 'subscriber', need: c => !!c.release, hint: 'اقرارنامه‌ای که در دفتر اسناد رسمی ثبت شده و در آن مبلغ خسارت را پذیرفته و حق هرگونه اعتراض و شکایت را از خود سلب کرده‌اید؛ همه صفحه‌ها خوانا باشند.' },
 ];
 
 export const MIN_PHOTOS = 4;
@@ -81,7 +85,9 @@ export const DEFAULT_SETTINGS = {
   logoDataUrl: '',
   // سه طرح بیمه آتش‌سوزی که در صفحه ورود پیشنهاد می‌شود؛ نام، نرخ و نشانی خرید را مدیر وارد می‌کند
   // ثبت‌نام اینترنتی مشترک
-  regSlaDays: 2, // مهلت بررسی درخواست ثبت‌نام توسط کارشناس گاز
+  regSlaDays: 2,
+  releaseSlaDays: 15, // مهلت مشترک برای ثبت اقرارنامه رسمی در دفترخانه
+  releaseDelivery: 'واحد خسارت بیمه‌گر', // محل تحویل اصل اقرارنامه // مهلت بررسی درخواست ثبت‌نام توسط کارشناس گاز
   subLookupUrl: 'https://my.nigc.ir/', // صفحه شرکت گاز برای یافتن شماره اشتراک با شماره کنتور
   fireOffers: [
     { insurer: 'بیمه‌گر الف (نمونه)', plan: 'طرح پایه آتش‌سوزی منزل', price: '۱٬۲۰۰٬۰۰۰ تومان در سال', cover: 'آتش‌سوزی، انفجار و صاعقه — سرمایه تا ۵۰۰ میلیون تومان', url: '' },
@@ -287,11 +293,16 @@ export const ACTIONS = {
                     return null;
                   } },
   ins_reject:   { role: 'insurer', from: ['insurer_review', 'objection'], to: 'rejected', label: 'رد پرونده', needsNote: true },
-  accept:       { role: 'subscriber', from: ['assessed'], to: 'payment', label: 'قبول مبلغ و درخواست پرداخت' },
+  accept:       { role: 'subscriber', from: ['assessed'], to: 'release_pending', label: 'قبول مبلغ خسارت' },
+  release_submit: { role: 'subscriber', from: ['release_pending'], to: 'release_review', label: 'ارسال اقرارنامه رسمی ثبت‌شده',
+                  guard: c => { const m = releaseIssues(c); return m.length ? 'موارد ناقص: ' + m.join('، ') : null; } },
+  release_return: { role: 'insurer', from: ['release_review'], to: 'release_pending', label: 'بازگرداندن اقرارنامه برای اصلاح', needsNote: true },
+  release_accept: { role: 'insurer', from: ['release_review'], to: 'payment', label: 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت' },
   object:       { role: 'subscriber', from: ['assessed'], to: 'objection', label: 'اعتراض به مبلغ', needsNote: true },
   ins_pay:      { role: 'insurer', from: ['payment'], to: 'paid', label: 'ثبت واریز',
                   guard: c => {
                     if (finStage(c) !== 'bank') return 'پیش از ثبت واریز، بررسی مالی، صدور حواله و ارسال به بانک باید انجام شود.';
+                    if (!(c.release && c.release.originalReceived)) return 'اصل اقرارنامه رسمی هنوز به بیمه‌گر تحویل نشده است.';
                     return (c.payment && c.payment.ref && c.payment.date) ? null : 'شماره پیگیری بانکی و تاریخ واریز را وارد کنید.';
                   } },
 };
@@ -336,7 +347,10 @@ export function applyAction(claim, actionId, actor, note = '', now = new Date(),
     // پاسخ داده‌شده‌ها برای بررسی مجدد گاز باز می‌مانند؛ گاز با ارسال آنها را می‌بندد
   }
   if (actionId === 'ins_assess') c.assessment.at = at;
-  if (actionId === 'accept') c.acceptedAt = at;
+  if (actionId === 'accept') { c.acceptedAt = at; c.release = { status: 'pending', notaryNo: '', notaryCity: '', regNo: '', date: '', confirmed: false, originalReceived: false }; }
+  if (actionId === 'release_submit') Object.assign(c.release, { status: 'submitted', submittedAt: at, note: '' });
+  if (actionId === 'release_return') Object.assign(c.release, { status: 'returned', note, reviewedBy: actor.name, reviewedAt: at, confirmed: false });
+  if (actionId === 'release_accept') Object.assign(c.release, { status: 'accepted', reviewedBy: actor.name, reviewedAt: at });
   if (actionId === 'object') c.objection = { note, at };
   if (actionId === 'ins_pay') c.paidAt = at;
   if (a.to === 'rejected') c.rejectReason = note;
@@ -351,7 +365,7 @@ export function slaInfo(c, settings = DEFAULT_SETTINGS, now = new Date()) {
   const since = c.statusAt || c.createdAt;
   const owner = waitingOn(c);
   const limit = owner === 'gas' ? settings.gasSlaDays : owner === 'insurer' ? settings.insurerSlaDays
-    : c.status === 'returned' ? settings.fixSlaDays : null;
+    : c.status === 'returned' ? settings.fixSlaDays : c.status === 'release_pending' ? (settings.releaseSlaDays || 15) : null;
   if (!limit) return null;
   const used = daysBetween(since, now);
   return { limit, used, left: limit - used, overdue: used > limit };
@@ -365,6 +379,7 @@ export function claimCode(seq, date = new Date()) {
 // در وضعیت «payment» پرونده این زیرمرحله‌ها را به ترتیب طی می‌کند و هر کدام جزئیاتش را نگه می‌دارد.
 export const FIN_STAGES = [
   { id: 'accepted', label: 'تأیید مبلغ توسط مشترک', short: 'تأیید مبلغ' },
+  { id: 'release', label: 'ثبت اقرارنامه رسمی و تأیید بیمه‌گر', short: 'اقرارنامه تأیید شد' },
   { id: 'review', label: 'بررسی مالی و استعلام شبا', short: 'بررسی مالی' },
   { id: 'voucher', label: 'صدور حواله پرداخت', short: 'حواله صادر شد' },
   { id: 'bank', label: 'ارسال دستور پرداخت به بانک', short: 'ارسال به بانک' },
@@ -375,14 +390,16 @@ export const TRANSFER_METHODS = {
   satna: { label: 'ساتنا', eta: 'معمولاً در همان روز کاری به حساب می‌نشیند' },
 };
 
+// آخرین مرحله مالیِ انجام‌شده؛ در دوره اقرارنامه «accepted» و پس از تأیید آن «release»
 export function finStage(c) {
   if (c.status === 'paid') return 'paid';
+  if (c.status === 'release_pending' || c.status === 'release_review') return 'accepted';
   if (c.status !== 'payment') return null;
-  return (c.finance && c.finance.stage) || 'accepted';
+  return (c.finance && c.finance.stage) || (c.release ? 'release' : 'accepted');
 }
 
 const FIN_STEPS = {
-  fin_review: { from: 'accepted', to: 'review', label: 'بررسی مالی و استعلام شبا انجام شد',
+  fin_review: { from: 'release', to: 'review', label: 'بررسی مالی و استعلام شبا انجام شد',
     check: d => (!d.reviewer ? 'نام بررسی‌کننده مالی را وارد کنید.' : !d.shebaMatch ? 'تطبیق شبا با نام ذی‌نفع باید تأیید شود.' : null) },
   fin_voucher: { from: 'review', to: 'voucher', label: 'حواله پرداخت صادر شد',
     check: d => (!d.voucherNo ? 'شماره حواله را وارد کنید.' : !parseJalali(d.date) ? 'تاریخ صدور حواله معتبر نیست.' : !(d.amount > 0) ? 'مبلغ حواله باید بیشتر از صفر باشد.' : null) },
@@ -393,6 +410,7 @@ export const FIN_ACTIONS = FIN_STEPS;
 
 // یک گام مالی را اعمال می‌کند و پرونده جدید برمی‌گرداند.
 export function applyFinance(claim, step, data, actor, now = new Date()) {
+  if (step === 'release_original') return applyReleaseOriginal(claim, data, actor, now);
   const f = FIN_STEPS[step];
   if (!f) throw new Error('گام مالی نامعتبر');
   if (actor.role !== 'insurer') throw new Error('فقط کارشناس بیمه‌گر گام‌های مالی را ثبت می‌کند.');
@@ -447,7 +465,7 @@ export const LIVE_GROUPS = [
   { id: 'referred', label: 'ارجاع به بیمه', sub: 'رسیده، هنوز بررسی شروع نشده', statuses: ['sent_insurer'], tone: 'violet' },
   { id: 'insurer', label: 'در دست بررسی بیمه', sub: 'ارزیابی، استعلام یا اعتراض', statuses: ['insurer_review', 'insurer_query', 'objection'], tone: 'warn' },
   { id: 'assessed', label: 'تعیین خسارت', sub: 'منتظر تأیید مشترک', statuses: ['assessed'], tone: 'accent' },
-  { id: 'payment', label: 'در انتظار پرداخت', sub: 'حواله و ارسال به بانک', statuses: ['payment'], tone: 'accent2' },
+  { id: 'payment', label: 'در انتظار پرداخت', sub: 'اقرارنامه رسمی، حواله و ارسال به بانک', statuses: ['release_pending', 'release_review', 'payment'], tone: 'accent2' },
   { id: 'paid', label: 'پرداخت‌شده توسط بیمه', sub: 'واریز به حساب مشترک', statuses: ['paid'], tone: 'ok' },
   { id: 'rejected', label: 'رد شده', sub: 'خارج از پوشش', statuses: ['rejected'], tone: 'bad' },
 ];
@@ -521,5 +539,39 @@ export function regSla(reg, settings = DEFAULT_SETTINGS, now = new Date()) {
   const limit = settings.regSlaDays || 2;
   const used = daysBetween(reg.submittedAt || reg.at, now);
   return { limit, used, left: limit - used, overdue: used > limit };
+}
+
+// ---------- اقرارنامه رسمی (پس از قبول مبلغ، پیش از پرداخت) ----------
+// مشترک در دفترخانه اقرار می‌کند مبلغ را پذیرفته و حق اعتراض و شکایت را از خود سلب کرده است؛
+// تصویر آن بارگذاری و اصلش به بیمه‌گر تحویل می‌شود. واریز نهایی فقط پس از دریافت اصل ممکن است.
+export function releaseIssues(c) {
+  const r = c.release || {};
+  const out = [];
+  if (!String(r.notaryNo || '').trim()) out.push('شماره دفترخانه');
+  if (!String(r.notaryCity || '').trim()) out.push('شهر دفترخانه');
+  if (!String(r.regNo || '').trim()) out.push('شماره ثبت یا شناسه یکتای سند');
+  const d = parseJalali(r.date);
+  if (!d) out.push('تاریخ ثبت اقرارنامه');
+  else if (c.acceptedAt && d < new Date(new Date(c.acceptedAt).getTime() - 86400000)) out.push('تاریخ اقرارنامه پیش از قبول مبلغ است');
+  if (!((c.docs && c.docs.release_deed) || []).length) out.push('تصویر اقرارنامه');
+  if (!r.confirmed) out.push('تأیید متن اقرارنامه');
+  return out;
+}
+function applyReleaseOriginal(claim, data, actor, now) {
+  if (actor.role !== 'insurer') throw new Error('فقط کارشناس بیمه‌گر دریافت اصل اقرارنامه را ثبت می‌کند.');
+  if (!['release_review', 'payment'].includes(claim.status) || !claim.release) throw new Error('در وضعیت فعلی پرونده این کار ممکن نیست.');
+  if (claim.release.originalReceived) throw new Error('دریافت اصل اقرارنامه قبلاً ثبت شده است.');
+  const c = structuredClone(claim);
+  const at = now.toISOString();
+  Object.assign(c.release, { originalReceived: true, originalAt: at, originalBy: actor.name, originalNote: String(data.note || '').slice(0, 300) });
+  c.timeline.push({ at, by: actor.name, role: actor.role, action: 'release_original', label: 'اصل اقرارنامه رسمی دریافت شد', note: c.release.originalNote });
+  return c;
+}
+// متن پیشنهادی اقرارنامه برای ارائه به دفترخانه
+export function releaseText(c, payable, settings = DEFAULT_SETTINGS, name = '', nationalId = '') {
+  const amount = new Intl.NumberFormat('fa-IR').format(Math.round(payable || 0));
+  return `اینجانب ${name || '...'} به شماره ملی ${nationalId || '...'}، ذی‌نفع پرونده خسارت شماره ${c.code} (بیمه‌نامه حوادث مشترکین گاز طبیعی شماره ${settings.policyNo})، `
+    + `اقرار می‌نمایم مبلغ ${amount} ریال را به‌عنوان خسارت کامل و نهایی حادثه مورخ ${c.incident.date || '...'} پذیرفته‌ام و پس از دریافت آن، `
+    + 'هیچ‌گونه ادعا، اعتراض یا شکایتی علیه بیمه‌گر، شرکت گاز و سایر اشخاص مرتبط نداشته و نخواهم داشت و حق هرگونه اعتراض و طرح دعوا در این خصوص را از خود سلب و ساقط نمودم.';
 }
 

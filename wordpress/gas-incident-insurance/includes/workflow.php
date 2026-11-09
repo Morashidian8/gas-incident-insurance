@@ -27,6 +27,8 @@ class GII_WF {
 		'insurer_query'  => array( 'label' => 'درخواست مدارک تکمیلی از سوی بیمه‌گر', 'owner' => 'gas' ),
 		'assessed'       => array( 'label' => 'خسارت تعیین شد؛ منتظر تأیید مشترک', 'owner' => 'subscriber' ),
 		'objection'      => array( 'label' => 'اعتراض مشترک به مبلغ خسارت', 'owner' => 'insurer' ),
+		'release_pending' => array( 'label' => 'در انتظار ثبت اقرارنامه رسمی توسط مشترک', 'owner' => 'subscriber' ),
+		'release_review'  => array( 'label' => 'بررسی اقرارنامه رسمی توسط بیمه‌گر', 'owner' => 'insurer' ),
 		'payment'        => array( 'label' => 'تأیید شد؛ در انتظار پرداخت', 'owner' => 'insurer' ),
 		'paid'           => array( 'label' => 'خسارت پرداخت شد', 'owner' => null ),
 		'rejected'       => array( 'label' => 'پرونده مشمول پوشش نیست (رد شد)', 'owner' => null ),
@@ -56,6 +58,8 @@ class GII_WF {
 		'policyStart'       => '1405/01/01',
 		'policyEnd'         => '1405/12/29',
 		'regSlaDays'        => 2,
+		'releaseSlaDays'    => 15,
+		'releaseDelivery'   => 'واحد خسارت بیمه‌گر',
 		'subLookupUrl'      => 'https://my.nigc.ir/',
 		// سه طرح بیمه آتش‌سوزی صفحه ورود؛ همان DEFAULT_SETTINGS.fireOffers در js/workflow.js
 		'fireOffers'        => array(
@@ -93,6 +97,7 @@ class GII_WF {
 			array( 'id' => 'death_cert', 'title' => 'گواهی فوت', 'uploader' => 'subscriber', 'need' => function ( $c ) { return GII_WF::has_kind( $c, 'death' ); } ),
 			array( 'id' => 'inheritance', 'title' => 'گواهی انحصار وراثت و مدارک وراث', 'uploader' => 'subscriber', 'need' => function ( $c ) { return GII_WF::has_kind( $c, 'death' ); } ),
 			array( 'id' => 'sheba_cert', 'title' => 'گواهی شماره شبا به نام ذی‌نفع', 'uploader' => 'subscriber', 'need' => $always ),
+			array( 'id' => 'release_deed', 'title' => 'تصویر اقرارنامه رسمی ثبت‌شده در دفترخانه', 'uploader' => 'subscriber', 'need' => function ( $c ) { return ! empty( $c['release'] ); } ),
 		);
 	}
 	public static function injury_or_death_pub( $c ) { return self::injury_or_death( $c ); }
@@ -362,11 +367,16 @@ class GII_WF {
 					return null;
 				} ),
 			'ins_reject'  => array( 'role' => 'insurer', 'from' => array( 'insurer_review', 'objection' ), 'to' => 'rejected', 'label' => 'رد پرونده', 'needsNote' => true ),
-			'accept'      => array( 'role' => 'subscriber', 'from' => array( 'assessed' ), 'to' => 'payment', 'label' => 'قبول مبلغ و درخواست پرداخت' ),
+			'accept'      => array( 'role' => 'subscriber', 'from' => array( 'assessed' ), 'to' => 'release_pending', 'label' => 'قبول مبلغ خسارت' ),
+			'release_submit' => array( 'role' => 'subscriber', 'from' => array( 'release_pending' ), 'to' => 'release_review', 'label' => 'ارسال اقرارنامه رسمی ثبت‌شده',
+				'guard' => function ( $c ) { $m = GII_WF::release_issues( $c ); return $m ? 'موارد ناقص: ' . implode( '، ', $m ) : null; } ),
+			'release_return' => array( 'role' => 'insurer', 'from' => array( 'release_review' ), 'to' => 'release_pending', 'label' => 'بازگرداندن اقرارنامه برای اصلاح', 'needsNote' => true ),
+			'release_accept' => array( 'role' => 'insurer', 'from' => array( 'release_review' ), 'to' => 'payment', 'label' => 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت' ),
 			'object'      => array( 'role' => 'subscriber', 'from' => array( 'assessed' ), 'to' => 'objection', 'label' => 'اعتراض به مبلغ', 'needsNote' => true ),
 			'ins_pay'     => array( 'role' => 'insurer', 'from' => array( 'payment' ), 'to' => 'paid', 'label' => 'ثبت واریز',
 				'guard' => function ( $c ) {
 					if ( 'bank' !== GII_WF::fin_stage( $c ) ) return 'پیش از ثبت واریز، بررسی مالی، صدور حواله و ارسال به بانک باید انجام شود.';
+					if ( empty( $c['release']['originalReceived'] ) ) return 'اصل اقرارنامه رسمی هنوز به بیمه‌گر تحویل نشده است.';
 					return ( ! empty( $c['payment']['ref'] ) && ! empty( $c['payment']['date'] ) ) ? null : 'شماره پیگیری بانکی و تاریخ واریز را وارد کنید.';
 				} ),
 		);
@@ -409,7 +419,13 @@ class GII_WF {
 		}
 		if ( 'gas_return' === $id ) $c['returnedAt'] = $at;
 		if ( 'ins_assess' === $id ) $c['assessment']['at'] = $at;
-		if ( 'accept' === $id ) $c['acceptedAt'] = $at;
+		if ( 'accept' === $id ) {
+			$c['acceptedAt'] = $at;
+			$c['release']    = array( 'status' => 'pending', 'notaryNo' => '', 'notaryCity' => '', 'regNo' => '', 'date' => '', 'confirmed' => false, 'originalReceived' => false );
+		}
+		if ( 'release_submit' === $id ) $c['release'] = array_merge( $c['release'], array( 'status' => 'submitted', 'submittedAt' => $at, 'note' => '' ) );
+		if ( 'release_return' === $id ) $c['release'] = array_merge( $c['release'], array( 'status' => 'returned', 'note' => $note, 'reviewedBy' => $actor['name'], 'reviewedAt' => $at, 'confirmed' => false ) );
+		if ( 'release_accept' === $id ) $c['release'] = array_merge( $c['release'], array( 'status' => 'accepted', 'reviewedBy' => $actor['name'], 'reviewedAt' => $at ) );
 		if ( 'object' === $id ) $c['objection'] = array( 'note' => $note, 'at' => $at );
 		if ( 'ins_pay' === $id ) $c['paidAt'] = $at;
 		if ( 'rejected' === $a['to'] ) $c['rejectReason'] = $note;
@@ -420,12 +436,13 @@ class GII_WF {
 	// ---------- فرایند مالی ----------
 	public static function fin_stage( $c ) {
 		if ( 'paid' === $c['status'] ) return 'paid';
+		if ( in_array( $c['status'], array( 'release_pending', 'release_review' ), true ) ) return 'accepted';
 		if ( 'payment' !== $c['status'] ) return null;
-		return $c['finance']['stage'] ?? 'accepted';
+		return $c['finance']['stage'] ?? ( empty( $c['release'] ) ? 'accepted' : 'release' );
 	}
 	public static function fin_steps() {
 		return array(
-			'fin_review'  => array( 'from' => 'accepted', 'to' => 'review', 'label' => 'بررسی مالی و استعلام شبا انجام شد',
+			'fin_review'  => array( 'from' => 'release', 'to' => 'review', 'label' => 'بررسی مالی و استعلام شبا انجام شد',
 				'check' => function ( $d ) { return empty( $d['reviewer'] ) ? 'نام بررسی‌کننده مالی را وارد کنید.' : ( empty( $d['shebaMatch'] ) ? 'تطبیق شبا با نام ذی‌نفع باید تأیید شود.' : null ); } ),
 			'fin_voucher' => array( 'from' => 'review', 'to' => 'voucher', 'label' => 'حواله پرداخت صادر شد',
 				'check' => function ( $d ) { return empty( $d['voucherNo'] ) ? 'شماره حواله را وارد کنید.' : ( ! GII_WF::parse_jalali( $d['date'] ?? '' ) ? 'تاریخ صدور حواله معتبر نیست.' : ( ( (float) ( $d['amount'] ?? 0 ) ) <= 0 ? 'مبلغ حواله باید بیشتر از صفر باشد.' : null ) ); } ),
@@ -434,6 +451,7 @@ class GII_WF {
 		);
 	}
 	public static function apply_finance( $c, $step, $data, $actor, $now = null ) {
+		if ( 'release_original' === $step ) return self::apply_release_original( $c, $data, $actor, $now );
 		$f = self::fin_steps()[ $step ] ?? null;
 		if ( ! $f ) throw new GII_WF_Error( 'گام مالی نامعتبر' );
 		if ( 'insurer' !== $actor['role'] ) throw new GII_WF_Error( 'فقط کارشناس بیمه‌گر گام‌های مالی را ثبت می‌کند.' );
@@ -451,6 +469,31 @@ class GII_WF {
 		$note = 'review' === $f['to'] ? (string) ( $data['note'] ?? '' )
 			: ( 'voucher' === $f['to'] ? "حواله {$data['voucherNo']} به مبلغ {$data['amount']} ریال" : self::TRANSFER_METHODS[ $data['method'] ] . " — پیگیری {$data['ref']}" );
 		$c['timeline'][] = array( 'at' => $at, 'by' => $actor['name'], 'role' => $actor['role'], 'action' => $step, 'label' => $f['label'], 'note' => $note );
+		return $c;
+	}
+
+	// ---------- اقرارنامه رسمی — همان قواعد js/workflow.js ----------
+	public static function release_issues( $c ) {
+		$r   = (array) ( $c['release'] ?? array() );
+		$out = array();
+		if ( '' === trim( (string) ( $r['notaryNo'] ?? '' ) ) ) $out[] = 'شماره دفترخانه';
+		if ( '' === trim( (string) ( $r['notaryCity'] ?? '' ) ) ) $out[] = 'شهر دفترخانه';
+		if ( '' === trim( (string) ( $r['regNo'] ?? '' ) ) ) $out[] = 'شماره ثبت یا شناسه یکتای سند';
+		$d = self::parse_jalali( $r['date'] ?? '' );
+		if ( ! $d ) $out[] = 'تاریخ ثبت اقرارنامه';
+		elseif ( ! empty( $c['acceptedAt'] ) && $d < strtotime( $c['acceptedAt'] ) - 86400 ) $out[] = 'تاریخ اقرارنامه پیش از قبول مبلغ است';
+		if ( empty( $c['docs']['release_deed'] ) ) $out[] = 'تصویر اقرارنامه';
+		if ( empty( $r['confirmed'] ) ) $out[] = 'تأیید متن اقرارنامه';
+		return $out;
+	}
+	private static function apply_release_original( $c, $data, $actor, $now ) {
+		if ( 'insurer' !== $actor['role'] ) throw new GII_WF_Error( 'فقط کارشناس بیمه‌گر دریافت اصل اقرارنامه را ثبت می‌کند.' );
+		if ( ! in_array( $c['status'], array( 'release_review', 'payment' ), true ) || empty( $c['release'] ) ) throw new GII_WF_Error( 'در وضعیت فعلی پرونده این کار ممکن نیست.' );
+		if ( ! empty( $c['release']['originalReceived'] ) ) throw new GII_WF_Error( 'دریافت اصل اقرارنامه قبلاً ثبت شده است.' );
+		$at           = self::iso( $now );
+		$note         = mb_substr( (string) ( $data['note'] ?? '' ), 0, 300 );
+		$c['release'] = array_merge( $c['release'], array( 'originalReceived' => true, 'originalAt' => $at, 'originalBy' => $actor['name'], 'originalNote' => $note ) );
+		$c['timeline'][] = array( 'at' => $at, 'by' => $actor['name'], 'role' => $actor['role'], 'action' => 'release_original', 'label' => 'اصل اقرارنامه رسمی دریافت شد', 'note' => $note );
 		return $c;
 	}
 

@@ -2,6 +2,7 @@ import { chromium } from 'playwright';
 // اجرا: ابتدا README همین پوشه را ببینید. تصاویر و فایل‌های خروجی در tests/e2e/out ذخیره می‌شوند.
 import { mkdirSync } from 'node:fs';
 mkdirSync('tests/e2e/out', { recursive: true });
+const PNG = { name: 'test.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') };
 
 const B = process.env.WP_BASE || 'http://localhost:8888';
 const b = await chromium.launch();
@@ -52,11 +53,11 @@ await sub.click('[data-nav=home]'); await sub.waitForTimeout(300);
 await sub.click('[data-go=sec][data-p*=docs]'); await sub.waitForTimeout(500);
 log('  doc hint shown:', await sub.locator('.doc-hint').count());
 await sub.screenshot({ path: 'tests/e2e/out/c2-docs.png' });
-await sub.setInputFiles('input[data-upload=ownership]', 'test.png'); await sub.waitForTimeout(2000);
+await sub.setInputFiles('input[data-upload=ownership]', PNG); await sub.waitForTimeout(2000);
 log('  uploaded ownership; thumbs with blob src:', await sub.locator('img[data-file][src^=blob]').count());
 for (const id of await sub.$$eval('[data-defreply]', els => els.map(e => e.dataset.defreply))) { await sub.fill(`#rep-${id}`, 'اصلاح شد'); await sub.click(`[data-act=saveReply][data-id="${id}"]`); await sub.waitForTimeout(800); }
 await sub.click('[data-nav=home]'); await sub.click('[data-go=sec][data-p*=photos]'); await sub.waitForTimeout(400);
-await sub.setInputFiles('input[data-upload=photos]', 'test.png'); await sub.waitForTimeout(1500);
+await sub.setInputFiles('input[data-upload=photos]', PNG); await sub.waitForTimeout(1500);
 for (const id of await sub.$$eval('[data-defreply]', els => els.map(e => e.dataset.defreply))) { await sub.fill(`#rep-${id}`, 'عکس کنتور اضافه شد'); await sub.click(`[data-act=saveReply][data-id="${id}"]`); await sub.waitForTimeout(800); }
 // ویرایش یک فیلد و ذخیره خودکار روی سرور
 await sub.click('[data-nav=home]'); await sub.click('[data-go=sec][data-p*=incident]'); await sub.waitForTimeout(400);
@@ -103,14 +104,33 @@ await sub.click('[data-go=track]'); await sub.waitForTimeout(600);
 await act(sub, 'accept');
 log('subscriber accepted:', await status(sub));
 
-// ---- بیمه‌گر: مراحل مالی و واریز ----
+// ---- اقرارنامه رسمی دفترخانه: مشترک ثبت و بارگذاری می‌کند ----
+await sub.waitForTimeout(800);
+log('  release panel:', await sub.locator('.form.release').count(), '| template text:', (await sub.textContent('.rel-text p')).slice(0, 40));
+for (const [k, v] of [['notaryNo', '۱۲۳'], ['notaryCity', 'تهران'], ['regNo', '140585123456'], ['date', await sub.evaluate(() => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map(x => [x.type, x.value])); return `${p.year}/${p.month}/${p.day}`; })]]) {
+  await sub.fill(`#f-release-${k}`, v); await sub.locator(`#f-release-${k}`).blur(); await sub.waitForTimeout(300);
+}
+await sub.setInputFiles('input[data-upload=release_deed]', { name: 'deed.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+await sub.waitForTimeout(1800);
+await sub.check('#f-release-confirmed'); await sub.waitForTimeout(1500);
+await act(sub, 'release_submit');
+log('  after release submit:', await status(sub));
+
+// ---- بیمه‌گر: بررسی اقرارنامه، مراحل مالی و واریز ----
 await ins.reload(); await ins.waitForTimeout(1500);
+await ins.click('[role=tab][data-p*=assess]'); await ins.waitForTimeout(500);
+log('insurer sees deed thumbs:', await ins.locator('.form.release .thumb').count());
+await act(ins, 'release_accept');
+log('  after release accept:', await status(ins));
 await ins.click('[role=tab][data-p*=assess]'); await ins.waitForTimeout(500);
 await ins.check('#fn-sheba'); await ins.click('form[data-form=fin] button[type=submit]'); await ins.waitForTimeout(1500);
 await ins.click('form[data-form=fin] button[type=submit]'); await ins.waitForTimeout(1500);
 await ins.fill('#fn-ref', 'P-123'); await ins.click('form[data-form=fin] button[type=submit]'); await ins.waitForTimeout(1500);
 await ins.fill('#f-payment-ref', '140507771234'); await ins.locator('#f-payment-ref').blur();
 await ins.fill('#f-payment-date', '1405/07/30'); await ins.locator('#f-payment-date').blur(); await ins.waitForTimeout(1200);
+await act(ins, 'ins_pay');
+log('  pay before original (expect BLOCKED above):', await status(ins));
+await ins.fill('form[data-form=relOriginal] input[name=note]', 'رسید ۵۵'); await ins.click('form[data-form=relOriginal] button[type=submit]'); await ins.waitForTimeout(1500);
 await act(ins, 'ins_pay');
 log('insurer paid:', await status(ins));
 await ins.screenshot({ path: 'tests/e2e/out/w3-insurer.png', fullPage: true });

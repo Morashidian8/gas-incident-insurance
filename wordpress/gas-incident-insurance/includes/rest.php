@@ -634,6 +634,18 @@ class GII_REST {
 			}
 			$did = true;
 		}
+		// اقرارنامه رسمی: مشترک مشخصات سند دفترخانه را وارد می‌کند
+		if ( 'subscriber' === $role && 'release_pending' === $st && isset( $in['release'] ) ) {
+			$r            = (array) $in['release'];
+			$c['release'] = array_merge( (array) $c['release'], array(
+				'notaryNo'   => self::txt( GII_WF::normalize_digits( $r['notaryNo'] ?? '' ), 20 ),
+				'notaryCity' => self::txt( $r['notaryCity'] ?? '', 60 ),
+				'regNo'      => self::txt( GII_WF::normalize_digits( $r['regNo'] ?? '' ), 40 ),
+				'date'       => self::digits( $r['date'] ?? '' ),
+				'confirmed'  => ! empty( $r['confirmed'] ),
+			) );
+			$did = true;
+		}
 		if ( 'insurer' === $role && in_array( $st, array( 'insurer_review', 'objection' ), true ) && isset( $in['assessment'] ) ) {
 			$a               = (array) $in['assessment'];
 			$c['assessment'] = array(
@@ -696,7 +708,17 @@ class GII_REST {
 			case 'ins_start': $t( "بیمه‌گر بررسی پرونده $code را آغاز کرد." ); break;
 			case 'ins_query': $role( 'gas', "بیمه‌گر برای پرونده $code مدارک تکمیلی خواست." ); break;
 			case 'ins_assess': $t( "مبلغ خسارت پرونده $code تعیین شد." ); $sms( "مبلغ خسارت پرونده $code تعیین شد. برای تأیید یا اعتراض وارد سامانه شوید." ); break;
-			case 'accept': $role( 'insurer', "مشترک مبلغ پرونده $code را پذیرفت." ); break;
+			case 'accept':
+				$role( 'insurer', "مشترک مبلغ پرونده $code را پذیرفت؛ منتظر اقرارنامه رسمی است." );
+				$t( "برای دریافت خسارت پرونده $code، اقرارنامه رسمی را در دفترخانه ثبت و تصویر آن را بارگذاری کنید." );
+				$sms( "مشترک گرامی، برای دریافت خسارت پرونده $code اقرارنامه رسمی را در دفترخانه ثبت، تصویرش را در سامانه بارگذاری و اصل آن را به بیمه‌گر تحویل دهید." );
+				break;
+			case 'release_submit': $role( 'insurer', "اقرارنامه رسمی پرونده $code برای بررسی ارسال شد." ); break;
+			case 'release_return': $t( "اقرارنامه پرونده $code نیاز به اصلاح دارد: $note" ); $sms( "اقرارنامه رسمی پرونده $code نیاز به اصلاح دارد: $note" ); break;
+			case 'release_accept':
+				$t( "اقرارنامه پرونده $code تأیید شد و مراحل پرداخت آغاز شد." );
+				$sms( "اقرارنامه رسمی پرونده $code تأیید شد و مراحل پرداخت آغاز شد." . ( empty( $c['release']['originalReceived'] ) ? ' اصل اقرارنامه را به ' . ( GII_Store::settings()['releaseDelivery'] ?? 'بیمه‌گر' ) . ' تحویل دهید؛ واریز پس از دریافت اصل انجام می‌شود.' : '' ) );
+				break;
 			case 'object': $role( 'insurer', "مشترک به مبلغ پرونده $code اعتراض کرد." ); break;
 			case 'ins_pay': $t( "خسارت پرونده $code واریز شد." ); $sms( "خسارت پرونده $code به مبلغ " . number_format( (float) $c['payment']['amount'] ) . " ریال واریز شد. پیگیری: {$c['payment']['ref']}" ); break;
 			case 'gas_reject':
@@ -710,10 +732,10 @@ class GII_REST {
 		$step = (string) $req['step'];
 		$d    = (array) $req['data'];
 		$s    = GII_Store::settings();
-		$data = 'fin_review' === $step ? array( 'reviewer' => self::txt( $d['reviewer'] ?? '', 100 ), 'shebaMatch' => ! empty( $d['shebaMatch'] ), 'note' => self::area( $d['note'] ?? '', 500 ) )
+		$data = 'release_original' === $step ? array( 'note' => self::txt( $d['note'] ?? '', 300 ) ) : ( 'fin_review' === $step ? array( 'reviewer' => self::txt( $d['reviewer'] ?? '', 100 ), 'shebaMatch' => ! empty( $d['shebaMatch'] ), 'note' => self::area( $d['note'] ?? '', 500 ) )
 			// مبلغ حواله همیشه از ارزیابی ثبت‌شده محاسبه می‌شود، نه از ورودی مرورگر
 			: ( 'fin_voucher' === $step ? array( 'voucherNo' => self::txt( $d['voucherNo'] ?? '', 40 ), 'date' => self::digits( $d['date'] ?? '' ), 'amount' => ! empty( $c['assessment'] ) ? GII_WF::payable_of( $c, $s ) : 0 )
-			: array( 'method' => self::pick( $d['method'] ?? '', array_keys( GII_WF::TRANSFER_METHODS ) ), 'ref' => self::txt( $d['ref'] ?? '', 40 ), 'date' => self::digits( $d['date'] ?? '' ) ) );
+			: array( 'method' => self::pick( $d['method'] ?? '', array_keys( GII_WF::TRANSFER_METHODS ) ), 'ref' => self::txt( $d['ref'] ?? '', 40 ), 'date' => self::digits( $d['date'] ?? '' ) ) ) );
 		try {
 			$c = GII_WF::apply_finance( $c, $step, $data, GII_Store::actor() );
 		} catch ( GII_WF_Error $e ) {
@@ -721,6 +743,10 @@ class GII_REST {
 		}
 		$c = self::save( $c );
 		if ( is_wp_error( $c ) ) return $c;
+		if ( 'release_original' === $step ) {
+			GII_Store::notify( (int) $c['subscriberId'], null, "اصل اقرارنامه رسمی پرونده {$c['code']} توسط بیمه‌گر دریافت شد.", $c['id'] );
+			return self::ok();
+		}
 		$msg = 'fin_review' === $step ? "بررسی مالی پرونده {$c['code']} انجام و شبای شما تأیید شد."
 			: ( 'fin_voucher' === $step ? "حواله پرداخت خسارت پرونده {$c['code']} به شماره {$data['voucherNo']} و مبلغ " . number_format( $data['amount'] ) . ' ریال صادر شد.'
 			: "دستور پرداخت خسارت پرونده {$c['code']} از طریق " . GII_WF::TRANSFER_METHODS[ $data['method'] ] . " به بانک ارسال شد. پیگیری: {$data['ref']}" );
@@ -832,6 +858,7 @@ class GII_REST {
 	// ---------- فایل ----------
 	const MIMES = array( 'jpg|jpeg|jpe' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif', 'pdf' => 'application/pdf' );
 	private static function can_upload( $c, $role, $target ) {
+		if ( 'subscriber' === $role && 'release_pending' === $c['status'] ) return 'release_deed' === $target;
 		if ( 'subscriber' === $role && in_array( $c['status'], array( 'draft', 'returned' ), true ) ) {
 			if ( 'photos' === $target ) return true;
 			$d = GII_WF::doc_type( $target );

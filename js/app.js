@@ -552,6 +552,7 @@ function subHome() {
   const multi = visibleClaims().length > 1;
   let bar;
   if (c.status === 'paid') bar = `<div class="pill-bar green"><span>مبلغ پرداخت‌شده:</span><span class="amt num">${money(c.payment?.amount || pay)}</span></div>`;
+  else if (['release_pending', 'release_review'].includes(c.status)) bar = `<div class="pill-bar ${c.status === 'release_pending' ? 'orange' : ''}"><span>${c.status === 'release_pending' ? 'گام بعد: اقرارنامه رسمی' : 'اقرارنامه نزد بیمه‌گر'}</span><span class="amt num">${money(pay)}</span></div>`;
   else if (c.status === 'payment') bar = `<div class="pill-bar"><span>${esc(W.FIN_STAGES.find(x => x.id === W.finStage(c)).label)}:</span><span class="amt num">${money(c.payment?.amount || pay)}</span></div>`;
   else if (['assessed', 'objection'].includes(c.status)) bar = `<div class="pill-bar"><span>مبلغ تعیین‌شده خسارت:</span><span class="amt num">${money(pay)}</span></div>`;
   else if (c.status === 'returned') bar = `<div class="pill-bar orange"><span>نقص پرونده:</span><span class="amt">${fa(W.openDeficiencies(c).length)} مورد</span></div>`;
@@ -573,6 +574,7 @@ function subHome() {
   ${bar}
   ${c.status === 'returned' ? `<div class="note warn">${icon('alert')}<div><b>شرکت گاز پرونده را برای اصلاح برگردانده است</b>
       <ul>${W.openDeficiencies(c).map(d => `<li>${esc(d.title)}: ${esc(d.note)}${d.reply ? ' — <i>پاسخ داده شد</i>' : ''}</li>`).join('')}</ul></div></div>` : ''}
+  ${c.status === 'release_pending' ? `<button class="note warn as-link" data-go="track">${icon('doc')}<div><b>${c.release?.status === 'returned' ? 'اقرارنامه نیاز به اصلاح دارد' : 'برای دریافت خسارت: اقرارنامه رسمی در دفترخانه'}</b>متن اقرارنامه، راهنمای ثبت در دفترخانه و بارگذاری تصویر آن در «پیگیری پرونده».</div>${icon('chevL', 'chev')}</button>` : ''}
   ${['payment', 'paid'].includes(c.status) ? `<button class="note info as-link" data-go="track">${icon('receipt')}<div><b>${c.status === 'paid' ? 'رسید واریز خسارت' : 'پرداخت در جریان است'}</b>مراحل مالی، شماره حواله و پیگیری بانکی را در «پیگیری پرونده» ببینید.</div>${icon('chevL', 'chev')}</button>` : ''}
   ${c.status === 'assessed' ? `<div class="note info">${icon('money')}<div><b>مبلغ خسارت شما تعیین شد</b>برای دیدن جزئیات و قبول یا اعتراض، «پیگیری پرونده» را باز کنید.</div></div>` : ''}
   <div class="well">
@@ -766,7 +768,7 @@ function docCards(c, { editableBy = null, flagRole = null } = {}) {
 }
 
 function offerBlock(c) {
-  if (!c.assessment || !['assessed', 'payment', 'paid', 'objection'].includes(c.status)) return '';
+  if (!c.assessment || !['assessed', 'release_pending', 'release_review', 'payment', 'paid', 'objection'].includes(c.status)) return '';
   const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
   return `<div class="form">
     <h2 style="font-size:17px">جزئیات ارزیابی خسارت</h2>
@@ -781,12 +783,55 @@ function offerBlock(c) {
     ${c.assessment.note ? `<div class="note info">${icon('chat')}<div><b>توضیح ارزیاب (${esc(c.assessment.adjuster)})</b>${esc(c.assessment.note)}</div></div>` : ''}
     ${c.objection ? `<div class="note warn">${icon('alert')}<div><b>اعتراض مشترک — ${fdate(c.objection.at)}</b>${esc(c.objection.note)}</div></div>` : ''}
     ${c.status === 'assessed' && st.user.role === 'subscriber' ? `<div class="btns"><button class="btn green" data-act="doAction" data-action="accept">${icon('check')} قبول مبلغ</button><button class="btn ghost" data-act="doAction" data-action="object">اعتراض به مبلغ</button></div>` : ''}
-  </div>${financeBlock(c)}`;
+  </div>${releaseBlock(c)}${financeBlock(c)}`;
 }
 
 // ---------- پنل مالی: از قبول مبلغ تا واریز ----------
 const maskSheba = v => v ? `${v.slice(0, 4)} •••• •••• ${v.slice(-4)}` : '—';
+// ---------- اقرارنامه رسمی دفترخانه (پس از قبول مبلغ، پیش از پرداخت) ----------
+function releaseBlock(c) {
+  const r = c.release;
+  if (!r) return '';
+  const role = st.user.role;
+  const sub = userById(c.subscriberId) || {};
+  const payable = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0).payable;
+  const deeds = (c.docs.release_deed || []);
+  const editable = role === 'subscriber' && c.status === 'release_pending';
+  const facts = `${kv('دفترخانه', r.notaryNo ? `شماره ${fa(r.notaryNo)} — ${esc(r.notaryCity)}` : '—')}${kv('شماره ثبت / شناسه یکتا', r.regNo ? `<span class="num" dir="ltr">${esc(fa(r.regNo))}</span>` : '—')}${kv('تاریخ ثبت', fa(r.date || '—'))}
+    ${kv('اصل اقرارنامه', r.originalReceived ? `<span class="ok-txt">${icon('check')} دریافت شد — ${esc(r.originalBy)}، ${fdate(r.originalAt)}${r.originalNote ? ' — ' + esc(r.originalNote) : ''}</span>` : `<span class="badge warn">هنوز تحویل نشده</span>`)}`;
+  const thumbs = `<div class="thumbs">${deeds.map(id => thumb(c, id, editable)).join('')}${editable ? addFileBtn('release_deed', 'تصویر اقرارنامه', 'image/*,application/pdf') : ''}</div>`;
+  if (editable) {
+    const text = fa(W.releaseText(c, payable, db.settings, sub.name, sub.nationalId));
+    return `<div class="form release">
+      <div class="fin-head"><h2>${icon('doc')} اقرارنامه رسمی برای دریافت خسارت</h2><span class="badge ${r.status === 'returned' ? 'warn' : 'accent'}">${r.status === 'returned' ? 'نیاز به اصلاح' : 'گام بعد'}</span></div>
+      ${r.status === 'returned' ? `<div class="note warn">${icon('alert')}<div><b>توضیح بیمه‌گر</b>${esc(r.note)}</div></div>` : ''}
+      <ol class="rel-steps">
+        <li><b>به یکی از دفاتر اسناد رسمی بروید</b> و با کارت ملی، اقرارنامه زیر را ثبت کنید. مبلغ و شماره پرونده باید دقیقاً همین باشد.</li>
+        <li><b>تصویر اقرارنامه ثبت‌شده</b> را (همه صفحه‌ها، خوانا) بارگذاری و مشخصات سند را وارد کنید.</li>
+        <li><b>اصل اقرارنامه</b> را به ${esc(db.settings.releaseDelivery || 'بیمه‌گر')} تحویل دهید؛ واریز پس از دریافت اصل انجام می‌شود.</li>
+      </ol>
+      <div class="rel-text"><p>${esc(text)}</p><button class="btn sm ghost" data-act="copyCred" data-text="${esc(text)}">${icon('copy')} رونوشت متن اقرارنامه</button></div>
+      <div class="grid2">${field('شماره دفترخانه', 'release.notaryNo', fa(r.notaryNo), { req: true, ltr: true })}${field('شهر دفترخانه', 'release.notaryCity', r.notaryCity, { req: true })}
+        ${field('شماره ثبت یا شناسه یکتای سند', 'release.regNo', fa(r.regNo), { req: true, ltr: true })}${field('تاریخ ثبت', 'release.date', fa(r.date), { req: true, ltr: true, ph: '۱۴۰۵/۰۸/۲۰' })}</div>
+      <div class="fld"><span>تصویر اقرارنامه <i>*</i></span>${thumbs}</div>
+      <label class="check"><input type="checkbox" id="f-release-confirmed" data-bind="release.confirmed" ${r.confirmed ? 'checked' : ''}><span>تأیید می‌کنم اقرارنامه با مبلغ <b>${money(payable)}</b> و سلب حق اعتراض و شکایت در دفترخانه ثبت شده و تصویر بارگذاری‌شده مربوط به همین سند است.</span></label>
+      <button class="btn green" data-act="doAction" data-action="release_submit">${icon('send')} ارسال اقرارنامه برای بیمه‌گر</button>
+    </div>`;
+  }
+  const canOriginal = role === 'insurer' && ['release_review', 'payment'].includes(c.status) && !r.originalReceived;
+  return `<div class="form release">
+    <div class="fin-head"><h2>${icon('doc')} اقرارنامه رسمی دفترخانه</h2><span class="badge ${r.status === 'accepted' ? 'ok' : r.status === 'submitted' ? 'info' : 'warn'}">${{ pending: 'منتظر مشترک', returned: 'نیاز به اصلاح', submitted: 'در حال بررسی بیمه‌گر', accepted: 'تأیید شد' }[r.status]}</span></div>
+    ${role === 'insurer' && c.status === 'release_review' ? `<div class="note info">${icon('help')}<div>مبلغ (${money(payable)})، شماره پرونده و عبارت سلب حق اعتراض را در تصویر سند بررسی کنید؛ سپس «تأیید اقرارنامه» یا «بازگرداندن برای اصلاح» را بالای صفحه بزنید.</div></div>` : ''}
+    ${facts}
+    ${deeds.length ? `<div class="fld"><span>تصویر اقرارنامه</span>${thumbs}</div>` : ''}
+    ${canOriginal ? `<form class="form flat" data-form="relOriginal"><b>دریافت اصل اقرارنامه</b>
+      <label class="fld"><span>شماره رسید یا توضیح (اختیاری)</span><input name="note" placeholder="مثلاً رسید ۱۲۳ — تحویل حضوری"></label>
+      <button class="btn" type="submit">${icon('check')} ثبت دریافت اصل اقرارنامه</button></form>` : ''}
+    ${role === 'subscriber' && !r.originalReceived ? `<p class="hint-s">${icon('help')} اصل اقرارنامه را به ${esc(db.settings.releaseDelivery || 'بیمه‌گر')} تحویل دهید.</p>` : ''}
+  </div>`;
+}
 const FIN_WAIT = {
+  release: 'اقرارنامه رسمی را در دفترخانه ثبت و تصویرش را بارگذاری کنید؛ بیمه‌گر آن را بررسی می‌کند.',
   review: 'واحد مالی بیمه‌گر مدارک پرداخت را کنترل و شبای شما را با نام ذی‌نفع تطبیق می‌دهد.',
   voucher: 'پس از بررسی مالی، حواله پرداخت به نام شما صادر می‌شود.',
   bank: 'حواله برای انتقال پایا یا ساتنا به بانک فرستاده می‌شود.',
@@ -796,6 +841,7 @@ function finDetails(c, id) {
   const f = c.finance || {};
   const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
   const num_ = v => `<span class="num" dir="ltr">${esc(fa(v))}</span>`;
+  if (id === 'release' && c.release && ['accepted'].includes(c.release.status)) return [['دفترخانه', `شماره ${fa(c.release.notaryNo)} — ${esc(c.release.notaryCity)}`], ['شماره ثبت', `<span class="num" dir="ltr">${esc(fa(c.release.regNo))}</span>`], ['تأیید بیمه‌گر', `${esc(c.release.reviewedBy)} — ${fdate(c.release.reviewedAt)}`], ['اصل اقرارنامه', c.release.originalReceived ? 'دریافت شد' : 'هنوز تحویل نشده']];
   if (id === 'accepted') return [['تاریخ تأیید شما', fdt(c.acceptedAt)], ['مبلغ پذیرفته‌شده', money(r.payable)]];
   if (id === 'review' && f.review) return [['بررسی‌کننده', esc(f.review.reviewer)], ['تطبیق شبا با نام ذی‌نفع', `<span class="ok-txt">${icon('check')} تأیید شد</span>`], ['زمان بررسی', fdt(f.review.at)], ...(f.review.note ? [['توضیح', esc(f.review.note)]] : [])];
   if (id === 'voucher' && f.voucher) return [['شماره حواله', num_(f.voucher.voucherNo)], ['تاریخ صدور', fa(f.voucher.date)], ['مبلغ حواله', money(f.voucher.amount)], ['صادرکننده', esc(f.voucher.by)]];
@@ -833,7 +879,7 @@ function finForm(c) {
   const r = W.computePayable(c.assessment.items, db.settings, c.damage.deceased?.length || 0);
   const today = fa(W.jalaliString(new Date()));
   const sub = userById(c.subscriberId);
-  if (stage === 'accepted') return `<form class="form" data-form="fin" data-step="fin_review"><b>گام بعد: بررسی مالی و استعلام شبا</b>
+  if (stage === 'release') return `<form class="form" data-form="fin" data-step="fin_review"><b>گام بعد: بررسی مالی و استعلام شبا</b>
     <label class="fld" for="fn-rev"><span>بررسی‌کننده مالی</span><input id="fn-rev" name="reviewer" value="${esc(st.user.name)}" required></label>
     <label class="check"><input type="checkbox" id="fn-sheba" name="shebaMatch"><span>استعلام شد: شبای <span class="num" dir="ltr">${esc(c.bank.sheba)}</span> به نام «${esc(c.bank.holder)}» است و با ذی‌نفع پرونده (${esc(sub?.name || '')}) مطابقت دارد.</span></label>
     <label class="fld" for="fn-note"><span>توضیح (اختیاری)</span><textarea id="fn-note" name="note" style="min-height:60px"></textarea></label>
@@ -852,6 +898,7 @@ function finForm(c) {
   return `<div class="form"><b>گام آخر: ثبت واریز</b>
     <div class="grid2">${field('شماره پیگیری بانکی واریز', 'payment.ref', fa(c.payment?.ref), { req: true, ltr: true })}${field('تاریخ واریز', 'payment.date', fa(c.payment?.date), { req: true, ltr: true, ph: today })}</div>
     <div class="sumline total"><span>مبلغ واریزی</span><b>${money(c.payment?.amount || r.payable)}</b></div>
+    ${c.release && !c.release.originalReceived ? `<div class="note warn">${icon('alert')}<div>واریز فقط پس از ثبت «دریافت اصل اقرارنامه رسمی» ممکن است.</div></div>` : ''}
     <button class="btn green" data-act="doAction" data-action="ins_pay">${icon('checkC')} ثبت واریز و اطلاع به مشترک</button></div>`;
 }
 
@@ -917,7 +964,7 @@ const FILTERS = {
     todo: ['کارتابل بررسی', ['submitted', 'gas_review']],
     query: ['استعلام بیمه‌گر', ['insurer_query']],
     subscriber: ['نزد مشترک', ['draft', 'returned']],
-    insurer: ['نزد بیمه‌گر', ['sent_insurer', 'insurer_review', 'assessed', 'objection', 'payment']],
+    insurer: ['نزد بیمه‌گر', ['sent_insurer', 'insurer_review', 'assessed', 'objection', 'release_pending', 'release_review', 'payment']],
     closed: ['بایگانی', ['paid', 'rejected']],
   },
   insurer: {
@@ -926,6 +973,7 @@ const FILTERS = {
     review: ['در حال ارزیابی', ['insurer_review', 'objection']],
     gas: ['استعلام از گاز', ['insurer_query', 'returned', 'submitted', 'gas_review']],
     wait: ['منتظر تأیید مشترک', ['assessed']],
+    release: ['اقرارنامه رسمی', ['release_review', 'release_pending']],
     pay: ['آماده پرداخت', ['payment']],
     closed: ['بایگانی', ['paid', 'rejected']],
   },
@@ -1005,6 +1053,7 @@ function insurerHome() {
     ${tile({ go: 'list', p: { f: 'review' }, color: 'green', art: 'trackRial', a: 'var(--green)', b: 'var(--blue)', title: 'ارزیابی خسارت', sub: 'در حال بررسی و اعتراض‌ها', btn: 'ورود', count: n(['insurer_review', 'objection']) })}
     ${tile({ go: 'list', p: { f: 'gas' }, color: 'violet', art: 'alertDoc', a: 'var(--violet)', b: 'var(--orange)', title: 'استعلام از گاز', sub: 'منتظر مدارک تکمیلی', btn: 'ورود', count: n(['insurer_query']) })}
     ${tile({ go: 'list', p: { f: 'wait' }, color: 'orange', art: 'timeline', a: 'var(--orange)', b: 'var(--blue)', title: 'منتظر تأیید مشترک', sub: 'مبلغ اعلام شده', btn: 'ورود', count: n(['assessed']) })}
+    ${tile({ go: 'list', p: { f: 'release' }, color: 'orange', art: 'alertDoc', title: 'بررسی اقرارنامه', sub: 'اقرارنامه رسمی دفترخانه', btn: 'ورود', count: n(['release_review']) })}
     ${tile({ go: 'list', p: { f: 'pay' }, color: 'green', art: 'payment', a: 'var(--green)', b: 'var(--orange)', title: 'آماده پرداخت', sub: pending ? money(pending) : 'موردی نیست', btn: 'ورود', count: n(['payment']) })}
     ${tile({ go: 'list', p: { f: 'closed' }, art: 'docsCheck', a: 'var(--blue)', b: 'var(--green)', title: 'بایگانی', sub: 'پرداخت‌شده یا رد شده', btn: 'ورود', count: n(['paid', 'rejected']) })}
   </div></div>
@@ -1218,7 +1267,7 @@ function viewUsers() {
 }
 function viewSettings() {
   const s = db.settings;
-  const f = (k, l, h = '') => `<label class="fld"><span>${l}</span><input id="s-${k}" name="${k}" class="${k === 'orgName' ? '' : 'ltr'}" value="${typeof s[k] === 'number' ? nf.format(s[k]) : esc(k === 'orgName' ? brandSetting('orgName') : k === 'subLookupUrl' ? s[k] || '' : fa(s[k]))}">${h ? `<small>${h}</small>` : ''}</label>`;
+  const f = (k, l, h = '') => `<label class="fld"><span>${l}</span><input id="s-${k}" name="${k}" class="${['orgName', 'releaseDelivery'].includes(k) ? '' : 'ltr'}" value="${typeof s[k] === 'number' ? nf.format(s[k]) : esc(k === 'orgName' ? brandSetting('orgName') : ['subLookupUrl', 'releaseDelivery'].includes(k) ? s[k] || '' : fa(s[k]))}">${h ? `<small>${h}</small>` : ''}</label>`;
   return pageTitle('تنظیمات بیمه‌نامه') + `<form class="form" data-form="settings">
     <div class="note warn">${icon('alert')}<div>مقادیر پیش‌فرض نمونه‌اند. سقف تعهدات و فرانشیز را دقیقاً مطابق بیمه‌نامه سال جاری وارد کنید.</div></div>
     <div class="fld"><span>لوگوی سازمان (صفحه ورود و نوار بالا)</span>
@@ -1229,7 +1278,8 @@ function viewSettings() {
     ${f('orgName', 'نام سازمان زیر لوگو', 'مثلاً: شرکت ملی گاز ایران — شرکت گاز استان تهران')}
     <div class="grid2">${f('policyNo', 'شماره بیمه‌نامه')}${f('policyStart', 'شروع')}${f('policyEnd', 'پایان')}${f('deductiblePercent', 'فرانشیز خسارت مالی (٪)')}</div>
     <div class="grid2">${f('propertyCapRial', 'سقف خسارت مالی (ریال)')}${f('medicalCapRial', 'سقف هزینه درمان (ریال)')}${f('deathCapRial', 'سقف فوت هر نفر (ریال)')}${f('reportWindowDays', 'مهلت اعلام حادثه (روز)')}</div>
-    <div class="grid2">${f('gasSlaDays', 'مهلت بررسی شرکت گاز (روز)')}${f('insurerSlaDays', 'مهلت بررسی بیمه‌گر (روز)')}${f('fixSlaDays', 'مهلت رفع نقص مشترک (روز)')}${f('regSlaDays', 'مهلت بررسی ثبت‌نام اینترنتی (روز)')}</div>
+    <div class="grid2">${f('gasSlaDays', 'مهلت بررسی شرکت گاز (روز)')}${f('insurerSlaDays', 'مهلت بررسی بیمه‌گر (روز)')}${f('fixSlaDays', 'مهلت رفع نقص مشترک (روز)')}${f('regSlaDays', 'مهلت بررسی ثبت‌نام اینترنتی (روز)')}${f('releaseSlaDays', 'مهلت مشترک برای ثبت اقرارنامه (روز)')}</div>
+    ${f('releaseDelivery', 'محل تحویل اصل اقرارنامه رسمی', 'مثلاً: واحد خسارت بیمه‌گر — تهران، خیابان …، پلاک …؛ در راهنمای مشترک و پیامک نمایش داده می‌شود.')}
     ${f('subLookupUrl', 'صفحه شرکت گاز برای یافتن شماره اشتراک (https)', 'دکمه «شماره اشتراک را ندارم» در ثبت‌نام این صفحه را باز می‌کند؛ مثلاً سامانه خدمات مشترکین (دریافت شماره اشتراک با سریال کنتور).')}
     <div class="section-label">${icon('flame')} بیمه آتش‌سوزی در صفحه ورود</div>
     <div class="note info">${icon('help')}<div>این سه طرح با دکمه «خرید بیمه آتش‌سوزی منزل» در صفحه ورود نمایش داده می‌شوند. با زدن هر طرح، سایت همان بیمه‌گر باز می‌شود. نشانی باید با <span dir="ltr">https://</span> شروع شود. برای پنهان کردن یک طرح، نام بیمه‌گر و عنوان آن را خالی بگذارید.</div></div>
@@ -2062,6 +2112,10 @@ async function resetPassword(id) {
 }
 
 const FORMS = {
+  relOriginal: async f => {
+    const c = currentClaim();
+    if (await run(() => B.finance(c, 'release_original', { note: f.note.value.trim() }), 'دریافت اصل اقرارنامه ثبت شد.')) render();
+  },
   signup1: async f => {
     su.f = { subscriptionNo: W.normalizeDigits(f.subscriptionNo.value).trim(), name: f.name.value.trim(), nationalId: W.normalizeDigits(f.nationalId.value).trim(), mobile: W.normalizeDigits(f.mobile.value).trim(), relation: f.relation.value };
     const errs = W.signupIssues(su.f);

@@ -1274,3 +1274,9 @@ main.enter { animation: viewIn .26s cubic-bezier(.2, .8, .2, 1); }
 .file-pick.has { border-style: solid; border-color: var(--ok); color: var(--ok); background: var(--oks); }
 .file-pick:focus-within { outline: 3px solid color-mix(in srgb, var(--br) 45%, transparent); outline-offset: 2px; }
 .login-card .btn.ghost[data-act="signup"], .glass .btn.ghost[data-act="signup"] { margin-top: -4px; }
+
+/* ================= اقرارنامه رسمی ================= */
+.form.release { border-color: color-mix(in srgb, var(--ac) 40%, var(--ln)); }
+.rel-steps { margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.9; }
+.rel-text { background: var(--sf2); border: 1px dashed var(--ln); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.rel-text p { margin: 0; font-size: 13.5px; line-height: 2; }

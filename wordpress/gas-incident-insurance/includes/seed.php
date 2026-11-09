@@ -227,7 +227,7 @@ class GII_Seed {
 			'age' => 70, 'status' => 'paid', 'fill' => true,
 			'incident' => array( 'description' => 'آتش‌سوزی آبگرمکن در پارکینگ؛ دیوار و تأسیسات آسیب دید.', 'causeReportNo' => '۴۴۰۹۸' ),
 			'damage' => array( 'items' => array( array( 'title' => 'آبگرمکن و لوله‌کشی', 'qty' => 1, 'amount' => 140000000 ), array( 'title' => 'بازسازی دیوار پارکینگ', 'qty' => 1, 'amount' => 90000000 ) ) ),
-			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 66 ), array( 'gas_start', 'شروع بررسی', 'gas', 65 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 62 ), array( 'ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 60 ), array( 'ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 50 ), array( 'accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 49 ), array( 'ins_pay', 'ثبت پرداخت', 'insurer', 41, 'واریز به حساب شبای مشترک' ) ),
+			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 66 ), array( 'gas_start', 'شروع بررسی', 'gas', 65 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 62 ), array( 'ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 60 ), array( 'ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 50 ), array( 'accept', 'قبول مبلغ خسارت', 'subscriber', 49 ), array( 'ins_pay', 'ثبت پرداخت', 'insurer', 41, 'واریز به حساب شبای مشترک' ) ),
 			'extra' => array( 'submitCount' => 1 ),
 		) );
 		$c6['assessment'] = array( 'adjuster' => 'مهندس نادر شریفی', 'visitDate' => self::jal( 55 ), 'note' => '', 'at' => self::iso( 50 ),
@@ -245,6 +245,17 @@ class GII_Seed {
 			array( 'at' => self::iso( 45, 11 ), 'by' => $ins, 'role' => 'insurer', 'action' => 'fin_voucher', 'label' => 'حواله پرداخت صادر شد', 'note' => 'حواله H-1405-000006' ),
 			array( 'at' => self::iso( 42, 11 ), 'by' => $ins, 'role' => 'insurer', 'action' => 'fin_bank', 'label' => 'دستور پرداخت به بانک ارسال شد', 'note' => 'پایا — پیگیری P-77810452' ),
 		) );
+		// اقرارنامه رسمی دفترخانه (پیش از مراحل مالی) و دریافت اصل آن
+		$c6['release'] = array( 'status' => 'accepted', 'notaryNo' => '۱۸۷', 'notaryCity' => 'تهران', 'regNo' => '140585000611', 'date' => self::jal( 48 ), 'confirmed' => true, 'submittedAt' => self::iso( 48, 11 ),
+			'reviewedBy' => $ins, 'reviewedAt' => self::iso( 48, 15 ), 'originalReceived' => true, 'originalAt' => self::iso( 44, 11 ), 'originalBy' => $ins, 'originalNote' => 'رسید ۴۴۱۲' );
+		self::add_svg( $c6, 'release_deed', self::doc_svg( 'اقرارنامه رسمی دفترخانه' ), 'release_deed.svg', 'subscriber' );
+		$at = array_search( 'fin_review', array_column( $c6['timeline'], 'action' ), true );
+		array_splice( $c6['timeline'], $at, 0, array(
+			array( 'at' => self::iso( 48, 11 ), 'by' => $users[5]->display_name, 'role' => 'subscriber', 'action' => 'release_submit', 'label' => 'ارسال اقرارنامه رسمی ثبت‌شده', 'note' => '' ),
+			array( 'at' => self::iso( 48, 15 ), 'by' => $ins, 'role' => 'insurer', 'action' => 'release_accept', 'label' => 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت', 'note' => '' ),
+		) );
+		$at = array_search( 'fin_bank', array_column( $c6['timeline'], 'action' ), true );
+		array_splice( $c6['timeline'], $at, 0, array( array( 'at' => self::iso( 44, 11 ), 'by' => $ins, 'role' => 'insurer', 'action' => 'release_original', 'label' => 'اصل اقرارنامه رسمی دریافت شد', 'note' => 'رسید ۴۴۱۲' ) ) );
 		GII_Store::save_claim( $c6 );
 
 		// ۷) حواله صادر شده
@@ -252,7 +263,7 @@ class GII_Seed {
 			'age' => 40, 'status' => 'payment', 'fill' => true,
 			'incident' => array( 'description' => 'آتش‌سوزی پکیج گرمایشی در آشپزخانه به علت نشتی اتصالات؛ کابینت و سقف کاذب آسیب دید.', 'causeReportNo' => '۴۷۲۲۵' ),
 			'damage' => array( 'items' => array( array( 'title' => 'پکیج و لوله‌کشی', 'qty' => 1, 'amount' => 210000000 ), array( 'title' => 'کابینت و سقف کاذب', 'qty' => 1, 'amount' => 260000000 ) ) ),
-			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36 ), array( 'gas_start', 'شروع بررسی', 'gas', 35 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31 ), array( 'ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29 ), array( 'ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12 ), array( 'accept', 'قبول مبلغ و درخواست پرداخت', 'subscriber', 9 ), array( 'fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6 ), array( 'fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007' ) ),
+			'steps' => array( array( 'submit', 'ارسال پرونده به شرکت گاز', 'subscriber', 36 ), array( 'gas_start', 'شروع بررسی', 'gas', 35 ), array( 'gas_forward', 'تأیید و ارسال به بیمه‌گر', 'gas', 31 ), array( 'ins_start', 'پذیرش و شروع ارزیابی', 'insurer', 29 ), array( 'ins_assess', 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer', 12 ), array( 'accept', 'قبول مبلغ خسارت', 'subscriber', 9 ), array( 'release_submit', 'ارسال اقرارنامه رسمی ثبت‌شده', 'subscriber', 8 ), array( 'release_accept', 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت', 'insurer', 7 ), array( 'fin_review', 'بررسی مالی و استعلام شبا انجام شد', 'insurer', 6 ), array( 'fin_voucher', 'حواله پرداخت صادر شد', 'insurer', 2, 'حواله H-1405-000007' ) ),
 			'extra' => array( 'submitCount' => 1, 'acceptedAt' => self::iso( 9 ) ),
 		) );
 		$c7['assessment'] = array( 'adjuster' => 'مهندس نادر شریفی', 'visitDate' => self::jal( 25 ), 'note' => 'سقف کاذب با استهلاک ۱۵٪ محاسبه شد.', 'at' => self::iso( 12 ),
@@ -263,6 +274,10 @@ class GII_Seed {
 			'voucher' => array( 'voucherNo' => 'H-1405-000007', 'date' => self::jal( 2 ), 'amount' => 374400000, 'at' => self::iso( 2 ), 'by' => $ins ),
 		);
 		$c7['payment']    = array( 'amount' => 374400000 );
+		// اقرارنامه تأیید شده ولی اصل آن هنوز به بیمه‌گر نرسیده
+		$c7['release'] = array( 'status' => 'accepted', 'notaryNo' => '۲۳۵', 'notaryCity' => 'تهران', 'regNo' => '140585000712', 'date' => self::jal( 8 ), 'confirmed' => true, 'submittedAt' => self::iso( 8, 12 ),
+			'reviewedBy' => $ins, 'reviewedAt' => self::iso( 7, 12 ), 'originalReceived' => false );
+		self::add_svg( $c7, 'release_deed', self::doc_svg( 'اقرارنامه رسمی دفترخانه' ), 'release_deed.svg', 'subscriber' );
 		$c7 = GII_Store::save_claim( $c7 );
 
 		GII_Store::notify( $users[6]->ID, null, "حواله پرداخت خسارت پرونده {$c7['code']} به شماره H-1405-000007 صادر شد.", $c7['id'] );
@@ -291,7 +306,8 @@ class GII_Seed {
 		$step = array(
 			'submit' => array( 1, 'ارسال پرونده به شرکت گاز', 'subscriber' ), 'gas_start' => array( 2, 'شروع بررسی', 'gas' ), 'gas_forward' => array( 4, 'تأیید و ارسال به بیمه‌گر', 'gas' ),
 			'ins_start' => array( 6, 'پذیرش و شروع ارزیابی', 'insurer' ), 'ins_query' => array( 9, 'درخواست مدارک تکمیلی', 'insurer' ), 'ins_assess' => array( 14, 'ثبت ارزیابی و اعلام مبلغ به مشترک', 'insurer' ),
-			'object' => array( 16, 'اعتراض به مبلغ', 'subscriber' ), 'accept' => array( 16, 'قبول مبلغ و درخواست پرداخت', 'subscriber' ), 'ins_reject' => array( 12, 'رد پرونده', 'insurer' ), 'ins_pay' => array( 26, 'ثبت واریز', 'insurer' ),
+			'object' => array( 16, 'اعتراض به مبلغ', 'subscriber' ), 'accept' => array( 16, 'قبول مبلغ خسارت', 'subscriber' ), 'ins_reject' => array( 12, 'رد پرونده', 'insurer' ), 'ins_pay' => array( 26, 'ثبت واریز', 'insurer' ),
+			'release_submit' => array( 20, 'ارسال اقرارنامه رسمی ثبت‌شده', 'subscriber' ), 'release_accept' => array( 22, 'تأیید اقرارنامه رسمی و آغاز فرایند پرداخت', 'insurer' ),
 		);
 		$base = array( 'submit', 'gas_start', 'gas_forward' );
 		$path = array(
@@ -300,8 +316,9 @@ class GII_Seed {
 			'insurer_query'  => array_merge( $base, array( 'ins_start', 'ins_query' ) ),
 			'assessed'       => array_merge( $base, array( 'ins_start', 'ins_assess' ) ),
 			'objection'      => array_merge( $base, array( 'ins_start', 'ins_assess', 'object' ) ),
-			'payment'        => array_merge( $base, array( 'ins_start', 'ins_assess', 'accept' ) ),
-			'paid'           => array_merge( $base, array( 'ins_start', 'ins_assess', 'accept', 'ins_pay' ) ),
+			'release_review' => array_merge( $base, array( 'ins_start', 'ins_assess', 'accept', 'release_submit' ) ),
+			'payment'        => array_merge( $base, array( 'ins_start', 'ins_assess', 'accept', 'release_submit', 'release_accept' ) ),
+			'paid'           => array_merge( $base, array( 'ins_start', 'ins_assess', 'accept', 'release_submit', 'release_accept', 'ins_pay' ) ),
 			'rejected'       => array_merge( $base, array( 'ins_start', 'ins_reject' ) ),
 		);
 		$out = array();
@@ -309,7 +326,7 @@ class GII_Seed {
 			$age = 16 + $i * 8;
 			if ( $age > 120 ) $status = 4 === $i % 9 ? 'rejected' : 'paid';
 			elseif ( $age > 75 ) $status = array( 'paid', 'payment', 'paid', 'assessed' )[ $i % 4 ];
-			elseif ( $age > 45 ) $status = array( 'insurer_review', 'payment', 'assessed', 'insurer_query', 'paid' )[ $i % 5 ];
+			elseif ( $age > 45 ) $status = array( 'insurer_review', 'release_review', 'assessed', 'insurer_query', 'paid' )[ $i % 5 ];
 			else $status = array( 'sent_insurer', 'insurer_review', 'objection', 'sent_insurer' )[ $i % 4 ];
 			$type   = $types[ $i % count( $types ) ];
 			$amount = 60000000 + ( ( $i * 37 ) % 20 ) * 15000000;
@@ -332,7 +349,8 @@ class GII_Seed {
 				'damage' => $damage, 'steps' => $steps,
 				'assessment' => $assessed ? array( 'adjuster' => array( 'مهندس نادر شریفی', 'مهندس پریسا امینی' )[ $i % 2 ], 'note' => '', 'items' => array( array( 'category' => 'co' === $type ? 'medical' : 'property', 'title' => 'co' === $type ? 'هزینه درمان' : $damage['items'][0]['title'], 'claimed' => $amount, 'approved' => $approved ) ) ) : null,
 				'assessAgo' => $age - $step['ins_assess'][0], 'acceptAgo' => $age - $step['accept'][0], 'payAgo' => $age - $step['ins_pay'][0],
-				'ref' => '1404' . ( 10000000 + $i * 7331 ), 'voucher' => 'H-' . ( $age > 220 ? '1404' : '1405' ) . '-' . str_pad( (string) ( 100 + $i ), 6, '0', STR_PAD_LEFT ),
+				'ref' => '1404' . ( 10000000 + $i * 7331 ),
+				'release' => array( 'notaryNo' => (string) ( 20 + ( ( $i * 7 ) % 180 ) ), 'notaryCity' => explode( '،', $areas[ $i % count( $areas ) ] )[0], 'regNo' => '1405' . ( 85000000 + $i * 911 ), 'ago' => $age - $step['release_submit'][0] ), 'voucher' => 'H-' . ( $age > 220 ? '1404' : '1405' ) . '-' . str_pad( (string) ( 100 + $i ), 6, '0', STR_PAD_LEFT ),
 			);
 		}
 		return $out;
@@ -348,7 +366,14 @@ class GII_Seed {
 				'incident' => array_merge( $a['incident'], array( 'causeReportDate' => self::jal( $a['age'] + 1 ) ) ),
 			) );
 			if ( $a['assessment'] ) $c['assessment'] = array_merge( $a['assessment'], array( 'at' => self::iso( $a['assessAgo'] ), 'visitDate' => self::jal( $a['assessAgo'] + 3 ) ) );
-			if ( in_array( $a['status'], array( 'payment', 'paid' ), true ) ) $c['acceptedAt'] = self::iso( $a['acceptAgo'] );
+			if ( in_array( $a['status'], array( 'release_review', 'payment', 'paid' ), true ) ) {
+				$c['acceptedAt'] = self::iso( $a['acceptAgo'] );
+				$rel             = $a['release'];
+				$c['release']    = array( 'status' => 'release_review' === $a['status'] ? 'submitted' : 'accepted', 'notaryNo' => $rel['notaryNo'], 'notaryCity' => $rel['notaryCity'], 'regNo' => $rel['regNo'], 'date' => self::jal( $rel['ago'] ), 'confirmed' => true,
+					'submittedAt' => self::iso( $rel['ago'] ), 'originalReceived' => 'paid' === $a['status'] );
+				if ( 'release_review' !== $a['status'] ) $c['release'] = array_merge( $c['release'], array( 'reviewedBy' => $ins, 'reviewedAt' => self::iso( $rel['ago'] - 2 ) ) );
+				if ( 'paid' === $a['status'] ) $c['release'] = array_merge( $c['release'], array( 'originalAt' => self::iso( $a['payAgo'] + 2 ), 'originalBy' => $ins, 'originalNote' => '' ) );
+			}
 			if ( 'paid' === $a['status'] ) {
 				$amount       = (int) GII_WF::compute_payable( $c['assessment']['items'], GII_Store::settings() )['payable'];
 				$p            = $a['payAgo'];

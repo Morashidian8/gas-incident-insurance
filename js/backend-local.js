@@ -97,7 +97,17 @@ function afterAction(c, id, note) {
     case 'ins_start': t(`بیمه‌گر بررسی پرونده ${c.code} را آغاز کرد.`); break;
     case 'ins_query': S.notify({ toRole: 'gas', text: `بیمه‌گر برای پرونده ${c.code} مدارک تکمیلی خواست.`, claimId: c.id }); break;
     case 'ins_assess': t(`مبلغ خسارت پرونده ${c.code} تعیین شد.`); sms(`مبلغ خسارت پرونده ${c.code} تعیین شد. برای تأیید یا اعتراض وارد سامانه شوید.`); break;
-    case 'accept': S.notify({ toRole: 'insurer', text: `مشترک مبلغ پرونده ${c.code} را پذیرفت.`, claimId: c.id }); break;
+    case 'accept':
+      S.notify({ toRole: 'insurer', text: `مشترک مبلغ پرونده ${c.code} را پذیرفت؛ منتظر اقرارنامه رسمی است.`, claimId: c.id });
+      t(`برای دریافت خسارت پرونده ${c.code}، اقرارنامه رسمی را در دفترخانه ثبت و تصویر آن را بارگذاری کنید.`);
+      sms(`مشترک گرامی، برای دریافت خسارت پرونده ${c.code} اقرارنامه رسمی را در دفترخانه ثبت، تصویرش را در سامانه بارگذاری و اصل آن را به بیمه‌گر تحویل دهید.`);
+      break;
+    case 'release_submit': S.notify({ toRole: 'insurer', text: `اقرارنامه رسمی پرونده ${c.code} برای بررسی ارسال شد.`, claimId: c.id }); break;
+    case 'release_return': t(`اقرارنامه پرونده ${c.code} نیاز به اصلاح دارد: ${note}`); sms(`اقرارنامه رسمی پرونده ${c.code} نیاز به اصلاح دارد: ${note}`); break;
+    case 'release_accept':
+      t(`اقرارنامه پرونده ${c.code} تأیید شد و مراحل پرداخت آغاز شد.`);
+      sms(`اقرارنامه رسمی پرونده ${c.code} تأیید شد و مراحل پرداخت آغاز شد.${c.release.originalReceived ? '' : ` اصل اقرارنامه را به ${db().settings.releaseDelivery || 'بیمه‌گر'} تحویل دهید؛ واریز پس از دریافت اصل انجام می‌شود.`}`);
+      break;
     case 'object': S.notify({ toRole: 'insurer', text: `مشترک به مبلغ پرونده ${c.code} اعتراض کرد.`, claimId: c.id }); break;
     case 'ins_pay': t(`خسارت پرونده ${c.code} واریز شد.`); sms(`خسارت پرونده ${c.code} به مبلغ ${nf.format(c.payment.amount)} ریال واریز شد. پیگیری: ${c.payment.ref}`); break;
     case 'gas_reject': case 'ins_reject': t(`پرونده ${c.code} رد شد.`); sms(`پرونده ${c.code} مشمول پوشش تشخیص داده نشد. دلیل: ${note}`); S.notify({ toRole: id === 'gas_reject' ? 'insurer' : 'gas', text: `پرونده ${c.code} رد شد.`, claimId: c.id }); break;
@@ -112,6 +122,7 @@ export async function action(c, id, note, opts = {}) {
 export async function finance(c, step, data) {
   Object.assign(c, W.applyFinance(c, step, data, user()));
   const sub = userById(c.subscriberId);
+  if (step === 'release_original') { S.notify({ toUser: sub.id, text: `اصل اقرارنامه رسمی پرونده ${c.code} توسط بیمه‌گر دریافت شد.`, claimId: c.id }); save(); return; }
   const msg = step === 'fin_review' ? `بررسی مالی پرونده ${c.code} انجام و شبای شما تأیید شد.`
     : step === 'fin_voucher' ? `حواله پرداخت خسارت پرونده ${c.code} به شماره ${data.voucherNo} و مبلغ ${nf.format(data.amount)} ریال صادر شد.`
     : `دستور پرداخت خسارت پرونده ${c.code} از طریق ${W.TRANSFER_METHODS[data.method].label} به بانک ارسال شد. پیگیری: ${data.ref}`;
