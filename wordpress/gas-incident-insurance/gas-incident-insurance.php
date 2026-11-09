@@ -20,6 +20,7 @@ define( 'GII_URL', plugin_dir_url( __FILE__ ) );
 require_once GII_DIR . 'includes/workflow.php';
 require_once GII_DIR . 'includes/store.php';
 require_once GII_DIR . 'includes/sms.php';
+require_once GII_DIR . 'includes/shahkar.php';
 require_once GII_DIR . 'includes/rest.php';
 require_once GII_DIR . 'includes/seed.php';
 require_once GII_DIR . 'includes/admin.php';

@@ -24,6 +24,12 @@ class GII_REST {
 		$r( '/auth/forgot', 'POST', 'forgot', 'public' );
 		$r( '/auth/verify', 'POST', 'verify', 'public' );
 		$r( '/auth/reset', 'POST', 'reset', 'public' );
+		$r( '/signup/start', 'POST', 'signup_start', 'public' );
+		$r( '/signup/verify', 'POST', 'signup_verify', 'public' );
+		$r( '/signup/submit', 'POST', 'signup_submit', 'public' );
+		$r( '/regs/me', 'POST', 'reg_resubmit' );
+		$r( '/regs/(?P<uid>\d+)/review', 'POST', 'reg_review' );
+		$r( '/regs/(?P<uid>\d+)/files/(?P<fid>[\w-]+)', 'GET', 'reg_file' );
 		$r( '/claims', 'POST', 'register' );
 		$r( '/claims/(?P<id>\d+)', 'PUT', 'update_claim' );
 		$r( '/claims/(?P<id>\d+)/action', 'POST', 'action' );
@@ -112,7 +118,12 @@ class GII_REST {
 			$ids = array_unique( array_merge( array( $uid ), array_map( 'intval', wp_list_pluck( $claims, 'subscriberId' ) ) ) );
 			$users = array_filter( array_map( 'get_userdata', $ids ) );
 		}
-		$db['users']         = array_values( array_map( array( 'GII_Store', 'user_to_client' ), $users ) );
+		$staff = in_array( $role, array( 'gas', 'admin' ), true );
+		if ( $staff ) {
+			$have  = array_map( function ( $u ) { return $u->ID; }, $users );
+			$users = array_merge( $users, array_filter( GII_Store::registrants(), function ( $u ) use ( $have ) { return ! in_array( $u->ID, $have, true ); } ) );
+		}
+		$db['users']         = array_values( array_map( function ( $u ) use ( $staff, $uid ) { return GII_Store::user_to_client( $u, $staff || (int) $u->ID === (int) $uid ); }, $users ) );
 		$db['claims']        = array_map( function ( $c ) use ( $role ) { return GII_Store::claim_to_client( $c, $role ); }, $claims );
 		$db['notifications'] = GII_Store::notices_for( $uid );
 		$db['sms']           = 'admin' === $role ? GII_Store::sms_log() : array();
@@ -147,6 +158,10 @@ class GII_REST {
 	public static function logout() {
 		wp_logout();
 		wp_set_current_user( 0 );
+		// کوکی ورود هنوز در همین درخواست خوانده می‌شود و nonce تازه را به نشست قدیمی گره می‌زند؛ پاکش می‌کنیم
+		foreach ( array( LOGGED_IN_COOKIE, AUTH_COOKIE, SECURE_AUTH_COOKIE ) as $ck ) {
+			unset( $_COOKIE[ $ck ] );
+		}
 		return self::ok( array( 'nonce' => wp_create_nonce( 'wp_rest' ) ) );
 	}
 	public static function password( $req ) {
@@ -291,21 +306,7 @@ class GII_REST {
 					'gii_address' => $f['address'], 'gii_must_change' => '1',
 				) );
 			}
-			$s     = GII_Store::settings();
-			$now   = GII_WF::iso();
-			$staff = GII_Store::actor();
-			$late  = GII_WF::days_between( $ts, time() ) > $s['reportWindowDays'];
-			$c     = GII_Store::save_claim( array(
-				'code' => GII_WF::claim_code( GII_Store::next_seq() ), 'subscriberId' => (string) $u->ID, 'createdBy' => $staff['id'], 'createdAt' => $now,
-				'status' => 'draft', 'statusAt' => $now, 'submitCount' => 0,
-				'incident' => array( 'date' => GII_WF::jalali_string( $ts ), 'time' => '', 'type' => $f['type'], 'placeType' => 'residential', 'address' => $f['address'], 'postalCode' => '', 'description' => '', 'causeIssuer' => '', 'causeReportNo' => '', 'causeReportDate' => '', 'causeStatesGas' => false, 'policeReportNo' => '' ),
-				'damage' => array( 'kinds' => array(), 'items' => array(), 'injured' => array(), 'deceased' => array() ),
-				'photos' => array(), 'docs' => array(), 'files' => array(), 'bank' => array( 'sheba' => '', 'holder' => $u->display_name ), 'declaration' => false,
-				'deficiencies' => array(), 'messages' => array(), 'assessment' => null, 'payment' => null,
-				'timeline' => array( array( 'at' => $now, 'by' => $staff['name'], 'role' => 'gas', 'action' => 'create',
-					'label' => $existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک',
-					'note' => implode( ' — ', array_filter( array( $f['note'], $late ? 'اعلام با تأخیر: بیش از ' . $s['reportWindowDays'] . ' روز پس از حادثه' : '' ) ) ) ) ),
-			) );
+			$c = self::new_claim( $u, $ts, $f['type'], $f['address'], $f['note'], $existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک' );
 		} catch ( GII_WF_Error $e ) {
 			return self::err( $e->getMessage() );
 		}
@@ -313,6 +314,279 @@ class GII_REST {
 		GII_SMS::send( $mobile, $pw ? "مشترک گرامی، پرونده خسارت {$c['code']} تشکیل شد. نام کاربری: {$u->user_login} — رمز موقت: $pw" : "مشترک گرامی، پرونده خسارت {$c['code']} برای شما تشکیل شد. با حساب قبلی وارد شوید." );
 		GII_Store::notify( $u->ID, null, "پرونده {$c['code']} تشکیل شد. لطفاً اطلاعات و مدارک را تکمیل کنید.", $c['id'] );
 		return self::ok( array( 'claimId' => $c['id'], 'username' => $u->user_login, 'password' => $pw, 'existing' => $existing ) );
+	}
+
+	/** پرونده تازه پیش‌نویس برای مشترک (ثبت حضوری یا تأیید ثبت‌نام اینترنتی) */
+	private static function new_claim( $u, $ts, $type, $address, $note, $label ) {
+		$s     = GII_Store::settings();
+		$now   = GII_WF::iso();
+		$staff = GII_Store::actor();
+		$late  = GII_WF::days_between( $ts, time() ) > $s['reportWindowDays'];
+		return GII_Store::save_claim( array(
+			'code' => GII_WF::claim_code( GII_Store::next_seq() ), 'subscriberId' => (string) $u->ID, 'createdBy' => $staff['id'], 'createdAt' => $now,
+			'status' => 'draft', 'statusAt' => $now, 'submitCount' => 0,
+			'incident' => array( 'date' => GII_WF::jalali_string( $ts ), 'time' => '', 'type' => $type, 'placeType' => 'residential', 'address' => $address, 'postalCode' => '', 'description' => '', 'causeIssuer' => '', 'causeReportNo' => '', 'causeReportDate' => '', 'causeStatesGas' => false, 'policeReportNo' => '' ),
+			'damage' => array( 'kinds' => array(), 'items' => array(), 'injured' => array(), 'deceased' => array() ),
+			'photos' => array(), 'docs' => array(), 'files' => array(), 'bank' => array( 'sheba' => '', 'holder' => $u->display_name ), 'declaration' => false,
+			'deficiencies' => array(), 'messages' => array(), 'assessment' => null, 'payment' => null,
+			'timeline' => array( array( 'at' => $now, 'by' => $staff['name'], 'role' => 'gas', 'action' => 'create', 'label' => $label,
+				'note' => implode( ' — ', array_filter( array( $note, $late ? 'اعلام با تأخیر: بیش از ' . $s['reportWindowDays'] . ' روز پس از حادثه' : '' ) ) ) ) ),
+		) );
+	}
+
+	// ---------- ثبت‌نام اینترنتی مشترک ----------
+	// مشخصات + کد پیامکی و استعلام شاهکار ← تأیید کد ← مدارک، حادثه و رمز. حساب تا تأیید کارشناس گاز «در انتظار» است.
+	private static function signup_fields( $in ) {
+		return array(
+			'name'           => self::txt( $in['name'] ?? '', 100 ),
+			'nationalId'     => trim( GII_WF::normalize_digits( (string) ( $in['nationalId'] ?? '' ) ) ),
+			'subscriptionNo' => trim( GII_WF::normalize_digits( (string) ( $in['subscriptionNo'] ?? '' ) ) ),
+			'mobile'         => trim( GII_WF::normalize_digits( (string) ( $in['mobile'] ?? '' ) ) ),
+			'relation'       => self::pick( (string) ( $in['relation'] ?? '' ), array_keys( GII_WF::RELATIONS ) ),
+		);
+	}
+	private static function blocked( $mobile ) {
+		return get_transient( 'gii_blk_m_' . md5( $mobile ) ) || get_transient( 'gii_blk_ip_' . md5( self::ip() ) );
+	}
+	public static function signup_start( $req ) {
+		$f = self::signup_fields( (array) $req->get_json_params() );
+		if ( $e = GII_WF::signup_issues( $f ) ) return self::err( 'بررسی کنید: ' . implode( '، ', $e ) );
+		if ( self::blocked( $f['mobile'] ) ) return self::err( 'امکان ثبت‌نام با این موبایل فعلاً وجود ندارد. با شرکت گاز تماس بگیرید.', 403 );
+		if ( ! self::rate_limit( 'su|' . self::ip(), 10, HOUR_IN_SECONDS ) || ! self::rate_limit( 'su|' . $f['mobile'], 3, 10 * MINUTE_IN_SECONDS ) || ! self::rate_limit( 'sud|' . $f['mobile'], 10, DAY_IN_SECONDS ) ) {
+			return self::err( 'درخواست‌ها زیاد بود. چند دقیقه دیگر دوباره امتحان کنید.', 429 );
+		}
+		$sk = GII_Shahkar::check( $f['nationalId'], $f['mobile'] );
+		if ( 'mismatch' === $sk['status'] ) {
+			return self::err( 'این شماره موبایل به نام صاحب این کد ملی نیست (استعلام شاهکار). موبایلی را وارد کنید که به نام خودتان ثبت شده است.' );
+		}
+		$code = (string) random_int( 100000, 999999 );
+		$rid  = wp_generate_password( 24, false );
+		set_transient( 'gii_su_' . $rid, array( 'f' => $f, 'sk' => $sk, 'hash' => hash_hmac( 'sha256', $code, wp_salt( 'auth' ) . $rid ), 'exp' => time() + self::OTP_TTL, 'tries' => 0 ), 45 * MINUTE_IN_SECONDS );
+		$text = "کد تأیید ثبت‌نام سامانه بیمه حوادث گاز: $code — این کد را به هیچ‌کس ندهید.";
+		GII_SMS::send( $f['mobile'], $text );
+		$demo = GII_Store::demo_on() && 'log' === ( GII_Store::settings()['sms_provider'] ?? 'log' ) ? $text : '';
+		return self::ok( array( 'rid' => $rid, 'ttl' => self::OTP_TTL * 1000, 'demoSms' => $demo, 'shahkar' => $sk['status'] ) );
+	}
+	private static function su( $rid ) {
+		$rid = preg_replace( '/[^A-Za-z0-9]/', '', (string) $rid );
+		return array( $rid, get_transient( 'gii_su_' . $rid ) );
+	}
+	public static function signup_verify( $req ) {
+		list( $rid, $o ) = self::su( $req['rid'] );
+		if ( ! $o ) return self::err( 'دوباره از اول شروع کنید.', 400, array( 'restart' => true ) );
+		if ( time() > $o['exp'] ) return self::err( 'کد منقضی شده است؛ «ارسال دوباره» را بزنید.' );
+		$o['tries']++;
+		if ( $o['tries'] > self::OTP_TRIES ) {
+			delete_transient( 'gii_su_' . $rid );
+			return self::err( 'تعداد تلاش‌ها زیاد بود. دوباره از اول شروع کنید.', 400, array( 'restart' => true ) );
+		}
+		$code = trim( GII_WF::normalize_digits( (string) $req['code'] ) );
+		if ( ! hash_equals( $o['hash'], hash_hmac( 'sha256', $code, wp_salt( 'auth' ) . $rid ) ) ) {
+			set_transient( 'gii_su_' . $rid, $o, 45 * MINUTE_IN_SECONDS );
+			return self::err( 'کد نادرست است. ' . ( self::OTP_TRIES - $o['tries'] ) . ' بار دیگر می‌توانید امتحان کنید.' );
+		}
+		$o['token']     = wp_generate_password( 32, false );
+		$o['token_exp'] = time() + 30 * MINUTE_IN_SECONDS; // ۳۰ دقیقه برای تکمیل مدارک
+		set_transient( 'gii_su_' . $rid, $o, 45 * MINUTE_IN_SECONDS );
+		return self::ok( array( 'token' => $o['token'] ) );
+	}
+	/** فایل‌های ثبت‌نام از فرم چندبخشی: national_card[]، bill[]، proof[] */
+	private static function reg_uploads( $req ) {
+		$out = array();
+		foreach ( (array) $req->get_file_params() as $slot => $f ) {
+			if ( ! isset( GII_WF::REG_DOCS[ $slot ] ) ) continue;
+			$n = is_array( $f['name'] ) ? count( $f['name'] ) : 1;
+			for ( $i = 0; $i < min( $n, 3 ); $i++ ) {
+				$one = is_array( $f['name'] ) ? array( 'name' => $f['name'][ $i ], 'tmp_name' => $f['tmp_name'][ $i ], 'error' => $f['error'][ $i ], 'size' => $f['size'][ $i ] ) : $f;
+				if ( UPLOAD_ERR_OK !== $one['error'] ) return self::err( 'فایل دریافت نشد.' );
+				if ( $one['size'] > 15 * MB_IN_BYTES ) return self::err( 'حجم هر فایل حداکثر ۱۵ مگابایت است.' );
+				$check = wp_check_filetype_and_ext( $one['tmp_name'], $one['name'], self::MIMES );
+				if ( empty( $check['type'] ) ) return self::err( 'فقط عکس (JPG، PNG، WEBP) یا PDF پذیرفته می‌شود.' );
+				if ( 0 === strpos( $check['type'], 'image/' ) && ! @getimagesize( $one['tmp_name'] ) ) return self::err( 'فایل تصویر معتبر نیست.' );
+				$one['type']    = $check['type'];
+				$out[ $slot ][] = $one;
+			}
+		}
+		return $out;
+	}
+	/** حساب دیگری با همین اشتراک، کد ملی یا موبایل (درخواست ردشده حساب نمی‌شود) */
+	private static function subscriber_clash( $f, $self_id = 0 ) {
+		foreach ( array( 'gii_subscription_no' => $f['subscriptionNo'], 'gii_national_id' => $f['nationalId'], 'gii_mobile' => $f['mobile'] ) as $k => $v ) {
+			if ( '' === (string) $v ) continue;
+			foreach ( get_users( array( 'role' => 'gii_subscriber', 'meta_key' => $k, 'meta_value' => $v, 'number' => 5 ) ) as $u ) {
+				if ( (int) $u->ID !== (int) $self_id && 'rejected' !== get_user_meta( $u->ID, 'gii_reg_status', true ) ) return true;
+			}
+		}
+		return false;
+	}
+	private static function reg_incident( $in ) {
+		$inc = (array) ( $in['incident'] ?? array() );
+		return array( 'date' => self::digits( $inc['date'] ?? '' ), 'type' => isset( GII_WF::INCIDENT_TYPES[ (string) ( $inc['type'] ?? '' ) ] ) ? (string) $inc['type'] : '', 'address' => self::area( $inc['address'] ?? '', 500 ) );
+	}
+	private static function store_reg_files( $uid, $uploads, &$files ) {
+		foreach ( $uploads as $slot => $list ) {
+			$files[ $slot ] = array();
+			foreach ( $list as $one ) {
+				$files[ $slot ][] = GII_Store::add_reg_file( $uid, $one['tmp_name'], $one['name'], $one['type'] );
+			}
+		}
+	}
+	public static function signup_submit( $req ) {
+		list( $rid, $o ) = self::su( $req['rid'] );
+		if ( ! $o || empty( $o['token'] ) || ! hash_equals( $o['token'], (string) $req['token'] ) || time() > ( $o['token_exp'] ?? 0 ) ) {
+			return self::err( 'اعتبار کد تأیید تمام شده است. دوباره از اول شروع کنید.', 400, array( 'restart' => true ) );
+		}
+		$in      = json_decode( (string) $req['data'], true );
+		$in      = is_array( $in ) ? $in : array();
+		$uploads = self::reg_uploads( $req );
+		if ( is_wp_error( $uploads ) ) return $uploads;
+		$f = array_merge( $o['f'], array(
+			'hasIncident' => ! empty( $in['hasIncident'] ), 'incident' => self::reg_incident( $in ), 'password' => (string) ( $in['password'] ?? '' ),
+			'declaration' => ! empty( $in['declaration'] ), 'docs' => array_map( 'count', $uploads ),
+		) );
+		if ( $e = GII_WF::signup_final_issues( $f ) ) return self::err( 'بررسی کنید: ' . implode( '، ', $e ) );
+		if ( self::subscriber_clash( $f ) ) return self::err( 'برای این شماره اشتراک، کد ملی یا موبایل قبلاً حساب ساخته شده است. وارد شوید یا «رمز عبور را فراموش کرده‌ام» را بزنید.' );
+		if ( ! self::rate_limit( 'sureg|' . self::ip(), 3, DAY_IN_SECONDS ) ) return self::err( 'از این اینترنت امروز ثبت‌نام‌های زیادی انجام شده است. فردا دوباره امتحان کنید.', 429 );
+		// درخواست ردشده قبلی با همین شماره اشتراک جای خود را به درخواست تازه می‌دهد
+		$old = get_user_by( 'login', $f['subscriptionNo'] );
+		if ( $old ) {
+			if ( 'rejected' !== get_user_meta( $old->ID, 'gii_reg_status', true ) ) return self::err( 'نام کاربری تکراری است.' );
+			require_once ABSPATH . 'wp-admin/includes/user.php';
+			GII_Store::delete_reg_files( $old->ID );
+			wp_delete_user( $old->ID );
+		}
+		try {
+			list( $u ) = GII_Store::create_user( $f['subscriptionNo'], $f['name'], 'gii_subscriber', array(
+				'gii_national_id' => $f['nationalId'], 'gii_subscription_no' => $f['subscriptionNo'], 'gii_mobile' => $f['mobile'],
+				'gii_address' => $f['hasIncident'] ? $f['incident']['address'] : '', 'gii_reg_ip' => self::ip(),
+			), $f['password'] );
+			$now   = GII_WF::iso();
+			$files = array();
+			self::store_reg_files( $u->ID, $uploads, $files );
+		} catch ( GII_WF_Error $e ) {
+			return self::err( $e->getMessage(), 500 );
+		}
+		GII_Store::save_reg( $u->ID, array(
+			'status' => 'pending', 'at' => $now, 'submittedAt' => $now, 'relation' => $f['relation'], 'hasIncident' => $f['hasIncident'],
+			'incident' => $f['hasIncident'] ? $f['incident'] : null, 'files' => $files, 'shahkar' => $o['sk'],
+			'history' => array( array( 'at' => $now, 'by' => $f['name'], 'role' => 'subscriber', 'action' => 'submit', 'label' => 'ثبت درخواست ثبت‌نام اینترنتی', 'note' => '' ) ),
+		) );
+		delete_transient( 'gii_su_' . $rid );
+		GII_Store::notify( null, 'gas', "درخواست ثبت‌نام جدید: {$f['name']} — اشتراک {$f['subscriptionNo']}" );
+		GII_SMS::send( $f['mobile'], 'درخواست ثبت‌نام شما در سامانه بیمه حوادث گاز ثبت شد. نتیجه بررسی کارشناس شرکت گاز پیامک می‌شود.' );
+		wp_set_current_user( $u->ID );
+		wp_set_auth_cookie( $u->ID, true, is_ssl() );
+		return self::ok( array( 'nonce' => wp_create_nonce( 'wp_rest' ) ) );
+	}
+	public static function reg_resubmit( $req ) {
+		$uid = get_current_user_id();
+		$reg = GII_Store::reg_of( $uid );
+		if ( ! $reg || 'needs_fix' !== $reg['status'] ) return self::err( 'در این وضعیت امکان ویرایش درخواست نیست.', 403 );
+		$in = json_decode( (string) $req['data'], true );
+		$in = is_array( $in ) ? $in : array();
+		$f  = self::signup_fields( array_merge( $in, array( 'subscriptionNo' => get_user_meta( $uid, 'gii_subscription_no', true ), 'mobile' => get_user_meta( $uid, 'gii_mobile', true ) ) ) );
+		if ( $e = GII_WF::signup_issues( $f ) ) return self::err( 'بررسی کنید: ' . implode( '، ', $e ) );
+		$uploads = self::reg_uploads( $req );
+		if ( is_wp_error( $uploads ) ) return $uploads;
+		$counts = array();
+		foreach ( GII_WF::REG_DOCS as $k => $t ) $counts[ $k ] = ! empty( $uploads[ $k ] ) ? count( $uploads[ $k ] ) : count( (array) ( $reg['files'][ $k ] ?? array() ) );
+		$all = array_merge( $f, array( 'hasIncident' => ! empty( $in['hasIncident'] ), 'incident' => self::reg_incident( $in ), 'password' => '------', 'declaration' => true, 'docs' => $counts ) );
+		if ( $e = array_values( array_filter( GII_WF::signup_final_issues( $all ), function ( $x ) { return 0 !== strpos( $x, 'رمز' ); } ) ) ) return self::err( 'بررسی کنید: ' . implode( '، ', $e ) );
+		if ( self::subscriber_clash( $f, $uid ) ) return self::err( 'این کد ملی برای حساب دیگری ثبت شده است.' );
+		$files = (array) $reg['files'];
+		try {
+			foreach ( $uploads as $slot => $list ) {
+				foreach ( (array) ( $files[ $slot ] ?? array() ) as $old ) @unlink( GII_Store::reg_file_path( $uid, $old['id'] ) );
+			}
+			self::store_reg_files( $uid, $uploads, $files );
+		} catch ( GII_WF_Error $e ) {
+			return self::err( $e->getMessage(), 500 );
+		}
+		$now = GII_WF::iso();
+		wp_update_user( array( 'ID' => $uid, 'display_name' => $f['name'], 'first_name' => $f['name'] ) );
+		update_user_meta( $uid, 'gii_national_id', $f['nationalId'] );
+		if ( $all['hasIncident'] ) update_user_meta( $uid, 'gii_address', $all['incident']['address'] );
+		$reg = array_merge( $reg, array( 'status' => 'pending', 'submittedAt' => $now, 'relation' => $f['relation'], 'hasIncident' => $all['hasIncident'], 'incident' => $all['hasIncident'] ? $all['incident'] : null, 'files' => $files ) );
+		$reg['history'][] = array( 'at' => $now, 'by' => $f['name'], 'role' => 'subscriber', 'action' => 'resubmit', 'label' => 'اصلاح و ارسال دوباره درخواست', 'note' => self::area( $in['reply'] ?? '', 500 ) );
+		GII_Store::save_reg( $uid, $reg );
+		GII_Store::notify( null, 'gas', "درخواست ثبت‌نام اصلاح شد: {$f['name']} — اشتراک " . get_user_meta( $uid, 'gii_subscription_no', true ) );
+		return self::ok();
+	}
+	public static function reg_review( $req ) {
+		$role = self::role();
+		if ( ! in_array( $role, array( 'gas', 'admin' ), true ) ) return self::err( 'فقط کارشناس شرکت گاز.', 403 );
+		$uid = (int) $req['uid'];
+		$u   = get_userdata( $uid );
+		$reg = $u ? GII_Store::reg_of( $uid ) : null;
+		if ( ! $reg || ! in_array( $reg['status'], array( 'pending', 'needs_fix' ), true ) ) return self::err( 'این درخواست دیگر قابل بررسی نیست.' );
+		$decision = (string) $req['decision'];
+		$labels   = array( 'approve' => 'تأیید ثبت‌نام', 'fix' => 'درخواست اصلاح', 'reject' => 'رد درخواست', 'spam' => 'مسدودسازی به‌عنوان اسپم' );
+		if ( ! isset( $labels[ $decision ] ) ) return self::err( 'تصمیم نامعتبر است.' );
+		$note = self::area( $req['note'], 500 );
+		if ( 'approve' !== $decision && mb_strlen( trim( $note ) ) < 3 ) return self::err( 'دلیل یا توضیح را بنویسید.' );
+		$staff  = GII_Store::actor();
+		$now    = GII_WF::iso();
+		$mobile = get_user_meta( $uid, 'gii_mobile', true );
+		$reg['history'][] = array( 'at' => $now, 'by' => $staff['name'], 'role' => $role, 'action' => $decision, 'label' => $labels[ $decision ], 'note' => $note );
+		$reg = array_merge( $reg, array( 'reviewedBy' => $staff['name'], 'reviewedAt' => $now, 'note' => $note ) );
+		$claim_id = null;
+		if ( 'approve' === $decision ) {
+			$reg['status'] = 'approved';
+			if ( ! empty( $reg['hasIncident'] ) && ! empty( $reg['incident'] ) ) {
+				try {
+					$c = self::new_claim( $u, GII_WF::parse_jalali( $reg['incident']['date'] ), $reg['incident']['type'], $reg['incident']['address'], $note, 'تأیید ثبت‌نام اینترنتی و تشکیل پرونده' );
+					// مدارک ثبت‌نام همان مدارک پرونده‌اند و دوباره خواسته نمی‌شوند
+					foreach ( (array) $reg['files'] as $slot => $list ) {
+						foreach ( (array) $list as $fl ) {
+							GII_Store::add_file( $c, GII_WF::REG_DOC_TO_CLAIM[ $slot ], GII_Store::reg_file_path( $uid, $fl['id'] ), $fl['name'], $fl['type'], 'subscriber', false );
+						}
+					}
+					$c        = GII_Store::save_claim( $c );
+					$claim_id = $c['id'];
+				} catch ( GII_WF_Error $e ) {
+					return self::err( $e->getMessage(), 500 );
+				}
+			}
+			GII_SMS::send( $mobile, 'ثبت‌نام شما در سامانه بیمه حوادث گاز تأیید شد. نام کاربری: ' . $u->user_login . ' و رمزی که خودتان ساختید.' . ( $claim_id ? ' پرونده خسارت شما تشکیل شد.' : '' ) );
+			GII_Store::notify( $uid, null, $claim_id ? 'ثبت‌نام شما تأیید و پرونده خسارت تشکیل شد. لطفاً اطلاعات و مدارک را تکمیل کنید.' : 'ثبت‌نام شما تأیید شد.', $claim_id );
+		} elseif ( 'fix' === $decision ) {
+			$reg['status'] = 'needs_fix';
+			GII_SMS::send( $mobile, "درخواست ثبت‌نام شما نیاز به اصلاح دارد: $note — وارد سامانه شوید و اصلاح کنید." );
+			GII_Store::notify( $uid, null, "درخواست ثبت‌نام نیاز به اصلاح دارد: $note" );
+		} elseif ( 'reject' === $decision ) {
+			$reg['status'] = 'rejected';
+			GII_SMS::send( $mobile, "درخواست ثبت‌نام شما در سامانه بیمه حوادث گاز رد شد. دلیل: $note" );
+			GII_Store::notify( $uid, null, "درخواست ثبت‌نام رد شد: $note" );
+		} else {
+			$reg['status'] = 'spam';
+			update_user_meta( $uid, 'gii_active', '0' );
+			set_transient( 'gii_blk_m_' . md5( $mobile ), 1, 7 * DAY_IN_SECONDS );
+			$ip = get_user_meta( $uid, 'gii_reg_ip', true );
+			if ( $ip ) set_transient( 'gii_blk_ip_' . md5( $ip ), 1, 7 * DAY_IN_SECONDS );
+		}
+		GII_Store::save_reg( $uid, $reg );
+		return self::ok( array( 'claimId' => $claim_id ) );
+	}
+	public static function reg_file( $req ) {
+		$uid  = (int) $req['uid'];
+		$self = get_current_user_id();
+		if ( $uid !== $self && ! in_array( self::role(), array( 'gas', 'admin' ), true ) ) return self::err( 'فایل پیدا نشد.', 404 );
+		$reg  = GII_Store::reg_of( $uid );
+		$fid  = (string) $req['fid'];
+		$meta = null;
+		foreach ( (array) ( $reg['files'] ?? array() ) as $list ) {
+			foreach ( (array) $list as $fl ) if ( $fl['id'] === $fid ) $meta = $fl;
+		}
+		$path = GII_Store::reg_file_path( $uid, $fid );
+		if ( ! $meta || ! is_file( $path ) ) return self::err( 'فایل پیدا نشد.', 404 );
+		nocache_headers();
+		header( 'Content-Type: ' . $meta['type'] );
+		header( 'Content-Length: ' . filesize( $path ) );
+		header( 'X-Content-Type-Options: nosniff' );
+		header( "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox" );
+		header( 'Content-Disposition: inline; filename="' . rawurlencode( $meta['name'] ) . '"' );
+		readfile( $path );
+		exit;
 	}
 
 	// ---------- ویرایش فیلدهای پرونده ----------
@@ -629,10 +903,15 @@ class GII_REST {
 		$in    = (array) $req->get_json_params();
 		$patch = array();
 		foreach ( GII_WF::DEFAULT_SETTINGS as $k => $v ) {
-			if ( ! array_key_exists( $k, $in ) || is_array( $v ) ) continue;
+			if ( ! array_key_exists( $k, $in ) || is_array( $v ) || 'subLookupUrl' === $k ) continue;
 			$patch[ $k ] = is_int( $v ) ? self::int( $in[ $k ] ) : self::txt( GII_WF::normalize_digits( $in[ $k ] ), 100 );
 		}
 		if ( array_key_exists( 'orgName', $in ) ) $patch['orgName'] = self::txt( $in['orgName'], 120 );
+		if ( array_key_exists( 'subLookupUrl', $in ) ) {
+			$url = trim( (string) $in['subLookupUrl'] );
+			if ( '' !== $url && ! preg_match( '#^https://[^\s"\'<>]+$#i', $url ) ) return self::err( 'نشانی صفحه شماره اشتراک باید با https:// شروع شود.' );
+			$patch['subLookupUrl'] = esc_url_raw( $url, array( 'https' ) );
+		}
 		if ( array_key_exists( 'fireOffers', $in ) ) {
 			$offers = array();
 			foreach ( array_slice( array_values( (array) $in['fireOffers'] ), 0, 3 ) as $o ) {

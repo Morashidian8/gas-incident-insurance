@@ -12,6 +12,7 @@ class GII_Admin {
 			add_menu_page( 'بیمه حوادث گاز', 'بیمه حوادث گاز', 'manage_options', 'gii', array( __CLASS__, 'page' ), 'dashicons-shield', 58 );
 		} );
 		add_action( 'admin_post_gii_sms', array( __CLASS__, 'save_sms' ) );
+		add_action( 'admin_post_gii_shahkar', array( __CLASS__, 'save_shahkar' ) );
 		add_action( 'admin_post_gii_demo_on', array( __CLASS__, 'demo_on' ) );
 		add_action( 'admin_post_gii_demo_off', array( __CLASS__, 'demo_off' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( GII_FILE ), function ( $links ) {
@@ -42,6 +43,17 @@ class GII_Admin {
 			'sms_pass'     => sanitize_text_field( $p['sms_pass'] ?? '' ),
 		) );
 		self::back( 'تنظیمات پیامک ذخیره شد.' );
+	}
+	public static function save_shahkar() {
+		self::guard( 'gii_shahkar' );
+		$p   = wp_unslash( $_POST );
+		$url = trim( (string) ( $p['shahkar_url'] ?? '' ) );
+		GII_Store::update_settings( array(
+			'shahkar_mode' => isset( GII_Shahkar::MODES[ $p['shahkar_mode'] ?? '' ] ) ? $p['shahkar_mode'] : 'off',
+			'shahkar_url'  => preg_match( '#^https://#i', $url ) ? esc_url_raw( $url, array( 'https' ) ) : '',
+			'shahkar_key'  => sanitize_text_field( $p['shahkar_key'] ?? '' ),
+		) );
+		self::back( 'تنظیمات استعلام شاهکار ذخیره شد.' );
 	}
 	public static function demo_on() {
 		self::guard( 'gii_demo_on' );
@@ -89,6 +101,20 @@ class GII_Admin {
 					<tr><th><label for="gii-s">شماره خط فرستنده</label></th><td><input id="gii-s" class="regular-text" dir="ltr" name="sms_sender" value="<?php echo esc_attr( $s['sms_sender'] ?? '' ); ?>"></td></tr>
 				</tbody></table>
 				<?php submit_button( 'ذخیره تنظیمات پیامک' ); ?>
+			</form>
+
+			<h2>استعلام شاهکار (ثبت‌نام اینترنتی مشترک)</h2>
+			<p>هنگام ثبت‌نام، تطابق کد ملی با صاحب سیم‌کارت بررسی می‌شود. اگر موبایل به نام صاحب کد ملی نباشد، ثبت‌نام انجام نمی‌شود. اگر سرویس در دسترس نباشد، ثبت‌نام انجام و به کارشناس گاز هشدار داده می‌شود.</p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'gii_shahkar' ); ?><input type="hidden" name="action" value="gii_shahkar">
+				<table class="form-table"><tbody>
+					<tr><th><label for="gii-sm">حالت</label></th><td><select id="gii-sm" name="shahkar_mode">
+						<?php foreach ( GII_Shahkar::MODES as $k => $label ) : ?><option value="<?php echo esc_attr( $k ); ?>" <?php selected( $s['shahkar_mode'] ?? ( GII_Store::demo_on() ? 'demo' : 'off' ), $k ); ?>><?php echo esc_html( $label ); ?></option><?php endforeach; ?>
+					</select></td></tr>
+					<tr><th><label for="gii-su">نشانی سرویس (https)</label></th><td><input id="gii-su" class="regular-text" dir="ltr" name="shahkar_url" value="<?php echo esc_attr( $s['shahkar_url'] ?? '' ); ?>"><p class="description">نشانی و قالب پاسخ را سرویس‌دهنده شاهکار (معمولاً سامانه پیامک) می‌دهد؛ جزئیات در includes/shahkar.php.</p></td></tr>
+					<tr><th><label for="gii-sk">کلید API</label></th><td><input id="gii-sk" type="password" class="regular-text" dir="ltr" name="shahkar_key" value="<?php echo esc_attr( $s['shahkar_key'] ?? '' ); ?>"></td></tr>
+				</tbody></table>
+				<?php submit_button( 'ذخیره تنظیمات شاهکار' ); ?>
 			</form>
 
 			<h2>حالت نمایشی</h2>

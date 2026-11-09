@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, DOC_TYPES, claimCode, jalaliString, isValidNationalId
 
 const KEY = 'gii.db.v1';
 // با تغییر ساختار داده نمایشی بالا می‌رود تا مرورگرهای قبلی داده نمونه تازه بگیرند
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 let db = null;
 
 export function uid(p = 'id') { return p + '-' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
@@ -288,8 +288,22 @@ export async function seed() {
   notify({ toUser: users[1].id, text: `مبلغ خسارت پرونده ${c2.code} تعیین شد. لطفاً بررسی و تأیید کنید.`, claimId: c2.id });
   notify({ toRole: 'insurer', text: `پرونده ${db.claims[4].code} از شرکت گاز دریافت شد.`, claimId: db.claims[4].id });
   await archive();
+  await regDemo();
   sendSms(users[2].mobile, `مشترک گرامی، پرونده خسارت گاز شما تشکیل شد. نام کاربری: ${users[2].username} — رمز موقت: ۱۲۳۴۵۶`);
   void admin; void now;
+
+  // دو درخواست ثبت‌نام اینترنتی برای کارتابل کارشناس گاز (همان GII_Seed::reg_demo در وردپرس)
+  async function regDemo() {
+    for (const r of regSpecs()) {
+      const at = daysAgo(r.ago).toISOString();
+      const files = {};
+      for (const [slot, title] of r.docs) { const b = sampleDoc(title); const id = uid('f'); await putFile(id, b); files[slot] = [{ id, name: slot + '.svg', type: b.type, size: b.size, at }]; }
+      const u = await mk({ role: 'subscriber', username: r.subNo, name: r.name, nationalId: nid(r.b9) || nid(r.b9.slice(0, 8) + '1'), subscriptionNo: r.subNo, mobile: r.mobile, address: r.incident.address, createdAt: at }, '123456');
+      u.reg = { status: 'pending', at, submittedAt: at, relation: r.relation, hasIncident: true, incident: { ...r.incident, date: jalaliString(daysAgo(r.ago + 1)) }, files,
+        shahkar: { status: r.shahkar, at, demo: true }, history: [{ at, by: r.name, role: 'subscriber', action: 'submit', label: 'ثبت درخواست ثبت‌نام اینترنتی', note: '' }] };
+      notify({ toRole: 'gas', text: `درخواست ثبت‌نام جدید: ${r.name} — اشتراک ${r.subNo}` });
+    }
+  }
 
   // پرونده‌های بایگانی و جاری بیشتر (بدون فایل) تا گزارش ماهانه و داشبورد وضعیت داده واقعی‌نما داشته باشد.
   // همین فرمول در wordpress/.../includes/seed.php تکرار شده است.
@@ -368,5 +382,15 @@ export function archiveSpecs() {
     });
   }
   return out;
+}
+
+// درخواست‌های ثبت‌نام نمایشی؛ همان GII_Seed::reg_specs در وردپرس
+export function regSpecs() {
+  return [
+    { name: 'نسرین قاسمی', subNo: '1056781234', b9: '051234567', mobile: '09123456780', relation: 'owner', ago: 0, shahkar: 'ok',
+      incident: { type: 'fire', address: 'تهران، شهران، خیابان کوهسار، پلاک ۹' }, docs: [['national_card', 'کارت ملی'], ['bill', 'قبض گاز']] },
+    { name: 'کامران یوسفی', subNo: '1078912345', b9: '061234578', mobile: '09351234567', relation: 'tenant', ago: 4, shahkar: 'error',
+      incident: { type: 'explosion', address: 'کرج، فردیس، خیابان سوم، پلاک ۲۱' }, docs: [['national_card', 'کارت ملی'], ['bill', 'قبض گاز'], ['proof', 'اجاره‌نامه']] },
+  ];
 }
 

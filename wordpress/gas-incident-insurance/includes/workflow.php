@@ -55,6 +55,8 @@ class GII_WF {
 		'policyNo'          => 'نمونه ۱۴۰۵/۴۲۲',
 		'policyStart'       => '1405/01/01',
 		'policyEnd'         => '1405/12/29',
+		'regSlaDays'        => 2,
+		'subLookupUrl'      => 'https://my.nigc.ir/',
 		// سه طرح بیمه آتش‌سوزی صفحه ورود؛ همان DEFAULT_SETTINGS.fireOffers در js/workflow.js
 		'fireOffers'        => array(
 			array( 'insurer' => 'بیمه‌گر الف (نمونه)', 'plan' => 'طرح پایه آتش‌سوزی منزل', 'price' => '۱٬۲۰۰٬۰۰۰ تومان در سال', 'cover' => 'آتش‌سوزی، انفجار و صاعقه — سرمایه تا ۵۰۰ میلیون تومان', 'url' => '' ),
@@ -450,5 +452,48 @@ class GII_WF {
 			: ( 'voucher' === $f['to'] ? "حواله {$data['voucherNo']} به مبلغ {$data['amount']} ریال" : self::TRANSFER_METHODS[ $data['method'] ] . " — پیگیری {$data['ref']}" );
 		$c['timeline'][] = array( 'at' => $at, 'by' => $actor['name'], 'role' => $actor['role'], 'action' => $step, 'label' => $f['label'], 'note' => $note );
 		return $c;
+	}
+
+	// ---------- ثبت‌نام اینترنتی مشترک — همان قواعد js/workflow.js ----------
+	const RELATIONS = array( 'owner' => 'مالک', 'tenant' => 'مستأجر', 'heir' => 'وارث مالک' );
+	const REG_STATUSES = array( 'pending', 'needs_fix', 'approved', 'rejected', 'spam' );
+	const REG_DOCS = array(
+		'national_card' => 'تصویر کارت ملی (روی کارت)',
+		'bill'          => 'تصویر آخرین قبض گاز (نام و شماره اشتراک خوانا باشد)',
+		'proof'         => 'اجاره‌نامه یا مدرک وراثت',
+	);
+	const REG_DOC_TO_CLAIM = array( 'national_card' => 'national_id', 'bill' => 'gas_bill', 'proof' => 'ownership' );
+	public static function reg_docs_needed( $relation ) {
+		return array_merge( array( 'national_card', 'bill' ), ( $relation && 'owner' !== $relation ) ? array( 'proof' ) : array() );
+	}
+	public static function is_valid_subscription_no( $raw ) {
+		return (bool) preg_match( '/^\d{6,13}$/', trim( self::normalize_digits( $raw ) ) );
+	}
+	public static function signup_issues( $f ) {
+		$out = array();
+		if ( mb_strlen( trim( (string) ( $f['name'] ?? '' ) ) ) < 5 ) $out[] = 'نام و نام خانوادگی کامل';
+		if ( ! self::is_valid_national_id( $f['nationalId'] ?? '' ) ) $out[] = 'کد ملی معتبر';
+		if ( ! self::is_valid_subscription_no( $f['subscriptionNo'] ?? '' ) ) $out[] = 'شماره اشتراک گاز (۶ تا ۱۳ رقم)';
+		if ( ! self::is_valid_mobile( $f['mobile'] ?? '' ) ) $out[] = 'موبایل ۱۱ رقمی با ۰۹';
+		if ( ! isset( self::RELATIONS[ $f['relation'] ?? '' ] ) ) $out[] = 'نسبت شما با اشتراک';
+		return $out;
+	}
+	public static function signup_final_issues( $f, $now = null ) {
+		$now = $now ? $now : time();
+		$out = self::signup_issues( $f );
+		foreach ( self::reg_docs_needed( $f['relation'] ?? '' ) as $k ) {
+			if ( empty( $f['docs'][ $k ] ) ) $out[] = self::REG_DOCS[ $k ];
+		}
+		if ( ! empty( $f['hasIncident'] ) ) {
+			$inc = (array) ( $f['incident'] ?? array() );
+			$ts  = self::parse_jalali( $inc['date'] ?? '' );
+			if ( ! $ts ) $out[] = 'تاریخ حادثه شمسی معتبر';
+			elseif ( $ts - $now > 86400 ) $out[] = 'تاریخ حادثه در آینده است';
+			if ( ! isset( self::INCIDENT_TYPES[ $inc['type'] ?? '' ] ) ) $out[] = 'نوع حادثه';
+			if ( mb_strlen( trim( (string) ( $inc['address'] ?? '' ) ) ) < 10 ) $out[] = 'نشانی کامل محل حادثه';
+		}
+		if ( mb_strlen( (string) ( $f['password'] ?? '' ) ) < 6 ) $out[] = 'رمز عبور دست‌کم ۶ نویسه';
+		if ( empty( $f['declaration'] ) ) $out[] = 'تأیید صحت اطلاعات';
+		return $out;
 	}
 }

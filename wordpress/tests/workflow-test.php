@@ -136,5 +136,17 @@ $c['incident']['type'] = 'co';
 check( 'cause report required for every type', in_array( 'cause_report', $ids(), true ) );
 check( 'no gas-uploaded documents', ! in_array( 'gas', array_column( GII_WF::doc_types(), 'uploader' ), true ) );
 
+// ثبت‌نام اینترنتی
+$f = array( 'name' => 'حمید رضایی', 'nationalId' => '0499370899', 'subscriptionNo' => '1023456789', 'mobile' => '09121112233', 'relation' => 'owner' );
+check( 'signup valid', array() === GII_WF::signup_issues( $f ) );
+check( 'signup bad national id', in_array( 'کد ملی معتبر', GII_WF::signup_issues( array_merge( $f, array( 'nationalId' => '0499370898' ) ) ), true ) );
+check( 'tenant needs proof', array( 'national_card', 'bill', 'proof' ) === GII_WF::reg_docs_needed( 'tenant' ) );
+$full = array_merge( $f, array( 'docs' => array( 'national_card' => 1, 'bill' => 1 ), 'hasIncident' => true, 'incident' => array( 'date' => '1405/07/20', 'type' => 'fire', 'address' => 'تهران، خیابان آزادی، پلاک ۱۲' ), 'password' => '123456', 'declaration' => true ) );
+$now  = mktime( 12, 0, 0, 11, 9, 2026 );
+check( 'signup final valid', array() === GII_WF::signup_final_issues( $full, $now ) );
+check( 'signup tenant missing proof', in_array( GII_WF::REG_DOCS['proof'], GII_WF::signup_final_issues( array_merge( $full, array( 'relation' => 'tenant' ) ), $now ), true ) );
+check( 'signup future incident', in_array( 'تاریخ حادثه در آینده است', GII_WF::signup_final_issues( array_merge( $full, array( 'incident' => array( 'date' => '1406/01/01', 'type' => 'fire', 'address' => 'تهران، خیابان آزادی، پلاک ۱۲' ) ) ), $now ), true ) );
+check( 'signup without incident ok', array() === GII_WF::signup_final_issues( array_merge( $full, array( 'hasIncident' => false, 'incident' => array() ) ), $now ) );
+
 echo $fails ? "\n$fails of $count checks failed\n" : "all $count checks passed\n";
 exit( $fails ? 1 : 0 );

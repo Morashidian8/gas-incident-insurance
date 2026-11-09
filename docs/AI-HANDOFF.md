@@ -19,7 +19,7 @@ Four roles share one claim:
 | Insurer expert (کارشناس بیمه‌گر) | `insurer` | Assesses (deductible, caps), queries gas co., runs finance stages (review → voucher → bank → paid) |
 | Admin (مدیر سامانه) | `admin` | Staff users, policy settings, logo, fire-insurance offers on login page, reports, SMS log |
 
-Flow: incident → gas co. creates account+claim → subscriber submits → gas reviews / returns with deficiencies → resubmit → gas forwards to insurer (cause-report confirmation required) → insurer assesses → subscriber accepts/objects → finance stages → paid.
+Flow: incident → subscriber **self-registers online** (subscription no. + Shahkar + SMS code + national card / gas bill photos; gas expert approves → account active + draft claim with those documents) — or gas co. registers them in person → subscriber submits → gas reviews / returns with deficiencies → resubmit → gas forwards to insurer (cause-report confirmation required) → insurer assesses → subscriber accepts/objects → finance stages → paid.
 
 **The single most important document** is the fire-department or official court expert report that explicitly states the cause was gas (`cause_report`). There is **no gas-company site visit** — do not reintroduce one.
 
@@ -104,6 +104,14 @@ CI: `.github/workflows/pages.yml` runs tests + PHP lint, builds, deploys `dist/p
 9. **Charts** use the validated palette `--s1..--s4` (fixed color per incident type: co=s1 blue, fire=s2 orange, leak=s3 aqua, explosion=s4 yellow). Never color a series by rank.
 10. Verify UI changes in a real browser at 390px and 1440px width, light and dark.
 
+## 5b. Online self-registration
+
+- Endpoints (`rest.php`): `signup/start` (validate, block list, rate limits, Shahkar via `includes/shahkar.php`, send OTP), `signup/verify`, `signup/submit` (multipart: `data` JSON + `national_card[]`, `bill[]`, `proof[]`), `regs/me` (resubmit after "needs fix"), `regs/<uid>/review` (approve | fix | reject | spam), `regs/<uid>/files/<fid>`.
+- Storage: the registration lives on the pending user (`gii_reg` user meta / `user.reg` in the browser version); files in `<private dir>/reg-<uid>/`. On approval they are copied into the claim (`REG_DOC_TO_CLAIM`).
+- Rules: `signupIssues` / `signupFinalIssues` / `regDocsNeeded` in workflow.js and workflow.php.
+- Shahkar modes (wp-admin → بیمه حوادث گاز): off, demo (mobiles ending 0000 mismatch), http (provider URL + key; adapt `GII_Shahkar::http()` to the provider's API).
+- A subscriber whose `reg.status` is not `approved` sees only the request-status page.
+
 ## 6. Key data shapes (claim)
 
 ```js
@@ -125,7 +133,7 @@ Statuses: draft, returned, submitted, gas_review, sent_insurer, insurer_review, 
 
 ## 7. Demo accounts (demo mode only)
 
-Subscribers `1023456789`, `1045678912`, `1067891234`, `1024681357` / `123456` · gas `gas` / `gas123` · insurer `bime` / `bime123` · admin `admin` / `admin123` (in WordPress the admin login is `modir` / `admin123`). Demo mode wipes all data — never enable it on a real server.
+Subscribers `1023456789`, `1045678912`, `1067891234`, `1024681357`, pending online registration `1056781234` / `123456` · gas `gas` / `gas123` · insurer `bime` / `bime123` · admin `admin` / `admin123` (in WordPress the admin login is `modir` / `admin123`). Demo mode wipes all data — never enable it on a real server.
 
 ## 8. Encrypted presentation file
 

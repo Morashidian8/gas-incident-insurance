@@ -176,23 +176,169 @@ export async function register(f) {
     u = { id: S.uid('u'), role: 'subscriber', username: f.subscriptionNo, name: f.name, nationalId: f.nationalId, subscriptionNo: f.subscriptionNo, mobile: f.mobile, address: f.address, active: true, mustChangePassword: true, createdAt: new Date().toISOString(), pwHash: await S.hashPw(f.subscriptionNo, pw) };
     db().users.push(u);
   }
-  db().seq += 1;
-  const now = new Date().toISOString();
-  const late = W.daysBetween(d, new Date()) > db().settings.reportWindowDays;
-  const staff = user();
-  const c = {
-    id: S.uid('c'), code: W.claimCode(db().seq), subscriberId: u.id, createdBy: staff.id, createdAt: now, status: 'draft', statusAt: now, submitCount: 0,
-    incident: { date: W.jalaliString(d), time: '', type: f.type, placeType: 'residential', address: f.address, postalCode: '', description: '', causeIssuer: '', causeReportNo: '', causeReportDate: '', causeStatesGas: false, policeReportNo: '' },
-    damage: { kinds: [], items: [], injured: [], deceased: [] }, photos: [], docs: {}, files: {}, bank: { sheba: '', holder: u.name }, declaration: false,
-    deficiencies: [], messages: [], assessment: null, payment: null,
-    timeline: [{ at: now, by: staff.name, role: 'gas', action: 'create', label: existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک', note: [f.note, late ? `اعلام با تأخیر: بیش از ${db().settings.reportWindowDays} روز پس از حادثه` : ''].filter(Boolean).join(' — ') }],
-  };
-  db().claims.push(c);
+  const c = newClaim(u, { date: d, type: f.type, address: f.address, note: f.note }, user(), existing ? 'تشکیل پرونده جدید برای مشترک موجود' : 'تشکیل پرونده و ایجاد حساب مشترک');
   S.sendSms(u.mobile, pw ? `مشترک گرامی، پرونده خسارت ${c.code} تشکیل شد. نام کاربری: ${u.username} — رمز موقت: ${pw}` : `مشترک گرامی، پرونده خسارت ${c.code} برای شما تشکیل شد. با حساب قبلی وارد شوید.`);
   S.notify({ toUser: u.id, text: `پرونده ${c.code} تشکیل شد. لطفاً اطلاعات و مدارک را تکمیل کنید.`, claimId: c.id });
   save();
   return { claimId: c.id, username: u.username, password: pw, existing };
 }
+// پرونده تازه برای مشترک (ثبت حضوری یا تأیید ثبت‌نام اینترنتی)
+function newClaim(u, f, staff, label) {
+  db().seq += 1;
+  const now = new Date().toISOString();
+  const d = f.date;
+  const late = W.daysBetween(d, new Date()) > db().settings.reportWindowDays;
+  const c = {
+    id: S.uid('c'), code: W.claimCode(db().seq), subscriberId: u.id, createdBy: staff.id, createdAt: now, status: 'draft', statusAt: now, submitCount: 0,
+    incident: { date: W.jalaliString(d), time: '', type: f.type, placeType: 'residential', address: f.address, postalCode: '', description: '', causeIssuer: '', causeReportNo: '', causeReportDate: '', causeStatesGas: false, policeReportNo: '' },
+    damage: { kinds: [], items: [], injured: [], deceased: [] }, photos: [], docs: {}, files: {}, bank: { sheba: '', holder: u.name }, declaration: false,
+    deficiencies: [], messages: [], assessment: null, payment: null,
+    timeline: [{ at: now, by: staff.name, role: 'gas', action: 'create', label, note: [f.note, late ? `اعلام با تأخیر: بیش از ${db().settings.reportWindowDays} روز پس از حادثه` : ''].filter(Boolean).join(' — ') }],
+  };
+  db().claims.push(c);
+  return c;
+}
+
+// ---------- ثبت‌نام اینترنتی مشترک ----------
+// سه مرحله: مشخصات + کد پیامکی (و استعلام شاهکار) ← تأیید کد ← مدارک، حادثه و رمز.
+// حساب تا تأیید کارشناس گاز «در انتظار» می‌ماند. محدودیت‌ها همان محدودیت‌های سرور وردپرس است.
+let regOtp = null;
+const rl = (key, max, ms) => {
+  const r = (db().rl ||= {}); const now = Date.now();
+  r[key] = (r[key] || []).filter(t => now - t < ms);
+  if (r[key].length >= max) return false;
+  r[key].push(now); save(); return true;
+};
+const blocked = mobile => { const until = (db().blocks || {})[mobile]; return until && new Date(until) > new Date(); };
+// استعلام شاهکار (تطابق کد ملی با صاحب سیم‌کارت). نسخه نمایشی: موبایل‌های پایان‌یافته به ۰۰۰۰ «عدم تطابق» است.
+function shahkar(nationalId, mobile) {
+  return { status: /0000$/.test(mobile) ? 'mismatch' : 'ok', at: new Date().toISOString(), demo: true };
+}
+const cleanSignup = f => ({
+  name: String(f.name || '').trim().slice(0, 100), nationalId: W.normalizeDigits(f.nationalId).trim(), subscriptionNo: W.normalizeDigits(f.subscriptionNo).trim(),
+  mobile: W.normalizeDigits(f.mobile).trim(), relation: f.relation,
+});
+export async function signupStart(raw) {
+  const f = cleanSignup(raw);
+  const errs = W.signupIssues(f);
+  if (errs.length) fail('بررسی کنید: ' + errs.join('، '));
+  if (blocked(f.mobile)) fail('امکان ثبت‌نام با این موبایل فعلاً وجود ندارد. با شرکت گاز تماس بگیرید.');
+  if (!rl('otp|' + f.mobile, 3, 600000) || !rl('otpday|' + f.mobile, 10, 86400000) || !rl('otpdev', 10, 3600000)) fail('درخواست‌ها زیاد بود. چند دقیقه دیگر دوباره امتحان کنید.');
+  const sk = shahkar(f.nationalId, f.mobile);
+  if (sk.status === 'mismatch') fail('این شماره موبایل به نام صاحب این کد ملی نیست (استعلام شاهکار). موبایلی را وارد کنید که به نام خودتان ثبت شده است.');
+  const code = String(100000 + Math.floor(Math.random() * 900000));
+  regOtp = { f, sk, hash: await S.hashPw(f.mobile, 'reg:' + code), exp: Date.now() + OTP_TTL, tries: 0, ok: false };
+  const demoSms = `کد تأیید ثبت‌نام سامانه بیمه حوادث گاز: ${code} — این کد را به هیچ‌کس ندهید.`;
+  S.sendSms(f.mobile, demoSms); save();
+  return { exp: regOtp.exp, ttl: OTP_TTL, demoSms, shahkar: sk.status };
+}
+export async function signupVerify(code) {
+  if (!regOtp) fail('دوباره از اول شروع کنید.');
+  if (Date.now() > regOtp.exp) fail('کد منقضی شده است؛ «ارسال دوباره» را بزنید.');
+  if (++regOtp.tries > OTP_TRIES) { regOtp = null; const e = new Error('تعداد تلاش‌ها زیاد بود. دوباره از اول شروع کنید.'); e.restart = true; throw e; }
+  if (await S.hashPw(regOtp.f.mobile, 'reg:' + W.normalizeDigits(code).trim()) !== regOtp.hash) fail(`کد نادرست است. ${(OTP_TRIES - regOtp.tries).toLocaleString('fa-IR')} بار دیگر می‌توانید امتحان کنید.`);
+  regOtp.ok = true; regOtp.exp = Date.now() + 30 * 60000; // ۳۰ دقیقه برای تکمیل مدارک
+}
+const subscriberClash = (f, selfId) => db().users.find(x => x.id !== selfId && x.role === 'subscriber' && !(x.reg && x.reg.status === 'rejected')
+  && (x.subscriptionNo === f.subscriptionNo || x.nationalId === f.nationalId || x.mobile === f.mobile));
+async function storeRegFiles(files) {
+  const out = {};
+  for (const [slot, list] of Object.entries(files || {})) {
+    if (!W.REG_DOCS[slot]) continue;
+    out[slot] = [];
+    for (const b of list.slice(0, 3)) {
+      if (!/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(b.type)) fail('فقط عکس (JPG، PNG، WEBP) یا PDF پذیرفته می‌شود.');
+      if (b.size > 15 * 1048576) fail('حجم هر فایل حداکثر ۱۵ مگابایت است.');
+      const id = S.uid('f'); await S.putFile(id, b);
+      out[slot].push({ id, name: b.name || slot, type: b.type, size: b.size, at: new Date().toISOString() });
+    }
+  }
+  return out;
+}
+const regIncident = f => (f.hasIncident ? { date: W.normalizeDigits(f.incident.date).trim(), type: f.incident.type, address: String(f.incident.address || '').trim().slice(0, 500) } : null);
+export async function signupSubmit(raw, files) {
+  if (!regOtp?.ok || Date.now() > regOtp.exp) { const e = new Error('اعتبار کد تأیید تمام شده است. دوباره از اول شروع کنید.'); e.restart = true; throw e; }
+  const f = { ...regOtp.f, hasIncident: !!raw.hasIncident, incident: raw.incident || {}, password: raw.password || '', declaration: !!raw.declaration,
+    docs: Object.fromEntries(Object.entries(files || {}).map(([k, v]) => [k, v.length])) };
+  const errs = W.signupFinalIssues(f);
+  if (errs.length) fail('بررسی کنید: ' + errs.join('، '));
+  if (subscriberClash(f)) fail('برای این شماره اشتراک، کد ملی یا موبایل قبلاً حساب ساخته شده است. وارد شوید یا «رمز عبور را فراموش کرده‌ام» را بزنید.');
+  if (!rl('reg|dev', 3, 86400000)) fail('از این دستگاه امروز ثبت‌نام‌های زیادی انجام شده است. فردا دوباره امتحان کنید.');
+  const d = db();
+  d.users = d.users.filter(x => !(x.username === f.subscriptionNo && x.reg && x.reg.status === 'rejected'));
+  const now = new Date().toISOString();
+  const u = { id: S.uid('u'), role: 'subscriber', username: f.subscriptionNo, name: f.name, nationalId: f.nationalId, subscriptionNo: f.subscriptionNo, mobile: f.mobile,
+    address: f.hasIncident ? f.incident.address : '', active: true, mustChangePassword: false, createdAt: now, pwHash: await S.hashPw(f.subscriptionNo, f.password),
+    reg: { status: 'pending', at: now, submittedAt: now, relation: f.relation, hasIncident: f.hasIncident, incident: regIncident(f), files: await storeRegFiles(files), shahkar: regOtp.sk,
+      history: [{ at: now, by: f.name, role: 'subscriber', action: 'submit', label: 'ثبت درخواست ثبت‌نام اینترنتی', note: '' }] } };
+  d.users.push(u);
+  S.notify({ toRole: 'gas', text: `درخواست ثبت‌نام جدید: ${u.name} — اشتراک ${u.subscriptionNo}` });
+  S.sendSms(u.mobile, 'درخواست ثبت‌نام شما در سامانه بیمه حوادث گاز ثبت شد. نتیجه بررسی کارشناس شرکت گاز پیامک می‌شود.');
+  regOtp = null; me = u.id; sset('gii.user', u.id); save();
+}
+// مشترک پس از «نیاز به اصلاح» اطلاعات یا مدارک را اصلاح و دوباره می‌فرستد
+export async function regResubmit(raw, files) {
+  const u = user();
+  if (!u?.reg || u.reg.status !== 'needs_fix') fail('در این وضعیت امکان ویرایش درخواست نیست.');
+  const f = { name: String(raw.name || '').trim().slice(0, 100), nationalId: W.normalizeDigits(raw.nationalId).trim(), subscriptionNo: u.subscriptionNo, mobile: u.mobile, relation: raw.relation };
+  const errs = W.signupIssues(f);
+  if (errs.length) fail('بررسی کنید: ' + errs.join('، '));
+  const added = await storeRegFiles(files);
+  for (const [k, v] of Object.entries(added)) if (v.length) u.reg.files[k] = v; // فایل تازه جایگزین قبلی می‌شود
+  const all = { ...f, hasIncident: !!raw.hasIncident, incident: raw.incident || {}, password: '------', declaration: true, docs: Object.fromEntries(Object.entries(u.reg.files).map(([k, v]) => [k, v.length])) };
+  const errs2 = W.signupFinalIssues(all).filter(x => !x.startsWith('رمز'));
+  if (errs2.length) fail('بررسی کنید: ' + errs2.join('، '));
+  if (subscriberClash(f, u.id)) fail('این کد ملی برای حساب دیگری ثبت شده است.');
+  const now = new Date().toISOString();
+  Object.assign(u, { name: f.name, nationalId: f.nationalId, address: all.hasIncident ? all.incident.address : u.address });
+  Object.assign(u.reg, { status: 'pending', submittedAt: now, relation: f.relation, hasIncident: all.hasIncident, incident: regIncident(all) });
+  u.reg.history.push({ at: now, by: u.name, role: 'subscriber', action: 'resubmit', label: 'اصلاح و ارسال دوباره درخواست', note: raw.reply || '' });
+  S.notify({ toRole: 'gas', text: `درخواست ثبت‌نام اصلاح شد: ${u.name} — اشتراک ${u.subscriptionNo}` });
+  save();
+}
+// تصمیم کارشناس گاز: approve | fix | reject | spam
+export async function regReview(uid, decision, note = '') {
+  const staff = user();
+  if (!['gas', 'admin'].includes(staff.role)) fail('فقط کارشناس شرکت گاز.');
+  const u = userById(uid);
+  if (!u?.reg || !['pending', 'needs_fix'].includes(u.reg.status)) fail('این درخواست دیگر قابل بررسی نیست.');
+  note = String(note || '').trim();
+  if (decision !== 'approve' && note.length < 3) fail('دلیل یا توضیح را بنویسید.');
+  const now = new Date().toISOString();
+  const LBL = { approve: 'تأیید ثبت‌نام', fix: 'درخواست اصلاح', reject: 'رد درخواست', spam: 'مسدودسازی به‌عنوان اسپم' };
+  if (!LBL[decision]) fail('تصمیم نامعتبر است.');
+  u.reg.history.push({ at: now, by: staff.name, role: staff.role, action: decision, label: LBL[decision], note });
+  Object.assign(u.reg, { reviewedBy: staff.name, reviewedAt: now, note });
+  let claimId = null;
+  if (decision === 'approve') {
+    u.reg.status = 'approved';
+    if (u.reg.hasIncident && u.reg.incident) {
+      const c = newClaim(u, { date: W.parseJalali(u.reg.incident.date), type: u.reg.incident.type, address: u.reg.incident.address, note: note || '' }, staff, 'تأیید ثبت‌نام اینترنتی و تشکیل پرونده');
+      // مدارک ثبت‌نام همان مدارک پرونده‌اند؛ دوباره خواسته نمی‌شوند
+      for (const [slot, list] of Object.entries(u.reg.files || {})) for (const fl of list) {
+        c.files[fl.id] = { name: fl.name, type: fl.type, size: fl.size, at: fl.at, by: 'subscriber' };
+        (c.docs[W.REG_DOC_TO_CLAIM[slot]] ||= []).push(fl.id);
+      }
+      claimId = c.id;
+    }
+    S.sendSms(u.mobile, `ثبت‌نام شما در سامانه بیمه حوادث گاز تأیید شد. نام کاربری: ${u.username} و رمزی که خودتان ساختید.${claimId ? ' پرونده خسارت شما تشکیل شد.' : ''}`);
+    S.notify({ toUser: u.id, text: claimId ? 'ثبت‌نام شما تأیید و پرونده خسارت تشکیل شد. لطفاً اطلاعات و مدارک را تکمیل کنید.' : 'ثبت‌نام شما تأیید شد.', claimId });
+  } else if (decision === 'fix') {
+    u.reg.status = 'needs_fix';
+    S.sendSms(u.mobile, `درخواست ثبت‌نام شما نیاز به اصلاح دارد: ${note} — وارد سامانه شوید و اصلاح کنید.`);
+    S.notify({ toUser: u.id, text: `درخواست ثبت‌نام نیاز به اصلاح دارد: ${note}` });
+  } else if (decision === 'reject') {
+    u.reg.status = 'rejected';
+    S.sendSms(u.mobile, `درخواست ثبت‌نام شما در سامانه بیمه حوادث گاز رد شد. دلیل: ${note}`);
+    S.notify({ toUser: u.id, text: `درخواست ثبت‌نام رد شد: ${note}` });
+  } else {
+    u.reg.status = 'spam'; u.active = false;
+    (db().blocks ||= {})[u.mobile] = new Date(Date.now() + 7 * 86400000).toISOString();
+  }
+  save();
+  return { claimId };
+}
+export async function regFile(uid, fid) { return S.getFile(fid); }
 
 // ---------- مدیریت ----------
 export async function saveSettings(patch) { Object.assign(db().settings, patch); save(); }

@@ -6,14 +6,21 @@ const CFG = (typeof window !== 'undefined' && window.GII_WP) || {};
 let nonce = CFG.nonce || '';
 let D = null;
 
-async function req(method, path, body, asBlob = false) {
-  const opt = { method, credentials: 'same-origin', headers: { 'X-WP-Nonce': nonce } };
+async function req(method, path, body, asBlob = false, retried = false) {
+  const opt = { method, credentials: 'same-origin', headers: nonce ? { 'X-WP-Nonce': nonce } : {} };
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
   let r;
   try { r = await fetch(CFG.rest + path, opt); } catch { throw new Error('ارتباط با سرور برقرار نشد. اینترنت را بررسی کنید.'); }
   if (asBlob) { if (!r.ok) throw new Error('فایل در دسترس نیست.'); return r.blob(); }
   const j = await r.json().catch(() => ({}));
+  // nonce کهنه (مثلاً پس از خروج یا پایان نشست): یک بار nonce تازه گرفته و درخواست تکرار می‌شود
+  if (r.status === 403 && j.code === 'rest_cookie_invalid_nonce' && !retried) {
+    nonce = '';
+    const b = await req('GET', 'bootstrap', undefined, false, true).catch(() => null);
+    if (b && b.nonce) nonce = b.nonce;
+    return req(method, path, body, asBlob, true);
+  }
   if (!r.ok) {
     const e = new Error(j.message || 'خطا در ارتباط با سرور');
     e.status = r.status; e.restart = !!(j.data && j.data.restart);
@@ -54,6 +61,32 @@ export async function forgotStart(username, mobile) {
 }
 export async function forgotVerify(code) { token = (await req('POST', 'auth/verify', { rid, code })).token; }
 export async function forgotReset(password) { return (await req('POST', 'auth/reset', { rid, token, password })).username; }
+
+// ---------- ثبت‌نام اینترنتی مشترک ----------
+let srid = '', stoken = '';
+export async function signupStart(f) {
+  const j = await req('POST', 'signup/start', f);
+  srid = j.rid; stoken = '';
+  return { exp: Date.now() + j.ttl, ttl: j.ttl, demoSms: j.demoSms || '', shahkar: j.shahkar };
+}
+export async function signupVerify(code) { stoken = (await req('POST', 'signup/verify', { rid: srid, code })).token; }
+// فرم چندبخشی: داده‌ها به‌صورت JSON و فایل‌ها با نام شکاف (national_card[]، bill[]، proof[])
+function regForm(data, files) {
+  const fd = new FormData();
+  fd.append('data', JSON.stringify(data));
+  for (const [k, list] of Object.entries(files || {})) for (const b of list) fd.append(k + '[]', b, b.name || k);
+  return fd;
+}
+export async function signupSubmit(data, files) {
+  const fd = regForm(data, files);
+  fd.append('rid', srid); fd.append('token', stoken);
+  const j = await req('POST', 'signup/submit', fd);
+  nonce = j.nonce;
+  await refresh();
+}
+export async function regResubmit(data, files) { await req('POST', 'regs/me', regForm(data, files)); }
+export async function regReview(uid, decision, note) { return req('POST', `regs/${uid}/review`, { decision, note }); }
+export async function regFile(uid, fid) { return req('GET', `regs/${uid}/files/${fid}`, undefined, true); }
 
 // ---------- پرونده ----------
 // ویرایش فیلدها با تأخیر کوتاه یک‌جا فرستاده می‌شود. اگر کاربر در فاصله ارسال تا پاسخ

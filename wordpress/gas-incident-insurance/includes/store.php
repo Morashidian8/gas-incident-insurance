@@ -62,9 +62,11 @@ class GII_Store {
 	public static function is_active( $user_id ) {
 		return '0' !== get_user_meta( $user_id, 'gii_active', true );
 	}
-	public static function user_to_client( WP_User $u ) {
-		$m = function ( $k ) use ( $u ) { return (string) get_user_meta( $u->ID, $k, true ); };
-		return array(
+	/** $with_reg: درخواست ثبت‌نام اینترنتی (فقط برای خود کاربر و کارشناس گاز/مدیر) */
+	public static function user_to_client( WP_User $u, $with_reg = false ) {
+		$m   = function ( $k ) use ( $u ) { return (string) get_user_meta( $u->ID, $k, true ); };
+		$reg = $with_reg ? self::reg_of( $u->ID ) : null;
+		$out = array(
 			'id'                 => (string) $u->ID,
 			'role'               => self::role_of( $u ),
 			'username'           => $u->user_login,
@@ -79,6 +81,46 @@ class GII_Store {
 			'lastLoginAt'        => $m( 'gii_last_login' ),
 			'createdAt'          => GII_WF::iso( strtotime( $u->user_registered . ' UTC' ) ),
 		);
+		if ( $reg ) {
+			$out['reg'] = $reg;
+		}
+		return $out;
+	}
+
+	// ---------- ثبت‌نام اینترنتی (روی خود کاربر: متای gii_reg و برای جستجو gii_reg_status) ----------
+	public static function reg_of( $user_id ) {
+		$r = get_user_meta( $user_id, 'gii_reg', true );
+		return is_array( $r ) && $r ? $r : null;
+	}
+	public static function save_reg( $user_id, $reg ) {
+		update_user_meta( $user_id, 'gii_reg', $reg );
+		update_user_meta( $user_id, 'gii_reg_status', $reg['status'] );
+	}
+	/** درخواست‌های باز و ۵۰ تصمیم اخیر، برای کارتابل کارشناس گاز */
+	public static function registrants() {
+		$open = get_users( array( 'role' => 'gii_subscriber', 'meta_key' => 'gii_reg_status', 'meta_value' => array( 'pending', 'needs_fix' ), 'meta_compare' => 'IN', 'number' => 500 ) );
+		$done = get_users( array( 'role' => 'gii_subscriber', 'meta_key' => 'gii_reg_status', 'meta_value' => array( 'approved', 'rejected', 'spam' ), 'meta_compare' => 'IN', 'number' => 50, 'orderby' => 'ID', 'order' => 'DESC' ) );
+		return array_merge( $open, $done );
+	}
+	public static function reg_file_path( $user_id, $file_id ) {
+		return self::files_dir() . '/reg-' . (int) $user_id . '/' . preg_replace( '/[^a-z0-9-]/', '', $file_id );
+	}
+	public static function add_reg_file( $user_id, $source_path, $name, $mime, $move = true ) {
+		$id   = 'f-' . strtolower( wp_generate_password( 12, false ) );
+		$path = self::reg_file_path( $user_id, $id );
+		wp_mkdir_p( dirname( $path ) );
+		$ok = $move ? ( @move_uploaded_file( $source_path, $path ) || @rename( $source_path, $path ) ) : @copy( $source_path, $path );
+		if ( ! $ok ) {
+			throw new GII_WF_Error( 'ذخیره فایل روی سرور ممکن نشد.' );
+		}
+		return array( 'id' => $id, 'name' => sanitize_file_name( $name ), 'type' => $mime, 'size' => filesize( $path ), 'at' => GII_WF::iso() );
+	}
+	public static function delete_reg_files( $user_id ) {
+		$dir = self::files_dir() . '/reg-' . (int) $user_id;
+		foreach ( (array) glob( "$dir/*" ) as $f ) {
+			@unlink( $f );
+		}
+		@rmdir( $dir );
 	}
 	public static function app_users( $args = array() ) {
 		return get_users( array_merge( array( 'role__in' => array_keys( self::ROLE_MAP ), 'number' => 2000 ), $args ) );
@@ -117,7 +159,7 @@ class GII_Store {
 	}
 
 	// ---------- تنظیمات ----------
-	const SECRET_KEYS = array( 'sms_provider', 'sms_key', 'sms_sender', 'sms_user', 'sms_pass', 'demo' );
+	const SECRET_KEYS = array( 'sms_provider', 'sms_key', 'sms_sender', 'sms_user', 'sms_pass', 'demo', 'shahkar_mode', 'shahkar_url', 'shahkar_key' );
 	public static function settings() {
 		$s = array_merge( GII_WF::DEFAULT_SETTINGS, array( 'sms_provider' => 'log', 'demo' => false ), (array) get_option( 'gii_settings', array() ) );
 		foreach ( GII_WF::DEFAULT_SETTINGS as $k => $v ) {

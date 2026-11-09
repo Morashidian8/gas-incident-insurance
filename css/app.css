@@ -1258,3 +1258,19 @@ main.enter { animation: viewIn .26s cubic-bezier(.2, .8, .2, 1); }
 .hero-copy h1 { line-height: 1.35; }
 
 .tbl input, .tbl select { min-height: 40px; padding: 7px 9px; }
+
+/* ================= ثبت‌نام اینترنتی ================= */
+.su-steps { padding: 4px 0 2px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.su-nosub { align-self: flex-start; display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; margin-top: -6px; }
+.su-nosub .ic { width: 17px; height: 17px; }
+.su-inc { display: flex; flex-direction: column; gap: 14px; padding: 12px; border-radius: 14px; background: var(--sf2); border: 1px solid var(--ln); }
+.su-inc[hidden] { display: none; }
+.seg label:has(input:checked) { border-color: var(--br); background: var(--brs); color: var(--br); font-weight: 700; }
+.seg.two label:has(input:checked) { background: var(--br); color: var(--on); }
+.file-pick { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 10px 14px;
+  border: 1.5px dashed var(--ln); border-radius: 12px; background: var(--sf2); color: var(--br); font-weight: 600; font-size: 13.5px; cursor: pointer; }
+.file-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.file-pick .fp-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.file-pick.has { border-style: solid; border-color: var(--ok); color: var(--ok); background: var(--oks); }
+.file-pick:focus-within { outline: 3px solid color-mix(in srgb, var(--br) 45%, transparent); outline-offset: 2px; }
+.login-card .btn.ghost[data-act="signup"], .glass .btn.ghost[data-act="signup"] { margin-top: -4px; }

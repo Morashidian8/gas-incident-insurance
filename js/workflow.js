@@ -80,6 +80,9 @@ export const DEFAULT_SETTINGS = {
   orgName: '',
   logoDataUrl: '',
   // سه طرح بیمه آتش‌سوزی که در صفحه ورود پیشنهاد می‌شود؛ نام، نرخ و نشانی خرید را مدیر وارد می‌کند
+  // ثبت‌نام اینترنتی مشترک
+  regSlaDays: 2, // مهلت بررسی درخواست ثبت‌نام توسط کارشناس گاز
+  subLookupUrl: 'https://my.nigc.ir/', // صفحه شرکت گاز برای یافتن شماره اشتراک با شماره کنتور
   fireOffers: [
     { insurer: 'بیمه‌گر الف (نمونه)', plan: 'طرح پایه آتش‌سوزی منزل', price: '۱٬۲۰۰٬۰۰۰ تومان در سال', cover: 'آتش‌سوزی، انفجار و صاعقه — سرمایه تا ۵۰۰ میلیون تومان', url: '' },
     { insurer: 'بیمه‌گر ب (نمونه)', plan: 'طرح متوسط', price: '۲٬۴۰۰٬۰۰۰ تومان در سال', cover: 'طرح پایه + ترکیدگی لوله، زلزله و سیل — سرمایه تا ۱ میلیارد تومان', url: '' },
@@ -459,5 +462,64 @@ export function toCsv(rows) {
     const s = v == null ? '' : String(v);
     return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }).join(',')).join('\r\n');
+}
+
+// ---------- ثبت‌نام اینترنتی مشترک (بدون مراجعه حضوری) ----------
+// مشترک خودش حساب می‌سازد؛ حساب تا تأیید کارشناس گاز «در انتظار» است. همین قواعد در workflow.php تکرار شده‌اند.
+export const RELATIONS = { owner: 'مالک', tenant: 'مستأجر', heir: 'وارث مالک' };
+export const REG_STATUS = {
+  pending:   { label: 'در انتظار بررسی کارشناس گاز', short: 'در انتظار بررسی', tone: 'info' },
+  needs_fix: { label: 'نیاز به اصلاح اطلاعات یا مدارک', short: 'نیاز به اصلاح', tone: 'warn' },
+  approved:  { label: 'تأیید شد', short: 'تأییدشده', tone: 'ok' },
+  rejected:  { label: 'درخواست رد شد', short: 'رد شده', tone: 'bad' },
+  spam:      { label: 'مسدود شد', short: 'مسدود', tone: 'bad' },
+};
+export const REG_DOCS = { national_card: 'تصویر کارت ملی (روی کارت)', bill: 'تصویر آخرین قبض گاز (نام و شماره اشتراک خوانا باشد)', proof: 'اجاره‌نامه یا مدرک وراثت' };
+// مدرک سوم فقط برای مستأجر و وارث؛ چون نام روی قبض با نام او فرق دارد
+export function regDocsNeeded(relation) { return ['national_card', 'bill', ...(relation && relation !== 'owner' ? ['proof'] : [])]; }
+// مدارک ثبت‌نام پس از تأیید به همین مدارک پرونده منتقل می‌شوند
+export const REG_DOC_TO_CLAIM = { national_card: 'national_id', bill: 'gas_bill', proof: 'ownership' };
+export const isValidSubscriptionNo = raw => /^\d{6,13}$/.test(normalizeDigits(raw).trim());
+// مرحله اول: مشخصات
+export function signupIssues(f) {
+  const out = [];
+  if (String(f.name || '').trim().length < 5) out.push('نام و نام خانوادگی کامل');
+  if (!isValidNationalId(f.nationalId)) out.push('کد ملی معتبر');
+  if (!isValidSubscriptionNo(f.subscriptionNo)) out.push('شماره اشتراک گاز (۶ تا ۱۳ رقم)');
+  if (!isValidMobile(f.mobile)) out.push('موبایل ۱۱ رقمی با ۰۹');
+  if (!RELATIONS[f.relation]) out.push('نسبت شما با اشتراک');
+  return out;
+}
+// مرحله آخر: مدارک، حادثه و رمز. docs: { slot: تعداد فایل }
+export function signupFinalIssues(f, now = new Date()) {
+  const out = signupIssues(f);
+  for (const k of regDocsNeeded(f.relation)) if (!(f.docs && f.docs[k] > 0)) out.push(REG_DOCS[k]);
+  if (f.hasIncident) {
+    const d = parseJalali(f.incident && f.incident.date);
+    if (!d) out.push('تاریخ حادثه شمسی معتبر');
+    else if (d - now > 86400000) out.push('تاریخ حادثه در آینده است');
+    if (!INCIDENT_TYPES[f.incident && f.incident.type]) out.push('نوع حادثه');
+    if (String((f.incident && f.incident.address) || '').trim().length < 10) out.push('نشانی کامل محل حادثه');
+  }
+  if (String(f.password || '').length < 6) out.push('رمز عبور دست‌کم ۶ نویسه');
+  if (!f.declaration) out.push('تأیید صحت اطلاعات');
+  return out;
+}
+// کاربران دیگری که همین شماره اشتراک، کد ملی یا موبایل را دارند (برای هشدار به کارشناس)
+export function regDuplicates(users, u) {
+  const out = [];
+  for (const x of users) {
+    if (x.id === u.id || x.role !== 'subscriber' || (x.reg && ['rejected'].includes(x.reg.status))) continue;
+    if (u.subscriptionNo && x.subscriptionNo === u.subscriptionNo) out.push({ field: 'شماره اشتراک', user: x });
+    else if (u.nationalId && x.nationalId === u.nationalId) out.push({ field: 'کد ملی', user: x });
+    else if (u.mobile && x.mobile === u.mobile) out.push({ field: 'موبایل', user: x });
+  }
+  return out;
+}
+export function regSla(reg, settings = DEFAULT_SETTINGS, now = new Date()) {
+  if (!reg || reg.status !== 'pending') return null;
+  const limit = settings.regSlaDays || 2;
+  const used = daysBetween(reg.submittedAt || reg.at, now);
+  return { limit, used, left: limit - used, overdue: used > limit };
 }
 

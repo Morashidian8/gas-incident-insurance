@@ -104,7 +104,15 @@ function go(view, p = {}) {
 function render() {
   const app = $('#app');
   const site = MODE === 'site';
-  if (!st.user) { app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); if (site) startJourney(); return; }
+  if (!st.user) {
+    if (st.view === 'signup' && su) { app.innerHTML = (site ? siteHeader() : guestBar()) + `<main class="page narrow enter">${viewSignup()}</main>` + (site ? siteFooter() : ''); startSuTimer(); return; }
+    app.innerHTML = site ? siteHeader() + viewLanding() + siteFooter() : viewLogin(); if (site) startJourney(); return;
+  }
+  // حساب ثبت‌نام اینترنتی تا تأیید کارشناس گاز فقط وضعیت درخواست را می‌بیند
+  if (st.user.role === 'subscriber' && st.user.reg && st.user.reg.status !== 'approved') {
+    app.innerHTML = (site ? siteHeader() : topbar()) + `<main class="page narrow">${viewRegStatus()}</main>` + (site ? siteFooter() : '');
+    hydrateFiles(app); return;
+  }
   if (st.user.mustChangePassword) { app.innerHTML = (site ? siteHeader() : topbar()) + `<main class="page narrow">${viewForcePassword()}</main>`; return; }
   const v = VIEWS[st.user.role][st.view] || VIEWS[st.user.role].home;
   const main = `<main class="page ${st.user.role === 'subscriber' ? 'narrow' : ''}">${v()}</main>`;
@@ -255,6 +263,15 @@ function closeSheet() { const s = $('#sheet'); if (s) s.remove(); clearInterval(
 // ================= فایل‌ها =================
 const urlCache = new Map();
 async function hydrateFiles(root) {
+  for (const img of root.querySelectorAll('img[data-regfile]')) {
+    const id = img.dataset.regfile;
+    if (!urlCache.has(id)) {
+      const blob = await B.regFile(img.dataset.uid, id).catch(() => null);
+      if (!blob) { img.alt = 'فایل در دسترس نیست'; continue; }
+      urlCache.set(id, URL.createObjectURL(blob));
+    }
+    img.src = urlCache.get(id);
+  }
   for (const img of root.querySelectorAll('img[data-file]')) {
     const id = img.dataset.file;
     if (!urlCache.has(id)) {
@@ -324,6 +341,7 @@ const DEMO = [
   { u: 'gas', p: 'gas123', t: 'کارشناس شرکت گاز', s: 'سارا کاظمی', ic: 'flame' },
   { u: 'bime', p: 'bime123', t: 'کارشناس بیمه‌گر', s: 'علی محمدی', ic: 'shield' },
   { u: 'admin', p: 'admin123', t: 'مدیر سامانه', s: 'کاربران، تنظیمات و گزارش', ic: 'settings' },
+  { u: '1056781234', p: '123456', t: 'مشترک — ثبت‌نام اینترنتی در انتظار تأیید', s: 'نسرین قاسمی', ic: 'clock' },
 ];
 function viewLogin() {
   return `<div class="login-hero"><div class="login-hero-in">${logoHtml(84)}${brandSetting('orgName') ? `<div class="org-name">${esc(brandSetting('orgName'))}</div>` : ''}
@@ -347,7 +365,8 @@ function loginForm() {
       <label class="fld" for="lg-pass"><span>رمز عبور</span><input id="lg-pass" name="password" type="password" class="ltr" autocomplete="current-password" required placeholder="رمز عبور یا رمز موقت پیامک‌شده"></label>
       <button class="link forgot" type="button" data-act="forgot">${icon('key')} رمز عبور را فراموش کرده‌ام</button>
       <button class="btn" type="submit">${icon('lock')} ورود به سامانه</button>
-      <div class="note info">${icon('help')}<div>حساب مشترک را شرکت گاز پس از مراجعه حضوری شما می‌سازد و نام کاربری و رمز موقت را پیامک می‌کند.</div></div>
+      <button class="btn ghost" type="button" data-act="signup">${icon('userPlus')} ثبت‌نام مشترک — بدون مراجعه حضوری</button>
+      <div class="note info">${icon('help')}<div>نام کاربری مشترک، <b>شماره اشتراک گاز</b> است. اگر حساب ندارید «ثبت‌نام» را بزنید؛ پس از بررسی کارشناس شرکت گاز، حساب شما فعال و پیامک می‌شود.</div></div>
     </form>`;
 }
 function demoRows() {
@@ -363,8 +382,8 @@ function demoRows() {
 function journeySteps() {
   const s = db.settings;
   return [
-    { art: 'houseFire', a: '#C4520F', b: '#1747A6', who: 'مشترک', t: 'وقوع حادثه و مراجعه', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری را بگیرید که در آن علت حادثه «گاز» قید شده باشد؛ سپس با کارت ملی به امور حوادث شرکت گاز منطقه مراجعه کنید.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
-    { art: 'sms', a: '#1747A6', b: '#1C8556', who: 'شرکت گاز', t: 'ساخت حساب و پیامک رمز', d: 'کارشناس گاز پرونده و حساب کاربری شما را می‌سازد. نام کاربری (شماره اشتراک) و رمز موقت پیامک می‌شود.', when: 'همان روز مراجعه' },
+    { art: 'houseFire', a: '#C4520F', b: '#1747A6', who: 'مشترک', t: 'وقوع حادثه و ثبت‌نام', d: `پس از آتش‌سوزی، انفجار یا گازگرفتگی، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری را بگیرید که در آن علت حادثه «گاز» قید شده باشد؛ سپس در اپ با شماره اشتراک گاز ثبت‌نام کنید و عکس کارت ملی و قبض گاز را بفرستید. نیازی به مراجعه حضوری نیست.`, when: `حداکثر ${fa(s.reportWindowDays)} روز پس از حادثه` },
+    { art: 'sms', a: '#1747A6', b: '#1C8556', who: 'شرکت گاز', t: 'تأیید ثبت‌نام و تشکیل پرونده', d: 'کارشناس شرکت گاز نام و شماره اشتراک را با مدارک شما و سامانه مشترکین مقایسه می‌کند؛ با تأیید، حساب فعال و پرونده خسارت تشکیل و پیامک می‌شود.', when: `حداکثر ${fa(s.regSlaDays || 2)} روز کاری` },
     { art: 'folderUp', a: '#1C8556', b: '#1747A6', who: 'مشترک', t: 'تکمیل و ارسال پرونده', d: 'اطلاعات حادثه، فهرست خسارت‌ها، دست‌کم ۴ عکس، مدارک و شماره شبا را بارگذاری و پرونده را ارسال کنید.', when: 'هر زمان، از گوشی یا کامپیوتر' },
     { art: 'docsCheck', a: '#A85F07', b: '#1747A6', who: 'شرکت گاز', t: 'بررسی مدارک در شرکت گاز', d: 'کارشناس گاز مدارک را بررسی می‌کند؛ به‌ویژه اینکه در گزارش آتش‌نشانی یا کارشناس رسمی دادگستری، علت حادثه «گاز» قید شده باشد. سپس پرونده را برای بیمه‌گر می‌فرستد.', when: `تا ${fa(s.gasSlaDays)} روز`, loop: `اگر نقصی باشد، پرونده با پیامک برمی‌گردد و ${fa(s.fixSlaDays)} روز برای اصلاح فرصت دارید.` },
     { art: 'trackRial', a: '#6A3CBD', b: '#1747A6', who: 'بیمه‌گر', t: 'ارزیابی خسارت', d: 'ارزیاب بیمه خسارت را بررسی می‌کند و مبلغ قابل پرداخت را پس از کسر فرانشیز اعلام می‌کند.', when: `تا ${fa(s.insurerSlaDays)} روز` },
@@ -452,7 +471,7 @@ function heroScene() {
 // «چرا این سامانه»
 function whySection() {
   const items = [
-    ['upload', 'بدون رفت‌وآمد', 'مدارک، عکس‌ها و شماره شبا را از گوشی بارگذاری کنید؛ فقط برای تشکیل پرونده یک‌بار به شرکت گاز مراجعه می‌کنید.'],
+    ['upload', 'بدون رفت‌وآمد', 'با شماره اشتراک گاز در اپ ثبت‌نام کنید و مدارک، عکس‌ها و شماره شبا را از گوشی بفرستید؛ مراجعه حضوری لازم نیست.'],
     ['alert', 'نقص‌ها دقیق و یکجا', 'اگر مدرکی کم باشد، دقیقاً همان مورد اعلام می‌شود و با پاسخ شما پرونده دوباره جریان می‌گیرد.'],
     ['history', 'همیشه می‌دانید کجاست', 'وضعیت، مهلت هر مرحله و اینکه اقدام بعدی با کیست را لحظه‌به‌لحظه می‌بینید.'],
     ['receipt', 'شفافیت مالی تا واریز', 'جزئیات ارزیابی، فرانشیز، حواله، دستور پرداخت و رسید واریز همه جلوی چشم شماست.'],
@@ -959,6 +978,7 @@ function gasHome() {
   <div class="pill-bar ${todo.some(c => W.slaInfo(c, db.settings)?.overdue) ? 'orange' : ''}"><span>پرونده‌های منتظر اقدام شما:</span><span class="amt">${fa(todo.length)} پرونده</span></div>
   <div class="well"><div class="tiles t3">
     ${tile({ go: 'register', color: 'green', art: 'userPlus', a: 'var(--green)', b: 'var(--blue)', title: 'ثبت مشترک حادثه‌دیده', sub: 'ساخت حساب و پرونده', btn: 'شروع' })}
+    ${tile({ go: 'regs', color: 'violet', art: 'people', title: 'درخواست‌های ثبت‌نام', sub: 'ثبت‌نام اینترنتی مشترکین', btn: 'بررسی', count: regList('pending').length })}
     ${tile({ go: 'list', p: { f: 'todo' }, art: 'inbox', a: 'var(--blue)', b: 'var(--green)', title: 'کارتابل بررسی', sub: 'پرونده‌های ارسالی مشترکین', btn: 'ورود', count: n(['submitted', 'gas_review']) })}
     ${tile({ go: 'list', p: { f: 'query' }, color: 'violet', art: 'alertDoc', a: 'var(--violet)', b: 'var(--orange)', title: 'استعلام بیمه‌گر', sub: 'مدارک تکمیلی درخواستی', btn: 'ورود', count: n(['insurer_query']) })}
     ${tile({ go: 'list', p: { f: 'subscriber' }, color: 'orange', art: 'camera', a: 'var(--orange)', b: 'var(--blue)', title: 'نزد مشترک', sub: 'در حال تکمیل یا رفع نقص', btn: 'ورود', count: n(['draft', 'returned']) })}
@@ -1178,6 +1198,7 @@ function adminHome() {
   <div class="pill-bar green"><span>جمع خسارت پرداخت‌شده:</span><span class="amt num">${money(paid)}</span></div>
   <div class="well"><div class="tiles t3">
     ${tile({ go: 'users', art: 'people', a: 'var(--blue)', b: 'var(--green)', title: 'کاربران', sub: 'کارکنان و مشترکین', btn: 'ورود', count: db.users.length })}
+    ${tile({ go: 'regs', color: 'violet', art: 'people', title: 'درخواست‌های ثبت‌نام', sub: 'ثبت‌نام اینترنتی مشترکین', btn: 'ورود', count: regList('pending').length })}
     ${tile({ go: 'settings', color: 'green', art: 'gear', a: 'var(--green)', b: 'var(--blue)', title: 'تنظیمات بیمه‌نامه', sub: 'سقف‌ها، فرانشیز، مهلت‌ها', btn: 'ورود' })}
     ${tile({ go: 'reports', color: 'violet', art: 'chart', a: 'var(--violet)', b: 'var(--orange)', title: 'گزارش‌ها و داشبورد', sub: 'وضعیت لحظه‌ای، ماهانه و خروجی Excel', btn: 'ورود' })}
     ${tile({ go: 'list', p: { f: 'all' }, art: 'inbox', a: 'var(--blue)', b: 'var(--orange)', title: 'همه پرونده‌ها', sub: 'جستجو و مشاهده', btn: 'ورود', count: db.claims.length })}
@@ -1197,7 +1218,7 @@ function viewUsers() {
 }
 function viewSettings() {
   const s = db.settings;
-  const f = (k, l, h = '') => `<label class="fld"><span>${l}</span><input id="s-${k}" name="${k}" class="${k === 'orgName' ? '' : 'ltr'}" value="${typeof s[k] === 'number' ? nf.format(s[k]) : esc(k === 'orgName' ? brandSetting('orgName') : fa(s[k]))}">${h ? `<small>${h}</small>` : ''}</label>`;
+  const f = (k, l, h = '') => `<label class="fld"><span>${l}</span><input id="s-${k}" name="${k}" class="${k === 'orgName' ? '' : 'ltr'}" value="${typeof s[k] === 'number' ? nf.format(s[k]) : esc(k === 'orgName' ? brandSetting('orgName') : k === 'subLookupUrl' ? s[k] || '' : fa(s[k]))}">${h ? `<small>${h}</small>` : ''}</label>`;
   return pageTitle('تنظیمات بیمه‌نامه') + `<form class="form" data-form="settings">
     <div class="note warn">${icon('alert')}<div>مقادیر پیش‌فرض نمونه‌اند. سقف تعهدات و فرانشیز را دقیقاً مطابق بیمه‌نامه سال جاری وارد کنید.</div></div>
     <div class="fld"><span>لوگوی سازمان (صفحه ورود و نوار بالا)</span>
@@ -1208,7 +1229,8 @@ function viewSettings() {
     ${f('orgName', 'نام سازمان زیر لوگو', 'مثلاً: شرکت ملی گاز ایران — شرکت گاز استان تهران')}
     <div class="grid2">${f('policyNo', 'شماره بیمه‌نامه')}${f('policyStart', 'شروع')}${f('policyEnd', 'پایان')}${f('deductiblePercent', 'فرانشیز خسارت مالی (٪)')}</div>
     <div class="grid2">${f('propertyCapRial', 'سقف خسارت مالی (ریال)')}${f('medicalCapRial', 'سقف هزینه درمان (ریال)')}${f('deathCapRial', 'سقف فوت هر نفر (ریال)')}${f('reportWindowDays', 'مهلت اعلام حادثه (روز)')}</div>
-    <div class="grid2">${f('gasSlaDays', 'مهلت بررسی شرکت گاز (روز)')}${f('insurerSlaDays', 'مهلت بررسی بیمه‌گر (روز)')}${f('fixSlaDays', 'مهلت رفع نقص مشترک (روز)')}</div>
+    <div class="grid2">${f('gasSlaDays', 'مهلت بررسی شرکت گاز (روز)')}${f('insurerSlaDays', 'مهلت بررسی بیمه‌گر (روز)')}${f('fixSlaDays', 'مهلت رفع نقص مشترک (روز)')}${f('regSlaDays', 'مهلت بررسی ثبت‌نام اینترنتی (روز)')}</div>
+    ${f('subLookupUrl', 'صفحه شرکت گاز برای یافتن شماره اشتراک (https)', 'دکمه «شماره اشتراک را ندارم» در ثبت‌نام این صفحه را باز می‌کند؛ مثلاً سامانه خدمات مشترکین (دریافت شماره اشتراک با سریال کنتور).')}
     <div class="section-label">${icon('flame')} بیمه آتش‌سوزی در صفحه ورود</div>
     <div class="note info">${icon('help')}<div>این سه طرح با دکمه «خرید بیمه آتش‌سوزی منزل» در صفحه ورود نمایش داده می‌شوند. با زدن هر طرح، سایت همان بیمه‌گر باز می‌شود. نشانی باید با <span dir="ltr">https://</span> شروع شود. برای پنهان کردن یک طرح، نام بیمه‌گر و عنوان آن را خالی بگذارید.</div></div>
     ${[0, 1, 2].map(i => { const o = (Array.isArray(s.fireOffers) ? s.fireOffers : W.DEFAULT_SETTINGS.fireOffers)[i] || {};
@@ -1548,15 +1570,224 @@ function viewSms() {
 
 const VIEWS = {
   subscriber: { home: subHome, sections: subSections, sec: subSection, track: subTrack, inbox: viewInbox, thread: viewThread },
-  gas: { home: gasHome, list: viewList, review: viewReview, register: viewRegister, registered: viewRegistered, reports: viewReports, inbox: viewInbox, thread: viewThread },
+  gas: { home: gasHome, list: viewList, review: viewReview, register: viewRegister, registered: viewRegistered, reports: viewReports, regs: viewRegs, reg: viewReg, inbox: viewInbox, thread: viewThread },
   insurer: { home: insurerHome, list: viewList, review: viewReview, reports: viewReports, inbox: viewInbox, thread: viewThread },
-  admin: { home: adminHome, list: viewList, review: viewReview, users: viewUsers, settings: viewSettings, reports: viewReports, sms: viewSms, inbox: viewInbox, thread: viewThread },
+  admin: { home: adminHome, list: viewList, review: viewReview, users: viewUsers, settings: viewSettings, reports: viewReports, sms: viewSms, regs: viewRegs, reg: viewReg, inbox: viewInbox, thread: viewThread },
+};
+
+
+// ================= ثبت‌نام اینترنتی مشترک =================
+// سه مرحله: مشخصات ← کد پیامکی (و استعلام شاهکار روی سرور) ← مدارک، حادثه و رمز.
+// حساب تا تأیید کارشناس گاز «در انتظار» است؛ همه محدودیت‌ها روی سرور هم بررسی می‌شود.
+let su = null;
+const PROOF_TITLE = { tenant: 'اجاره‌نامه معتبر', heir: 'گواهی انحصار وراثت یا سند مالکیت متوفی' };
+const regDocTitle = (slot, relation) => (slot === 'proof' ? PROOF_TITLE[relation] || W.REG_DOCS.proof : W.REG_DOCS[slot]);
+const maskMobile = m => fa(String(m || '').replace(/^(\d{4})\d{4}/, '$1****'));
+function guestBar() {
+  return `<header class="topbar"><div class="topbar-in"><button class="sq-btn" data-act="help" aria-label="راهنما">${icon('help')}</button>
+    <div class="brand">${logoHtml(40)}<div><b>ثبت‌نام مشترک</b><small>بیمه حوادث مشترکین گاز</small></div></div>
+    <button class="sq-btn" data-act="signupExit" aria-label="بستن ثبت‌نام و بازگشت به ورود">${icon('x')}</button></div></header>`;
+}
+function suSteps() {
+  const steps = ['مشخصات', 'تأیید موبایل', 'مدارک و رمز'];
+  return `<div class="stepper su-steps" role="list">${steps.map((t, i) => { const n = i + 1; const done = n < su.step; return `<div class="step ${done ? 'done' : ''} ${n === su.step ? 'cur' : ''}" role="listitem"><span class="b">${done ? icon('check') : fa(n)}</span>${t}</div>`; }).join('')}</div>`;
+}
+function relationSeg(name, val) {
+  return `<div class="seg" role="radiogroup" aria-label="نسبت شما با اشتراک">${Object.entries(W.RELATIONS).map(([k, v]) => `<label class="${val === k ? 'on' : ''}"><input type="radio" name="${name}" value="${k}" ${val === k ? 'checked' : ''} required>${v}</label>`).join('')}</div>`;
+}
+function typeSeg(name, val) {
+  return `<div class="seg" role="radiogroup" aria-label="نوع حادثه">${Object.entries(W.INCIDENT_TYPES).map(([k, v]) => `<label class="${val === k ? 'on' : ''}"><input type="radio" name="${name}" value="${k}" ${val === k ? 'checked' : ''}>${v.replace(/\s*\(.*\)/, '')}</label>`).join('')}</div>`;
+}
+// مدارک، حادثه و توضیح (مرحله ۳ ثبت‌نام و فرم اصلاح)؛ فایل‌ها هنگام ارسال از خود ورودی‌ها خوانده می‌شوند
+function regDocInputs(relation, existing = null) {
+  return W.regDocsNeeded(relation).map(slot => `<label class="fld file-fld"><span>${regDocTitle(slot, relation)}${existing ? '' : ' <i>*</i>'}</span>
+    <span class="file-pick"><input type="file" name="${slot}" accept="image/jpeg,image/png,image/webp,application/pdf" data-pick multiple><span class="fp-txt">${existing && existing[slot] ? `${fa(existing[slot].length)} فایل قبلی — برای جایگزینی فایل تازه انتخاب کنید` : 'انتخاب عکس یا PDF'}</span>${icon('upload')}</span></label>`).join('');
+}
+function regIncidentFields(x, prefix) {
+  const inc = x.incident || {};
+  return `<label class="check"><input type="checkbox" name="hasIncident" data-toggle="#${prefix}-inc" ${x.hasIncident ? 'checked' : ''}><span><b>حادثه گاز رخ داده است</b> و می‌خواهم پس از تأیید، پرونده خسارت تشکیل شود.</span></label>
+    <div id="${prefix}-inc" class="su-inc" ${x.hasIncident ? '' : 'hidden'}>
+      <label class="fld"><span>تاریخ حادثه <i>*</i></span><input name="incDate" class="ltr" placeholder="۱۴۰۵/۰۷/۲۸" value="${esc(fa(inc.date || ''))}"></label>
+      <div class="fld"><span>نوع حادثه <i>*</i></span>${typeSeg('incType', inc.type || 'fire')}</div>
+      <label class="fld"><span>نشانی کامل محل حادثه <i>*</i></span><textarea name="incAddress" style="min-height:70px">${esc(inc.address || '')}</textarea></label>
+    </div>`;
+}
+async function pickedFiles(form, relation) {
+  const out = {};
+  for (const slot of W.regDocsNeeded(relation)) {
+    const inp = form.querySelector(`input[type=file][name="${slot}"]`);
+    if (!inp || !inp.files.length) continue;
+    out[slot] = [];
+    for (const f of [...inp.files].slice(0, 3)) {
+      const b = await S.compressImage(f);
+      out[slot].push(b === f ? f : new File([b], f.name.replace(/\.\w+$/, '') + '.jpg', { type: b.type }));
+    }
+  }
+  return out;
+}
+const incidentFrom = f => ({ hasIncident: !!f.hasIncident.checked, incident: { date: W.normalizeDigits(f.incDate.value).trim(), type: f.incType.value || 'fire', address: f.incAddress.value.trim() } });
+
+function viewSignup() {
+  const e = su.err ? `<div class="note bad">${icon('alert')}<div>${esc(su.err)}</div></div>` : '';
+  const head = `<div class="page-title"><button class="back" data-act="${su.step > 1 ? 'suBack' : 'signupExit'}" aria-label="بازگشت">${icon('chevR')}</button><div><h1>ثبت‌نام مشترک</h1><div class="sub">بدون مراجعه حضوری؛ تأیید نهایی با کارشناس شرکت گاز</div></div></div>${suSteps()}`;
+  const f = su.f;
+  if (su.step === 1) return head + e + `<form class="form" data-form="signup1" autocomplete="on">
+    <label class="fld" for="su-sub"><span>شماره اشتراک گاز <i>*</i></span><input id="su-sub" name="subscriptionNo" class="ltr" inputmode="numeric" required value="${esc(f.subscriptionNo || '')}" placeholder="روی قبض گاز نوشته شده است">
+      <small>نام کاربری شما همین شماره خواهد بود.</small></label>
+    <button class="link su-nosub" type="button" data-act="noSubNo">${icon('help')} شماره اشتراک را ندارم</button>
+    <label class="fld" for="su-name"><span>نام و نام خانوادگی <i>*</i></span><input id="su-name" name="name" required autocomplete="name" value="${esc(f.name || '')}" placeholder="همان نامی که روی قبض یا کارت ملی است"></label>
+    <div class="grid2">
+      <label class="fld" for="su-nid"><span>کد ملی <i>*</i></span><input id="su-nid" name="nationalId" class="ltr" inputmode="numeric" maxlength="10" required value="${esc(f.nationalId || '')}"></label>
+      <label class="fld" for="su-mob"><span>موبایل <i>*</i></span><input id="su-mob" name="mobile" class="ltr" inputmode="tel" autocomplete="tel" required placeholder="09xxxxxxxxx" value="${esc(f.mobile || '')}"></label>
+    </div>
+    <div class="fld"><span>نسبت شما با این اشتراک <i>*</i></span>${relationSeg('relation', f.relation || 'owner')}<small>اگر مستأجر یا وارث هستید، در مرحله بعد اجاره‌نامه یا مدرک وراثت خواسته می‌شود.</small></div>
+    <div class="note info">${icon('shield')}<div>موبایل باید <strong>به نام خودتان</strong> باشد؛ تطابق کد ملی و موبایل از سامانه شاهکار استعلام می‌شود. کد تأیید به همین موبایل پیامک می‌شود.</div></div>
+    <button class="btn" type="submit">${icon('sms')} دریافت کد تأیید</button>
+  </form>`;
+  if (su.step === 2) return head + e + `${su.demoSms ? `<div class="sms-demo">${icon('sms')}<div><b>پیامک نمایشی</b>${esc(su.demoSms)}</div></div>` : ''}
+    ${su.shahkar === 'ok' ? `<div class="note ok">${icon('checkC')}<div>تطابق کد ملی و موبایل در سامانه شاهکار تأیید شد.</div></div>` : ''}
+    <form class="form" data-form="signup2">
+    <p class="muted" style="margin:0">کد ۶ رقمی به <span class="num" dir="ltr">${maskMobile(f.mobile)}</span> پیامک شد.</p>
+    <label class="fld" for="su-code"><span>کد تأیید</span><input id="su-code" name="code" class="ltr otp" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="------"></label>
+    <div class="otp-left" id="otp-left"></div>
+    <div class="btns"><button class="btn green" type="submit">تأیید کد</button><button class="btn ghost" type="button" data-act="suResend" id="otp-resend" disabled>ارسال دوباره</button></div>
+    <button class="link" type="button" data-act="suBack">${icon('edit')} اصلاح مشخصات یا شماره موبایل</button>
+  </form>`;
+  const x = su.x;
+  return head + e + `<form class="form" data-form="signup3">
+    <div class="note info">${icon('doc')}<div>کارشناس شرکت گاز نام و شماره اشتراک را با این مدارک و سامانه مشترکین مقایسه می‌کند. عکس‌ها خوانا و کامل باشند. پس از تأیید، همین مدارک در پرونده شما ثبت می‌شوند.</div></div>
+    ${regDocInputs(f.relation)}
+    ${regIncidentFields(x, 'su')}
+    <div class="grid2">
+      <label class="fld"><span>رمز عبور <i>*</i></span><input name="password" type="password" class="ltr" minlength="6" required autocomplete="new-password"><small>دست‌کم ۶ نویسه</small></label>
+      <label class="fld"><span>تکرار رمز <i>*</i></span><input name="password2" type="password" class="ltr" minlength="6" required autocomplete="new-password"></label>
+    </div>
+    <label class="check"><input type="checkbox" name="declaration" required><span>اینجانب <b>${esc(f.name)}</b> تأیید می‌کنم اطلاعات و مدارک صحیح است و اظهار خلاف واقع موجب رد درخواست و پیگرد قانونی است.</span></label>
+    <button class="btn green" type="submit">${icon('send')} ارسال برای بررسی کارشناس گاز</button>
+  </form>`;
+}
+function startSuTimer() {
+  clearInterval(otpTick);
+  if (!su || su.step !== 2) return;
+  const tick = () => {
+    const left = Math.max(0, Math.ceil((su.exp - Date.now()) / 1000));
+    const el = $('#otp-left'); if (!el) { clearInterval(otpTick); return; }
+    el.textContent = left ? `اعتبار کد: ${fa(Math.floor(left / 60))}:${fa(String(left % 60).padStart(2, '0'))}` : 'کد منقضی شد؛ دوباره ارسال کنید.';
+    el.classList.toggle('over', !left);
+    const r = $('#otp-resend'); if (r) r.disabled = left > su.ttl / 2000;
+  };
+  tick(); otpTick = setInterval(tick, 1000);
+}
+function suRender(err = '') { su.err = err; render(); window.scrollTo({ top: 0 }); }
+function noSubNoSheet() {
+  const url = W.safeOfferUrl(db.settings.subLookupUrl ?? W.DEFAULT_SETTINGS.subLookupUrl);
+  openSheet(`<h2>شماره اشتراک را ندارم</h2>
+    <div class="rows">
+      <div class="row">${icon('receipt')}<span class="main"><span class="t">روی قبض گاز</span><span class="s">شماره اشتراک در بالای هر قبض گاز چاپ شده است.</span></span></div>
+      <div class="row">${icon('sms')}<span class="main"><span class="t">پیامک یا اپ قبض گاز</span><span class="s">در پیامک‌های قبض و اپ‌های پرداخت قبض هم شماره اشتراک آمده است.</span></span></div>
+      <div class="row">${icon('meter')}<span class="main"><span class="t">با شماره کنتور</span><span class="s">شماره سریال روی خود کنتور گاز نوشته شده است. با آن در سامانه شرکت گاز شماره اشتراک را بگیرید.</span></span></div>
+    </div>
+    ${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${icon('external')} رفتن به سامانه شرکت گاز (دریافت شماره اشتراک با شماره کنتور)</a>` : ''}
+    <p class="hint-s">${icon('help')} پس از گرفتن شماره اشتراک، به همین صفحه برگردید و ثبت‌نام را ادامه دهید.</p>
+    <button class="btn ghost" data-act="closeSheet">بازگشت به ثبت‌نام</button>`);
+}
+
+// ---------- وضعیت درخواست برای خود مشترک ----------
+function regFilesHtml(u) {
+  const files = u.reg.files || {};
+  return Object.entries(files).map(([slot, list]) => `<div class="fld"><span>${regDocTitle(slot, u.reg.relation)}</span><div class="thumbs">${list.map(fl => regThumb(u, fl)).join('')}</div></div>`).join('');
+}
+function regThumb(u, fl) {
+  const isImg = (fl.type || '').startsWith('image/');
+  return `<div class="thumb"><button class="link" style="all:unset;cursor:pointer;display:block;width:100%;height:100%" data-act="viewRegFile" data-uid="${u.id}" data-fid="${fl.id}" aria-label="نمایش ${esc(fl.name)}">
+    ${isImg ? `<img data-regfile="${fl.id}" data-uid="${u.id}" alt="${esc(fl.name)}">` : `<div class="pdf">${icon('doc')}${esc(fl.name)}</div>`}</button></div>`;
+}
+function regHistory(reg) {
+  return `<ol class="tl">${reg.history.slice().reverse().map(h => `<li><div class="t">${esc(h.label)}</div><div class="s">${esc(h.by)} · ${fdt(h.at)}</div>${h.note ? `<div class="n">${esc(h.note)}</div>` : ''}</li>`).join('')}</ol>`;
+}
+function regBadge(reg) { const r = W.REG_STATUS[reg.status]; return `<span class="badge ${r.tone}">${r.short}</span>`; }
+function viewRegStatus() {
+  const u = st.user; const reg = u.reg; const R = W.REG_STATUS[reg.status];
+  const stage = reg.status === 'pending' ? 2 : reg.status === 'needs_fix' ? 1 : 3;
+  const steps = ['ثبت درخواست', 'بررسی کارشناس گاز', 'فعال‌شدن حساب'];
+  const note = reg.note && reg.status !== 'pending' ? `<div class="note ${reg.status === 'needs_fix' ? 'warn' : 'bad'}">${icon('alert')}<div><b>${reg.status === 'needs_fix' ? 'توضیح کارشناس گاز' : 'دلیل رد درخواست'}</b>${esc(reg.note)}</div></div>` : '';
+  const x = { hasIncident: reg.hasIncident, incident: reg.incident || {} };
+  return `<div class="ocard" style="box-shadow:var(--sh)"><div style="padding:14px 0;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${regBadge(reg)}<span class="muted" style="font-size:12.5px">نام کاربری: <span class="num" dir="ltr">${esc(u.username)}</span></span></div>
+      <h2 style="font-size:18px">${R.label}</h2>
+      <div class="stepper" role="list">${steps.map((t, i) => { const n = i + 1; const done = n < stage || (reg.status === 'approved'); return `<div class="step ${done ? 'done' : ''} ${n === stage && !done ? 'cur' : ''}" role="listitem"><span class="b">${done ? icon('check') : fa(n)}</span>${t}</div>`; }).join('')}</div>
+      ${reg.status === 'pending' ? `<p class="muted" style="margin:0;font-size:13.5px">کارشناس شرکت گاز معمولاً ظرف ${fa(db.settings.regSlaDays || 2)} روز کاری درخواست را بررسی می‌کند. نتیجه به <span class="num" dir="ltr">${maskMobile(u.mobile)}</span> پیامک می‌شود.</p>` : ''}
+    </div></div>
+    ${note}
+    ${reg.status === 'needs_fix' ? `<form class="form" data-form="regfix">
+      <b>اصلاح درخواست</b>
+      <label class="fld"><span>نام و نام خانوادگی</span><input name="name" required value="${esc(u.name)}"></label>
+      <label class="fld"><span>کد ملی</span><input name="nationalId" class="ltr" inputmode="numeric" maxlength="10" required value="${esc(u.nationalId)}"></label>
+      <div class="fld"><span>نسبت با اشتراک</span>${relationSeg('relation', reg.relation)}</div>
+      ${regDocInputs(reg.relation, reg.files)}
+      ${regIncidentFields(x, 'rf')}
+      <label class="fld"><span>توضیح برای کارشناس (اختیاری)</span><textarea name="reply" style="min-height:60px" placeholder="مثلاً: عکس قبض واضح‌تر بارگذاری شد."></textarea></label>
+      <button class="btn green" type="submit">${icon('send')} ارسال دوباره برای بررسی</button></form>` : ''}
+    <div class="form"><b>اطلاعات درخواست</b>
+      ${kv('شماره اشتراک', `<span class="num" dir="ltr">${esc(u.subscriptionNo)}</span>`)}${kv('نام', esc(u.name))}${kv('کد ملی', `<span class="num">${fa(u.nationalId)}</span>`)}${kv('نسبت با اشتراک', W.RELATIONS[reg.relation] || '—')}
+      ${reg.hasIncident && reg.incident ? kv('حادثه', `${esc(W.INCIDENT_TYPES[reg.incident.type] || '')} — ${fa(reg.incident.date)}`) : ''}
+      ${regFilesHtml(u)}</div>
+    <div class="form"><b>تاریخچه درخواست</b>${regHistory(reg)}</div>
+    <div class="btns">${reg.status === 'rejected' ? `<button class="btn" data-act="signupAgain">${icon('userPlus')} ثبت‌نام دوباره</button>` : ''}<button class="btn ghost red" data-act="logout">${icon('logout')} خروج</button></div>`;
+}
+
+// ---------- کارتابل کارشناس گاز ----------
+const REG_FILTERS = { pending: ['در انتظار بررسی', ['pending']], needs_fix: ['نیاز به اصلاح', ['needs_fix']], approved: ['تأییدشده', ['approved']], closed: ['رد یا مسدود', ['rejected', 'spam']] };
+const regList = st_ => db.users.filter(u => u.reg && (!st_ || REG_FILTERS[st_]?.[1].includes(u.reg.status) || u.reg.status === st_));
+function regSlaBadge(reg) {
+  const s = W.regSla(reg, db.settings); if (!s) return '';
+  return `<span class="badge sla ${s.overdue ? 'over' : ''}">${icon('clock')} ${s.overdue ? fa(s.used - s.limit) + ' روز تأخیر' : fa(Math.max(0, s.left)) + ' روز مانده'}</span>`;
+}
+const SHAHKAR = { ok: ['ok', 'شاهکار: تطابق'], mismatch: ['bad', 'شاهکار: عدم تطابق'], error: ['warn', 'شاهکار: انجام نشد'], skipped: ['neutral', 'شاهکار: خاموش'] };
+const shahkarBadge = reg => { const s = SHAHKAR[reg.shahkar?.status] || SHAHKAR.skipped; return `<span class="badge ${s[0]}">${s[1]}</span>`; };
+function viewRegs() {
+  const f = st.p.f || 'pending';
+  const list = regList(f).sort((a, b) => (a.reg.submittedAt || '').localeCompare(b.reg.submittedAt || ''));
+  return pageTitle('درخواست‌های ثبت‌نام', 'ثبت‌نام اینترنتی مشترکین بدون مراجعه حضوری') + `
+    <div class="chips">${Object.entries(REG_FILTERS).map(([k, [l]]) => `<button class="chip ${k === f ? 'on' : ''}" data-go="regs" data-p='{"f":"${k}"}'>${l} <span class="num">${fa(regList(k).length)}</span></button>`).join('')}</div>
+    ${list.length ? `<div style="display:flex;flex-direction:column;gap:10px">${list.map(u => `<button class="claim-row" data-go="reg" data-p='{"uid":"${u.id}"}'>
+      <span class="av">${icon('user')}</span><span class="main"><span>${esc(u.name)} — ${esc(W.RELATIONS[u.reg.relation] || '')}</span>
+      <span class="meta"><span class="num" dir="ltr">${esc(u.subscriptionNo)}</span> ${regBadge(u.reg)} ${shahkarBadge(u.reg)} ${regSlaBadge(u.reg)} <span>${fdate(u.reg.submittedAt)}</span></span></span>${icon('chevL', 'chev')}</button>`).join('')}</div>`
+      : `<div class="empty">${illo('inbox')}<span>درخواستی در این دسته نیست.</span></div>`}`;
+}
+function viewReg() {
+  const u = db.users.find(x => x.id === st.p.uid && x.reg);
+  if (!u) return pageTitle('درخواست پیدا نشد', '', 'regs');
+  const reg = u.reg; const open = ['pending', 'needs_fix'].includes(reg.status);
+  const dups = W.regDuplicates(db.users, u);
+  const sk = reg.shahkar?.status || 'skipped';
+  const skNote = { ok: ['ok', 'checkC', 'تطابق کد ملی با صاحب سیم‌کارت در سامانه شاهکار تأیید شد.'], mismatch: ['bad', 'alert', 'موبایل به نام صاحب این کد ملی نیست.'], error: ['warn', 'alert', 'استعلام شاهکار انجام نشد (سرویس در دسترس نبود). هویت را با دقت بیشتری از روی مدارک بررسی کنید.'], skipped: ['info', 'help', 'استعلام شاهکار خاموش است؛ تصمیم فقط بر اساس مدارک است.'] }[sk];
+  return pageTitle(esc(u.name), `اشتراک <span class="num" dir="ltr">${esc(u.subscriptionNo)}</span>`, 'regs', { f: open ? reg.status : 'approved' }) + `
+    <div class="ocard" style="box-shadow:var(--sh)"><div style="padding:12px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${regBadge(reg)} ${regSlaBadge(reg)} <span class="muted" style="font-size:12.5px">ثبت: ${fdt(reg.submittedAt)}</span></div></div>
+    <div class="note ${skNote[0]}">${icon(skNote[1])}<div>${skNote[2]}${reg.shahkar?.demo ? ' (نمایشی)' : ''}</div></div>
+    ${dups.length ? `<div class="note warn">${icon('alert')}<div><b>هشدار تکراری</b><ul>${dups.map(d => `<li>${d.field} با حساب «${esc(d.user.name)}» (${esc(d.user.username)}) یکی است.</li>`).join('')}</ul></div></div>` : ''}
+    ${open ? `<div class="btns"><button class="btn green" data-act="regDecide" data-d="approve" data-uid="${u.id}">${icon('check')} تأیید${reg.hasIncident ? ' و تشکیل پرونده' : ''}</button><button class="btn orange" data-act="regDecide" data-d="fix" data-uid="${u.id}">درخواست اصلاح</button>
+      <button class="btn red ghost" data-act="regDecide" data-d="reject" data-uid="${u.id}">رد درخواست</button><button class="btn red ghost sm" data-act="regDecide" data-d="spam" data-uid="${u.id}">اسپم و مسدودسازی</button></div>` : ''}
+    <div class="note info">${icon('help')}<div>نام و شماره اشتراک را با <strong>سامانه مشترکین شرکت گاز</strong> و با قبض بارگذاری‌شده مقایسه کنید. نام روی کارت ملی باید با نام متقاضی یکی باشد؛ برای مستأجر یا وارث، مدرک سوم را هم ببینید.</div></div>
+    <div class="form"><b>مشخصات متقاضی</b>
+      ${kv('نام و نام خانوادگی', esc(u.name))}${kv('شماره اشتراک', `<span class="num" dir="ltr">${esc(u.subscriptionNo)}</span>`)}${kv('کد ملی', `<span class="num">${fa(u.nationalId)}</span>`)}
+      ${kv('موبایل (تأییدشده با کد)', `<span class="num" dir="ltr">${fa(u.mobile)}</span>`)}${kv('نسبت با اشتراک', W.RELATIONS[reg.relation] || '—')}</div>
+    ${reg.hasIncident && reg.incident ? `<div class="form"><b>حادثه اعلام‌شده</b>${kv('نوع', esc(W.INCIDENT_TYPES[reg.incident.type] || ''))}${kv('تاریخ', fa(reg.incident.date))}${kv('نشانی', esc(reg.incident.address))}
+      <small class="muted">با تأیید، پرونده خسارت پیش‌نویس با همین اطلاعات ساخته و مدارک بالا در آن ثبت می‌شود.</small></div>` : `<div class="note info">${icon('help')}<div>متقاضی حادثه‌ای اعلام نکرده است؛ با تأیید فقط حساب فعال می‌شود.</div></div>`}
+    <div class="form"><b>مدارک</b>${regFilesHtml(u)}</div>
+    <div class="form"><b>تاریخچه</b>${regHistory(reg)}</div>`;
+}
+const DECIDE = {
+  approve: ['تأیید ثبت‌نام', 'حساب فعال می‌شود و نتیجه به متقاضی پیامک می‌شود.', 'green', false],
+  fix: ['درخواست اصلاح', 'بنویسید چه چیزی باید اصلاح شود؛ متن برای متقاضی پیامک می‌شود.', 'orange', true],
+  reject: ['رد درخواست', 'دلیل رد برای متقاضی پیامک می‌شود.', 'red', true],
+  spam: ['اسپم و مسدودسازی', 'حساب غیرفعال و این موبایل و اینترنت تا ۷ روز برای ثبت‌نام مسدود می‌شوند. دلیل را برای سابقه بنویسید.', 'red', true],
 };
 
 // ================= برگه‌های عمومی =================
 const FAQ = [
   ['چه حوادثی تحت پوشش است؟', 'آتش‌سوزی، انفجار و گازگرفتگی ناشی از گاز طبیعی در محل مشترک (معمولاً پس از کنتور) که به خسارت مالی، جرح یا فوت منجر شده باشد. جزئیات و سقف‌ها را بیمه‌نامه سال جاری تعیین می‌کند.'],
-  ['حساب کاربری را از کجا بگیرم؟', 'به امور حوادث شرکت گاز منطقه مراجعه کنید. پس از ثبت، نام کاربری (شماره اشتراک) و رمز موقت برایتان پیامک می‌شود.'],
+  ['حساب کاربری را از کجا بگیرم؟', 'در صفحه ورود «ثبت‌نام مشترک» را بزنید: شماره اشتراک گاز، نام، کد ملی و موبایل (به نام خودتان) را وارد کنید، کد پیامکی را تأیید و عکس کارت ملی و قبض گاز را بفرستید. پس از تأیید کارشناس شرکت گاز، حساب فعال و پیامک می‌شود. اگر شماره اشتراک را ندارید، روی قبض گاز آمده است یا با شماره کنتور از سامانه شرکت گاز بگیرید.'],
   ['چه مدارکی لازم است؟', 'مهم‌ترین مدرک، گزارش آتش‌نشانی یا کارشناس رسمی دادگستری است که در آن علت حادثه «گاز» قید شده باشد. بقیه: کارت ملی، سند یا اجاره‌نامه، قبض گاز، عکس‌های محل، فاکتور اقلام و گواهی شبا. در جرح یا فوت، مدارک پزشکی، پزشکی قانونی، گواهی فوت و انحصار وراثت هم لازم است. سامانه فهرست دقیق پرونده شما را نشان می‌دهد.'],
   ['اگر شرکت گاز نقص اعلام کند؟', 'پیامک دریافت می‌کنید. وارد سامانه شوید، موارد را اصلاح کنید، به هر مورد پاسخ دهید و پرونده را دوباره ارسال کنید.'],
   ['اگر با مبلغ خسارت موافق نباشم؟', 'در «پیگیری پرونده» گزینه «اعتراض به مبلغ» را بزنید و دلیل را بنویسید. بیمه‌گر دوباره ارزیابی می‌کند.'],
@@ -1636,6 +1867,29 @@ function setPath(obj, path, val) {
 // ================= رویدادها =================
 const ACTS = {
   forgot: () => forgotSheet('id'),
+  // ثبت‌نام اینترنتی
+  signup: () => { su = { step: 1, f: { relation: 'owner', subscriptionNo: W.normalizeDigits($('#lg-user')?.value || '').replace(/\D/g, '') }, x: { hasIncident: true, incident: { type: 'fire' } } }; st.view = 'signup'; st.p = {}; render(); window.scrollTo({ top: 0 }); },
+  signupExit: () => { su = null; clearInterval(otpTick); st.view = 'login'; render(); },
+  suBack: () => { su.step = Math.max(1, su.step - 1); suRender(); },
+  suResend: async () => { try { Object.assign(su, await B.signupStart(su.f)); suRender(); toast('کد تازه پیامک شد.'); } catch (e) { suRender(e.message); } },
+  noSubNo: () => noSubNoSheet(),
+  signupAgain: async () => { await run(() => B.logout()); ACTS.signup(); },
+  viewRegFile: async el => {
+    const u = db.users.find(x => x.id === el.dataset.uid); const fl = Object.values(u?.reg?.files || {}).flat().find(x => x.id === el.dataset.fid);
+    const blob = fl && await B.regFile(u.id, fl.id).catch(() => null); if (!blob) { toast('فایل در دسترس نیست.', true); return; }
+    if (!urlCache.has(fl.id)) urlCache.set(fl.id, URL.createObjectURL(blob));
+    const url = urlCache.get(fl.id);
+    openSheet(`<h2 style="font-size:16px">${esc(regDocTitle(Object.keys(u.reg.files).find(k => u.reg.files[k].includes(fl)), u.reg.relation))}</h2>
+      <div class="viewer">${fl.type.startsWith('image/') ? `<img src="${url}" alt="${esc(fl.name)}">` : `<div class="note info">${icon('doc')}<div><a href="${url}" target="_blank" rel="noopener">باز کردن فایل PDF</a></div></div>`}</div>
+      <button class="btn ghost" data-act="closeSheet">بستن</button>`);
+  },
+  regDecide: a => {
+    const [title, hint, tone, needNote] = DECIDE[a.dataset.d];
+    openSheet(`<h2>${title}</h2><p class="lead">${hint}</p>
+      <form class="form flat" data-form="regReview" data-uid="${a.dataset.uid}" data-d="${a.dataset.d}">
+        <label class="fld"><span>${needNote ? 'دلیل / توضیح <i>*</i>' : 'یادداشت (اختیاری)'}</span><textarea name="note" ${needNote ? 'required minlength="3"' : ''} style="min-height:80px"></textarea></label>
+        <div class="btns"><button class="btn ${tone}" type="submit">${title}</button><button class="btn ghost" type="button" data-act="closeSheet">انصراف</button></div></form>`);
+  },
   // گزارش‌ها
   rep: a => { st.p = { ...st.p, ...JSON.parse(a.dataset.p) }; sset('gii.view', JSON.stringify({ view: st.view, p: st.p })); renderKeep(); },
   repRefresh: async () => { await sync().catch(() => {}); liveAt = new Date(); renderKeep(); toast('داده‌ها تازه شد.'); },
@@ -1808,6 +2062,44 @@ async function resetPassword(id) {
 }
 
 const FORMS = {
+  signup1: async f => {
+    su.f = { subscriptionNo: W.normalizeDigits(f.subscriptionNo.value).trim(), name: f.name.value.trim(), nationalId: W.normalizeDigits(f.nationalId.value).trim(), mobile: W.normalizeDigits(f.mobile.value).trim(), relation: f.relation.value };
+    const errs = W.signupIssues(su.f);
+    if (errs.length) return suRender('بررسی کنید: ' + errs.join('، '));
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true;
+    try { Object.assign(su, await B.signupStart(su.f), { step: 2 }); suRender(); } catch (e) { suRender(e.message); }
+  },
+  signup2: async f => {
+    try { await B.signupVerify(f.code.value); su.step = 3; suRender(); }
+    catch (e) { if (e.restart) su.step = 1; suRender(e.message); }
+  },
+  signup3: async f => {
+    if (f.password.value !== f.password2.value) return toast('رمز و تکرار آن یکسان نیستند.', true);
+    const files = await pickedFiles(f, su.f.relation);
+    const data = { ...incidentFrom(f), password: f.password.value, declaration: f.declaration.checked };
+    const errs = W.signupFinalIssues({ ...su.f, ...data, docs: Object.fromEntries(Object.entries(files).map(([k, v]) => [k, v.length])) });
+    if (errs.length) return toast('بررسی کنید: ' + errs.join('، '), true);
+    const btn = f.querySelector('[type=submit]'); btn.disabled = true; btn.textContent = 'در حال ارسال…';
+    try {
+      await B.signupSubmit(data, files);
+      su = null; await sync(); st.view = 'home'; st.p = {}; st.enter = true; render();
+      celebrate('درخواست ثبت‌نام ارسال شد', 'نتیجه بررسی کارشناس گاز پیامک می‌شود');
+    } catch (e) { btn.disabled = false; btn.textContent = 'ارسال برای بررسی کارشناس گاز'; if (e.restart) { su.step = 1; suRender(e.message); } else toast(e.message, true); }
+  },
+  regfix: async f => {
+    const files = await pickedFiles(f, f.relation.value);
+    const data = { name: f.name.value.trim(), nationalId: W.normalizeDigits(f.nationalId.value).trim(), relation: f.relation.value, ...incidentFrom(f), reply: f.reply.value.trim() };
+    if (await run(() => B.regResubmit(data, files))) { render(); celebrate('درخواست اصلاح‌شده ارسال شد'); }
+  },
+  regReview: async f => {
+    const d = f.dataset.d;
+    const r = await run(() => B.regReview(f.dataset.uid, d, f.note.value.trim()));
+    if (!r) return;
+    closeSheet();
+    if (d === 'approve') { celebrate('ثبت‌نام تأیید شد', r.claimId ? 'پرونده خسارت تشکیل شد' : 'حساب مشترک فعال شد'); if (r.claimId) return go('review', { id: r.claimId }); }
+    else toast({ fix: 'درخواست اصلاح برای متقاضی پیامک شد.', reject: 'درخواست رد شد.', spam: 'متقاضی مسدود شد.' }[d]);
+    go('regs', { f: 'pending' });
+  },
   login: f => doLogin(f.username.value, f.password.value),
   forgotId: async f => {
     const username = W.normalizeDigits(f.username.value).trim(), mobile = W.normalizeDigits(f.mobile.value).trim();
@@ -1886,6 +2178,7 @@ const FORMS = {
       if (k === 'orgName' || k === 'logoDataUrl' || k === 'fireOffers' || !f[k]) continue;
       patch[k] = typeof s[k] === 'number' ? num(f[k].value) : W.normalizeDigits(f[k].value).trim();
     }
+    if (patch.subLookupUrl && !W.safeOfferUrl(patch.subLookupUrl)) return toast('نشانی صفحه شماره اشتراک باید با https:// شروع شود.', true);
     if (f.fo0_insurer) {
       patch.fireOffers = [0, 1, 2].map(i => Object.fromEntries(Object.keys(W.FIRE_OFFER_FIELDS).map(k => [k, f[`fo${i}_${k}`].value.trim()])));
       const bad = patch.fireOffers.find(o => o.url && !W.safeOfferUrl(o.url));
@@ -1961,6 +2254,9 @@ function wire() {
       if (el.checked && k === 'death' && !c.damage.deceased.length) c.damage.deceased.push({ name: '', nationalId: '', relation: '' });
       saveClaim(c); render(); return;
     }
+    if (el.matches('input[type=file][data-pick]')) { const t = el.parentElement.querySelector('.fp-txt'); if (t) t.textContent = el.files.length ? [...el.files].map(x => x.name).join('، ') : 'انتخاب عکس یا PDF'; el.closest('.file-pick')?.classList.toggle('has', !!el.files.length); return; }
+    if (el.matches('input[data-toggle]')) { const box = $(el.dataset.toggle); if (box) box.hidden = !el.checked; return; }
+    if (el.matches('.seg input[type=radio]:not([data-bind])')) { el.closest('.seg').querySelectorAll('label').forEach(l => l.classList.toggle('on', l.contains(el))); return; }
     if (el.matches('[data-rep]')) { st.p = { ...st.p, [el.dataset.rep]: +el.value, m: 0 }; sset('gii.view', JSON.stringify({ view: st.view, p: st.p })); return renderKeep(); }
     if (el.matches('[data-bind]')) onBind(el);
   });

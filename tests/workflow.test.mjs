@@ -162,3 +162,20 @@ test('CSV و نشانی خرید بیمه', () => {
   for (const bad of ['http://a.ir', 'javascript:alert(1)', 'https://a.ir/"onmouseover', '']) assert.equal(W.safeOfferUrl(bad), '');
   assert.equal(W.DEFAULT_SETTINGS.fireOffers.length, 3);
 });
+
+test('ثبت‌نام اینترنتی: اعتبارسنجی مشخصات و مدارک', () => {
+  const f = { name: 'حمید رضایی', nationalId: '0499370899', subscriptionNo: '1023456789', mobile: '09121112233', relation: 'owner' };
+  assert.deepEqual(W.signupIssues(f), []);
+  assert.ok(W.signupIssues({ ...f, nationalId: '0499370898' }).includes('کد ملی معتبر'));
+  assert.ok(W.signupIssues({ ...f, subscriptionNo: '12a4' }).some(x => x.startsWith('شماره اشتراک')));
+  assert.ok(W.signupIssues({ ...f, relation: 'x' }).includes('نسبت شما با اشتراک'));
+  assert.deepEqual(W.regDocsNeeded('owner'), ['national_card', 'bill']);
+  assert.deepEqual(W.regDocsNeeded('tenant'), ['national_card', 'bill', 'proof']);
+  const full = { ...f, docs: { national_card: 1, bill: 1 }, hasIncident: true, incident: { date: '1405/07/20', type: 'fire', address: 'تهران، خیابان آزادی، پلاک ۱۲' }, password: '123456', declaration: true };
+  assert.deepEqual(W.signupFinalIssues(full, new Date('2026-11-09')), []);
+  assert.ok(W.signupFinalIssues({ ...full, relation: 'tenant' }, new Date('2026-11-09')).includes(W.REG_DOCS.proof), 'مستأجر اجاره‌نامه لازم دارد');
+  assert.ok(W.signupFinalIssues({ ...full, incident: { ...full.incident, date: '1406/01/01' } }, new Date('2026-11-09')).includes('تاریخ حادثه در آینده است'));
+  assert.deepEqual(W.signupFinalIssues({ ...full, hasIncident: false, incident: {} }, new Date('2026-11-09')), [], 'ثبت‌نام بدون حادثه هم مجاز است');
+  const users = [{ id: 'a', role: 'subscriber', subscriptionNo: '1023456789', nationalId: '1', mobile: '0' }, { id: 'b', role: 'subscriber', subscriptionNo: '9', nationalId: '0499370899', mobile: '0', reg: { status: 'rejected' } }];
+  assert.deepEqual(W.regDuplicates(users, { id: 'n', ...f }).map(d => d.field), ['شماره اشتراک'], 'درخواست ردشده تکراری حساب نمی‌شود');
+});

@@ -17,6 +17,7 @@ class GII_Seed {
 		array( 'u' => 'gas', 'p' => 'gas123', 't' => 'کارشناس شرکت گاز', 's' => 'سارا کاظمی', 'ic' => 'flame' ),
 		array( 'u' => 'bime', 'p' => 'bime123', 't' => 'کارشناس بیمه‌گر', 's' => 'علی محمدی', 'ic' => 'shield' ),
 		array( 'u' => 'modir', 'p' => 'admin123', 't' => 'مدیر سامانه', 's' => 'کاربران، تنظیمات و گزارش', 'ic' => 'settings' ),
+		array( 'u' => '1056781234', 'p' => '123456', 't' => 'مشترک — ثبت‌نام اینترنتی در انتظار تأیید', 's' => 'نسرین قاسمی', 'ic' => 'clock' ),
 	);
 
 	private static $gas;
@@ -39,6 +40,7 @@ class GII_Seed {
 		require_once ABSPATH . 'wp-admin/includes/user.php';
 		foreach ( get_users( array( 'role__in' => array( 'gii_subscriber', 'gii_gas', 'gii_insurer', 'gii_admin' ), 'fields' => 'ids' ) ) as $uid ) {
 			if ( (int) $uid !== (int) $keep ) {
+				GII_Store::delete_reg_files( $uid );
 				wp_delete_user( $uid );
 			}
 		}
@@ -269,6 +271,7 @@ class GII_Seed {
 		GII_Store::notify( $users[1]->ID, null, "مبلغ خسارت پرونده {$c2['code']} تعیین شد. لطفاً بررسی و تأیید کنید.", $c2['id'] );
 		GII_Store::notify( null, 'insurer', "پرونده {$c5['code']} از شرکت گاز دریافت شد.", $c5['id'] );
 		self::archive();
+		self::reg_demo();
 		GII_SMS::send( '09125556677', 'مشترک گرامی، پرونده خسارت گاز شما تشکیل شد. نام کاربری: 1067891234 — رمز موقت: ۱۲۳۴۵۶' );
 		return $admin;
 	}
@@ -359,6 +362,38 @@ class GII_Seed {
 				$c['paidAt']  = self::iso( $p );
 			}
 			GII_Store::save_claim( $c );
+		}
+	}
+
+	/** درخواست‌های ثبت‌نام نمایشی؛ همان regSpecs در js/store.js */
+	public static function reg_specs() {
+		return array(
+			array( 'name' => 'نسرین قاسمی', 'subNo' => '1056781234', 'b9' => '051234567', 'mobile' => '09123456780', 'relation' => 'owner', 'ago' => 0, 'shahkar' => 'ok',
+				'incident' => array( 'type' => 'fire', 'address' => 'تهران، شهران، خیابان کوهسار، پلاک ۹' ), 'docs' => array( array( 'national_card', 'کارت ملی' ), array( 'bill', 'قبض گاز' ) ) ),
+			array( 'name' => 'کامران یوسفی', 'subNo' => '1078912345', 'b9' => '061234578', 'mobile' => '09351234567', 'relation' => 'tenant', 'ago' => 4, 'shahkar' => 'error',
+				'incident' => array( 'type' => 'explosion', 'address' => 'کرج، فردیس، خیابان سوم، پلاک ۲۱' ), 'docs' => array( array( 'national_card', 'کارت ملی' ), array( 'bill', 'قبض گاز' ), array( 'proof', 'اجاره‌نامه' ) ) ),
+		);
+	}
+	private static function reg_demo() {
+		foreach ( self::reg_specs() as $r ) {
+			$nid = self::nid( $r['b9'] ) ?: self::nid( substr( $r['b9'], 0, 8 ) . '1' );
+			$u   = self::user( $r['subNo'], '123456', $r['name'], 'gii_subscriber', array( 'gii_national_id' => $nid, 'gii_subscription_no' => $r['subNo'], 'gii_mobile' => $r['mobile'], 'gii_address' => $r['incident']['address'] ), $r['ago'] );
+			$at    = self::iso( $r['ago'] );
+			$files = array();
+			foreach ( $r['docs'] as $d ) {
+				$tmp = tempnam( get_temp_dir(), 'gii' );
+				file_put_contents( $tmp, self::doc_svg( $d[1] ) );
+				$fl       = GII_Store::add_reg_file( $u->ID, $tmp, $d[0] . '.svg', 'image/svg+xml' );
+				$fl['at'] = $at;
+				$files[ $d[0] ] = array( $fl );
+			}
+			GII_Store::save_reg( $u->ID, array(
+				'status' => 'pending', 'at' => $at, 'submittedAt' => $at, 'relation' => $r['relation'], 'hasIncident' => true,
+				'incident' => array_merge( $r['incident'], array( 'date' => self::jal( $r['ago'] + 1 ) ) ), 'files' => $files,
+				'shahkar' => array( 'status' => $r['shahkar'], 'at' => $at, 'demo' => true ),
+				'history' => array( array( 'at' => $at, 'by' => $r['name'], 'role' => 'subscriber', 'action' => 'submit', 'label' => 'ثبت درخواست ثبت‌نام اینترنتی', 'note' => '' ) ),
+			) );
+			GII_Store::notify( null, 'gas', "درخواست ثبت‌نام جدید: {$r['name']} — اشتراک {$r['subNo']}" );
 		}
 	}
 }

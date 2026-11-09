@@ -11,6 +11,9 @@ python3 -m http.server 8770 -d dist/pwa &
 node tests/e2e/app-reports.mjs            # APP_BASE=http://localhost:8770/ by default
 ```
 
+## Online self-registration — `signup.mjs`
+Shahkar mismatch, SMS code, documents, duplicate subscription, expert asks for a fix, resubmit, approve (claim created with the registration documents), spam block. Works on both backends: `BASE=http://localhost:8770/` or `BASE=http://localhost:8888/gii-app/` (WordPress, after `activate.php`).
+
 ## WordPress plugin, 4 users — `wp-flow.mjs`
 Site landing, password reset by SMS code, subscriber fixes deficiencies and uploads, gas reviews and forwards (cause confirmation required), insurer assesses, subscriber accepts, insurer finance stages and payment, admin SMS log.
 
